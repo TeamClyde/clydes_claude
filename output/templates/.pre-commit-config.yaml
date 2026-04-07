@@ -1,0 +1,137 @@
+# .pre-commit-config.yaml — Standard hook set template
+#
+# This is the standard pre-commit configuration for all repos in this workflow.
+# Per-repo customization is expected:
+#   - Update `rev` values to the current release for each hook repo.
+#   - Disable hooks that don't apply (e.g. remove ruff if the repo has no Python,
+#     remove eslint/prettier if there is no JS/TS).
+#   - Uncomment the optional fast-tests hook at the bottom if the suite qualifies.
+#
+# First-time setup:
+#   pip install pre-commit
+#   pre-commit install          # installs hooks into .git/hooks/commit-msg and pre-commit
+#   pre-commit run --all-files  # optional: run against existing files on first install
+#
+# CI gate: run `pre-commit run --all-files` on every push. This is a hard gate —
+# not a warning. Branch protection blocks merge until CI is green.
+#
+# Bypassing hooks: `--no-verify` skips all hooks. Only use with explicit user
+# instruction. CI provides the second gate when hooks are bypassed locally.
+
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+
+repos:
+
+  # ---------------------------------------------------------------------------
+  # commitlint — enforce Conventional Commits format
+  #
+  # Rejects commit messages that don't match:
+  #   type(optional-scope): subject [PROJ-N]
+  # Catches "fixed the thing" before it lands in history.
+  #
+  # Requires a commitlint config in the repo root. Minimal example:
+  #   echo '{ "extends": ["@commitlint/config-conventional"] }' > commitlint.config.js
+  # Install the npm dep: npm install --save-dev @commitlint/config-conventional
+  #
+  # Check current release: https://github.com/conventional-changelog/commitlint/releases
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.18.0  # check https://github.com/alessandrojcm/commitlint-pre-commit-hook/releases
+    hooks:
+      - id: commitlint
+        stages: [commit-msg]
+        additional_dependencies:
+          - "@commitlint/config-conventional"
+
+  # ---------------------------------------------------------------------------
+  # ruff — Python lint and format (replaces flake8, isort, black)
+  #
+  # ruff --fix auto-corrects fixable lint violations and re-stages the file so
+  # the next commit attempt succeeds without manual intervention.
+  # ruff-format is the formatter (black-compatible).
+  #
+  # Check current release: https://github.com/astral-sh/ruff-pre-commit/releases
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.2  # check https://github.com/astral-sh/ruff-pre-commit/releases
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # ---------------------------------------------------------------------------
+  # eslint — JavaScript / TypeScript lint
+  #
+  # Requires eslint to be installed in the repo: npm install --save-dev eslint
+  # and an eslint config file (eslint.config.js / .eslintrc.json / etc.).
+  # Remove this block if the repo has no JS/TS.
+  #
+  # Check current release: https://github.com/pre-commit/mirrors-eslint/tags
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.23.0  # check https://github.com/pre-commit/mirrors-eslint/tags
+    hooks:
+      - id: eslint
+        files: \.[jt]sx?$
+        types: [file]
+        additional_dependencies:
+          # Add your eslint plugins here, e.g.:
+          # - eslint-plugin-react
+          # - "@typescript-eslint/eslint-plugin"
+          # - "@typescript-eslint/parser"
+          - eslint
+
+  # ---------------------------------------------------------------------------
+  # prettier — JavaScript / TypeScript formatter
+  #
+  # Requires prettier to be installed: npm install --save-dev prettier
+  # Prettier auto-formats and re-stages, so the next commit attempt succeeds.
+  # Remove this block if the repo has no JS/TS.
+  #
+  # Check current release: https://github.com/pre-commit/mirrors-prettier/tags
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8  # check https://github.com/pre-commit/mirrors-prettier/tags
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, ts, tsx, css, json, yaml, markdown]
+
+  # ---------------------------------------------------------------------------
+  # gitleaks — secret scanning
+  #
+  # Scans staged content for API keys, tokens, passwords, and other credentials
+  # before they reach the remote. Catches issues at commit time, not after push.
+  #
+  # gitleaks does not auto-fix. Findings require manual remediation:
+  #   1. Remove the credential from the staged file.
+  #   2. Rotate the credential immediately (assume it was already exposed).
+  #   3. If the credential was committed previously, treat the history as compromised.
+  #
+  # Check current release: https://github.com/gitleaks/gitleaks/releases
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.2  # check https://github.com/gitleaks/gitleaks/releases
+    hooks:
+      - id: gitleaks
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: fast unit tests
+  #
+  # Uncomment to run fast unit tests (<30s) on every commit.
+  # Requires /e2e-init to have been run (installs test dependencies).
+  #
+  # Only enable this if the full targeted suite finishes in under 30 seconds.
+  # Slow hooks get bypassed with --no-verify, defeating their purpose.
+  # If tests are slow, run them in CI only (they run on every push regardless).
+  #
+  # - repo: local
+  #   hooks:
+  #     - id: fast-unit-tests
+  #       name: fast unit tests
+  #       language: system
+  #       entry: bash scripts/run-tests.sh --fast
+  #       pass_filenames: false
+  #       stages: [pre-commit]
+  # ---------------------------------------------------------------------------

@@ -1,0 +1,28 @@
+# Repo-specific Claude Code permissions (not part of the deliverable)
+.claude/
+
+# Reference implementations from another project
+ref_docs/
+
+# Internal design review artifacts
+plans/review/
+plans/test-fixtures/
+plans/REVIEW-PLAN.md
+plans/REVIEW-RESULTS.md
+plans/BENCHMARK-HANDOFF.md
+plans/BENCHMARK-RESULTS.md
+plans/SETUP-TEST-RESULTS.md
+plans/TRACK3-HANDOFF.md
+plans/**/CATEGORIZATION-*.md
+
+# Internal build tracking
+output/BUILD-STATUS.md
+
+# Duplicate/outdated setup script (superseded by scripts/setup.sh at repo root)
+output/scripts/
+
+# Standard ignores
+node_modules/
+.DS_Store
+*.pyc
+__pycache__/

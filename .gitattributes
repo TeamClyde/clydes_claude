@@ -1,0 +1,15 @@
+# Force LF line endings for all text files — shell scripts break with CRLF on macOS/Linux
+* text=auto eol=lf
+
+# Explicitly mark shell scripts as requiring LF
+*.sh text eol=lf
+
+# Markdown and JSON are text
+*.md text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.py text eol=lf
+
+# Pre-commit hook (no extension)
+output/hooks/pre-commit text eol=lf

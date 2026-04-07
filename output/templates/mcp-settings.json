@@ -1,0 +1,24 @@
+{
+  "_comment": "Merged additively into ~/.claude/settings.json by setup.sh. _comment keys are metadata and are stripped during merge. Do not add these _comment fields to settings.json directly.",
+  "mcpServers": {
+    "bitbucket": {
+      "_comment": "PR management, repo discovery, file browsing via Bitbucket Cloud API",
+      "command": "npx",
+      "args": ["-y", "@aashari/mcp-server-atlassian-bitbucket"],
+      "env": {
+        "BITBUCKET_USERNAME": "${BITBUCKET_USERNAME}",
+        "BITBUCKET_APP_PASSWORD": "${BITBUCKET_APP_PASSWORD}"
+      }
+    },
+    "atlassian": {
+      "_comment": "Jira ticket creation, transitions, Confluence. Auth via browser session — run 'claude mcp auth atlassian' once to authenticate.",
+      "type": "sse",
+      "url": "https://mcp.atlassian.com/v1/sse"
+    },
+    "git": {
+      "_comment": "Local git operations — reading history, blame, diffs. No auth required. Requires uv (https://docs.astral.sh/uv/).",
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."]
+    }
+  }
+}

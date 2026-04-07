@@ -1,0 +1,52 @@
+{
+  "_comment": "Template for branch protection rules. Apply via your git host's API or UI. GitHub and Bitbucket use different API schemas — adapt field names as indicated by the _github_equivalent and _bitbucket_equivalent keys inside each rule. This file represents the desired policy; the field names here are generic. Do not use this JSON verbatim as an API payload without translating to your platform's schema.",
+  "target_branch": "main",
+  "rules": {
+
+    "require_pull_request": {
+      "_comment": "No direct push to main. All changes must arrive via a PR. This is the foundational rule — all others depend on it.",
+      "enabled": true,
+      "_github_equivalent": "required_pull_request_reviews (present in ruleset) or branch protection 'required_pull_request_reviews' object",
+      "_bitbucket_equivalent": "restriction type 'push' scoped to the target branch; combined with a merge check requiring at least one approval"
+    },
+
+    "required_approvals": {
+      "_comment": "Minimum number of reviewer approvals before a PR can be merged. 1 is the floor. Increase for higher-risk repos or regulated environments.",
+      "minimum": 1,
+      "_github_equivalent": "required_pull_request_reviews.required_approving_review_count",
+      "_bitbucket_equivalent": "branch_restriction_type 'require_approvals_to_merge', value: 1 (in branch restrictions API)"
+    },
+
+    "require_status_checks": {
+      "_comment": "All required CI checks must pass before merge is allowed. Define which check names are required — do not leave this as 'any passing check'. Specific check names are set per repo in your CI config.",
+      "enabled": true,
+      "required_checks": [
+        "_placeholder: replace with your actual CI check names, e.g. 'ci/lint', 'ci/test', 'ci/build'"
+      ],
+      "_github_equivalent": "required_status_checks.contexts (list of check names) and required_status_checks.strict",
+      "_bitbucket_equivalent": "Bitbucket Pipelines: enable 'Require passing builds before merging' under branch permissions; specific step names set in bitbucket-pipelines.yml"
+    },
+
+    "require_up_to_date": {
+      "_comment": "The PR branch must be up to date with main before merge is allowed. Prevents a scenario where two approved PRs conflict — the second must rebase or merge main before landing.",
+      "enabled": true,
+      "_github_equivalent": "required_status_checks.strict: true",
+      "_bitbucket_equivalent": "No direct equivalent in Bitbucket branch permissions; enforce via merge check or CI step that fails if the branch is behind main (e.g. git merge-base check in pipeline)"
+    },
+
+    "allow_force_push": {
+      "_comment": "Force push to main is prohibited. This protects history integrity and prevents accidental or intentional rewriting of the shared baseline.",
+      "enabled": false,
+      "_github_equivalent": "allow_force_pushes: false (branch protection) or 'non_fast_forward' restriction in rulesets",
+      "_bitbucket_equivalent": "restriction type 'force' scoped to the target branch in branch restrictions API"
+    },
+
+    "allow_deletion": {
+      "_comment": "The main branch cannot be deleted. Guards against accidental deletion via UI or API.",
+      "enabled": false,
+      "_github_equivalent": "allow_deletions: false (branch protection) or omit 'deletion' from ruleset bypass list",
+      "_bitbucket_equivalent": "restriction type 'delete' scoped to the target branch in branch restrictions API"
+    }
+
+  }
+}

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Global pre-commit hook — installed by setup.sh
+# Delegates to per-repo scripts/run-tests.sh and runs global checks.
+# Each check exits gracefully (0) if the tool is not installed.
+# Only exits non-zero on actual check failures.
+set -euo pipefail
+
+# Step 1 — Find repo root
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+if [ -z "$REPO_ROOT" ]; then
+  exit 0  # Not in a git repo — nothing to check
+fi
+
+# Step 2 — Per-repo test script
+if [ -x "$REPO_ROOT/scripts/run-tests.sh" ]; then
+  "$REPO_ROOT/scripts/run-tests.sh" || {
+    echo "Pre-commit: scripts/run-tests.sh failed. Fix errors before committing." >&2
+    exit 1
+  }
+fi
+
+# Step 3 — Lint (skip if tool not installed)
+
+# ESLint — run if a config file exists and npx is available
+if [ -f "$REPO_ROOT/.eslintrc" ] || [ -f "$REPO_ROOT/.eslintrc.js" ] || [ -f "$REPO_ROOT/.eslintrc.json" ] || [ -f "$REPO_ROOT/eslint.config.js" ]; then
+  if command -v npx >/dev/null 2>&1; then
+    npx eslint --quiet . || {
+      echo "Pre-commit: ESLint failed." >&2
+      exit 1
+    }
+  fi
+fi
+
+# ruff — run if a config file exists and ruff is available
+if [ -f "$REPO_ROOT/pyproject.toml" ] || [ -f "$REPO_ROOT/ruff.toml" ]; then
+  if command -v ruff >/dev/null 2>&1; then
+    ruff check . || {
+      echo "Pre-commit: ruff check failed." >&2
+      exit 1
+    }
+  fi
+fi
+
+# Step 4 — Secret scanning (skip if gitleaks not installed)
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --no-banner || {
+    echo "Pre-commit: gitleaks detected potential secrets. Review staged changes." >&2
+    exit 1
+  }
+fi
+
+exit 0
