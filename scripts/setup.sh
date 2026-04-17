@@ -146,6 +146,21 @@ if [[ -z "$PYTHON_CMD" ]]; then
   PREREQS_OK=false
 fi
 
+# /infra-init specifically requires python3.11 or python3.14 — resolve separately
+# from the generic PYTHON_CMD above (which covers the MCP settings merge and can
+# use any Python 3).
+INFRA_INIT_PY=""
+for _py in python3.11 python3.14; do
+  if command -v "$_py" > /dev/null 2>&1; then
+    INFRA_INIT_PY="$_py"
+    break
+  fi
+done
+if [[ -z "$INFRA_INIT_PY" ]]; then
+  fail "missing: python3.11 or python3.14 — required by /infra-init. Install one of them and re-run setup.sh."
+  PREREQS_OK=false
+fi
+
 check_prereq "uv"     "Install uv from https://docs.astral.sh/uv/getting-started/installation/ (required for git MCP server)"
 check_prereq "claude" "Install Claude Code CLI with: npm install -g @anthropic-ai/claude-code"
 check_prereq "git"    "Install Git from https://git-scm.com"
@@ -247,6 +262,24 @@ install_npm_pkg() {
 
 install_npm_pkg "@aashari/mcp-server-atlassian-bitbucket"
 # git MCP server uses uvx (mcp-server-git) — no pre-install needed; uvx downloads on first use
+
+# /infra-init Python dependencies — graphify (structural extraction) + tree-sitter
+# parsers (env var scanner). Install unpinned (upstream churn accepted; translator
+# is drift-defensive). pip show guard avoids re-resolving on every setup.sh run.
+echo ""
+info "Installing /infra-init Python dependencies using $INFRA_INIT_PY"
+for pkg in graphifyy tree-sitter-python tree-sitter-typescript pyyaml jsonschema; do
+  if "$INFRA_INIT_PY" -m pip show "$pkg" > /dev/null 2>&1; then
+    skip "already installed: $pkg"
+  else
+    info "installing $pkg ..."
+    if "$INFRA_INIT_PY" -m pip install --user "$pkg" > /dev/null 2>&1; then
+      success "installed: $pkg"
+    else
+      warn "pip install failed for $pkg — install manually: $INFRA_INIT_PY -m pip install --user $pkg"
+    fi
+  fi
+done
 
 # ---------------------------------------------------------------------------
 # Step 8 — Merge MCP settings into ~/.claude/settings.json

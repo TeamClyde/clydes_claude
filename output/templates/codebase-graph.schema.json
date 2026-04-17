@@ -46,7 +46,7 @@
           "type": {
             "description": "Structural category of the node.",
             "type": "string",
-            "enum": ["file", "class", "function", "method", "env_var", "route"]
+            "enum": ["file", "class", "function", "method", "env_var", "route", "external"]
           },
           "name": {
             "description": "Human-readable symbol name (class name, function name, variable name, route path, etc.).",

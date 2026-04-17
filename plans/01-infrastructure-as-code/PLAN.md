@@ -1,8 +1,10 @@
 # Codebase Knowledge System — Sub-Plan
 
 **Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Detailed
+**Status:** Detailed (revised — extraction pipeline wraps graphify. See [graphify-wrap/PLAN.md](graphify-wrap/PLAN.md) for the refactor.)
 **Priority:** 1 (Highest — other subsystems depend on this)
+
+> **2026-04-15 revision.** The original design had `/infra-init` orchestrate multiple LLM sub-agents to extract symbols/calls/imports from source (Phase 2 Batch Indexers). That design has been **replaced** by a wrapper around [graphify](https://github.com/safishamsi/graphify) — deterministic tree-sitter extraction, SHA256-cached — with a custom Python enrichment pass for env vars (which graphify does not extract) and AWS serverless triggers/routes. The external contract (graph schema, FastMCP server, CODEBASE.md) is unchanged. See the graphify-wrap sub-plan for details. Sections below describing Batch Indexers are historical; the current flow is: detect_structure → graphify build → translate + env_var_scan + serverless_enrich + build_indexes → CODEBASE.md sub-agent → MCP setup.
 
 ---
 
@@ -293,24 +295,24 @@ The resume-on-interrupt behavior runs through every phase boundary — if the sk
     ...
 ```
 
-`progress.json` is the single source of truth:
+`progress.json` is the single source of truth (current shape, post–graphify-wrap):
 ```json
 {
-  "repo_type": "typescript-node-backend",
-  "total_files": 84,
-  "batch_size": 20,
-  "batches": {
-    "0": {"status": "complete", "output": "results/batch_00.json"},
-    "1": {"status": "in_progress", "output": "results/batch_01.json"},
-    "2": {"status": "pending"},
-    "3": {"status": "failed", "error": "indexer hit context limit mid-batch"}
+  "meta": {
+    "python_interpreter": "python3.11",
+    "graphify_version": "0.X.Y",
+    "started_at": "2026-04-15T14:00:00Z",
+    "completed_at": null
   },
-  "graph_builder": {"status": "pending"},
-  "mcp_setup": {"status": "pending"}
+  "structure":   {"status": "complete"},
+  "graphify":    {"status": "complete", "mode": "cold"},
+  "phase25":     {"status": "pending", "output": ".claude-init/codebase-graph.json"},
+  "codebase_md": {"status": "pending"},
+  "mcp_setup":   {"status": "pending"}
 }
 ```
 
-Batch status values: `pending`, `in_progress`, `complete`, `needs_continuation` (indexer wrote a handoff doc, re-spawn needed), `failed` (error captured in `error` field).
+Phase status values: `pending`, `complete`, `failed` (error captured in `error` field).
 
 If `/infra-init` is interrupted, re-running it reads `progress.json` and resumes from the first incomplete step — no work is repeated.
 
