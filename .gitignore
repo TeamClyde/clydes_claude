@@ -14,12 +14,17 @@ plans/BENCHMARK-RESULTS.md
 plans/SETUP-TEST-RESULTS.md
 plans/TRACK3-HANDOFF.md
 plans/**/CATEGORIZATION-*.md
+plans/**/HANDOFF.md
+plans/**/TESTING.md
 
 # Internal build tracking
 output/BUILD-STATUS.md
 
 # Duplicate/outdated setup script (superseded by scripts/setup.sh at repo root)
 output/scripts/
+
+# Test harness for setup script
+scripts/setup-test.sh
 
 # Standard ignores
 node_modules/
