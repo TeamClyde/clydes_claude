@@ -1,8 +1,4 @@
-# Skills System — Sub-Plan
-
-**Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Designing
-**Priority:** 8
+# Skills System
 
 ---
 
@@ -189,7 +185,7 @@ description: >
 | `progress.json` | `.claude-init/` | Batch manifest — persists state for resume on interruption |
 | `results/batch_NN.json` | `.claude-init/results/` | Per-batch extraction output — consumed by graph-builder in Phase 3 |
 
-**Phase 1 — Structure Detection**
+#### Phase 1 — Structure Detection
 
 Spawn `infra-init-structure` (Haiku). Provide: repo root path.
 
@@ -197,7 +193,7 @@ Returns `structure.json` (repo type, key dirs) and `progress.json` (all source f
 
 If `progress.json` already exists: read it and offer the user two options — resume from the last complete batch, or start over.
 
-**Phase 2 — Parallel Batch Indexing**
+#### Phase 2 — Parallel Batch Indexing
 
 Spawn `infra-init-batch-indexer` agents (Haiku), up to 5 in parallel per wave. Each agent receives its pre-assigned batch ID.
 
@@ -210,7 +206,7 @@ Orchestration loop:
 
 If an agent fails without writing a result: mark batch as `failed`, continue remaining batches, report failures after all other batches finish.
 
-**Phase 3 — Graph Synthesis**
+#### Phase 3 — Graph Synthesis
 
 Spawn `infra-init-graph-builder` (Sonnet). Provide: path to `.claude-init/results/`.
 
@@ -452,19 +448,6 @@ argument-hint: "status:created|in_progress|completed|backlog|reconcile ticket-ke
 - Git operations — delegate to `git-manager`
 
 **Full spec:** See Plan 06 for the complete TODO.md format and lifecycle rules.
-
----
-
-## Implementation Sequence
-
-| Order | Skill | Blocked On |
-|-------|-------|------------|
-| 1 | `git-manager` | Plan 04: conventional commits spec and squash-merge policy must be finalized |
-| 2 | `infra-init` | Plan 01: artifact schemas; Plan 05: designs for the 3 infra-init agents it spawns inline |
-| 3 | `e2e-init` | Plan 03: testing-plan.md and e2e-plan.md schemas; pre-commit hook spec; Plan 07: testing-protocol.md scope |
-| 4 | `plan-management` | Plan 06: TODO.md format and lifecycle rules must be finalized |
-
-`git-manager` is the most self-contained. `infra-init` and `e2e-init` cannot be finalized until the agents and document schemas they depend on are locked in Plans 03, 01, and 06. `plan-management` cannot be finalized until Plan 06 locks the TODO.md schema and status transition rules.
 
 ---
 

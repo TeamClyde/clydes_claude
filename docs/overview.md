@@ -1,8 +1,4 @@
-# Claude Workflow System — Main Plan
-**Status:** Designing
-**Project Type:** System Design & Implementation
-
----
+# Claude Workflow System — Overview
 
 ## Project Overview
 
@@ -80,17 +76,17 @@ After running the setup script, a developer's machine contains:
 
 ## Sub-Plans Index
 
-| # | Name | File | Purpose |
-|---|------|------|---------|
-| 01 | Codebase Knowledge System | `plans/01-infrastructure-as-code/PLAN.md` | Generates a queryable codebase graph and MCP tools via the `/infra-init` skill — so Claude knows what exists without reading the whole codebase |
-| 02 | Jira Integration | `plans/02-jira-integration/PLAN.md` | Defines how Jira works as a background tracking layer — tickets for plan-execution, bugs, human tasks, and cross-repo dependencies |
-| 03 | Testing System | `plans/03-testing-system/PLAN.md` | TDD-first testing framework: `/e2e-init` bootstraps TDD for repos with no tests (unit/integration only — E2E deferred); test-strategy agent defines contracts before code; test-builder writes failing tests from spec; pipeline gating, pre-commit hooks, and runtime observability |
-| 04 | Git Workflow | `plans/04-git-workflow/PLAN.md` | Standard branching, commits (conventional commits), squash-merge, PR review, release tagging, and pre-flight checks via the `git-manager` skill |
-| 05 | Agent Architecture | `plans/05-agent-architecture/PLAN.md` | Design specs for every agent in the system: architect (informed isolation), researcher (codebase + infrastructure lookups via appropriate MCP), infra-init agents, integration-engineer (cross-repo via local MCPs), test-strategy, test-builder, jira-workflow-manager. `todo-manager` migrated to `plan-management` skill (Plan 08) |
-| 06 | Plan Management | `plans/06-plan-management/PLAN.md` | Protocol for making and maintaining plans: research-first, architect gate, test strategy gate, plan doc structure, session handoff, archival. Plan doc is the single source of truth; TODO.md is a pointer registry, not a task copy |
-| 07 | Rules System | `plans/07-rules/PLAN.md` | Minimal instruction system: 2 always-on files (CLAUDE.md + filesystem-efficiency.md, ~110 lines total) + 2 path-scoped rules (planning.md, new-repo-setup.md). Detailed guidance lives in agent/skill definitions, not always-on rules |
-| 08 | Skills System | `plans/08-skills/PLAN.md` | All skills in `~/.claude/skills/` — `git-manager`, `infra-init`, `e2e-init`, and `plan-management` (absorbs `todo-manager` agent) |
-| 09 | Developer Setup | `plans/09-setup/PLAN.md` | Sequenced implementation guide and setup script that installs all agents, skills, rules, and MCP servers on a new machine via symlinks (not copies) so repo updates propagate immediately |
+| # | Name | Purpose |
+|---|------|---------|
+| 01 | Codebase Knowledge System | Generates a queryable codebase graph and MCP tools via the `/infra-init` skill — so Claude knows what exists without reading the whole codebase |
+| 02 | Jira Integration | Defines how Jira works as a background tracking layer — tickets for plan-execution, bugs, human tasks, and cross-repo dependencies |
+| 03 | Testing System | TDD-first testing framework: `/e2e-init` bootstraps TDD for repos with no tests (unit/integration only — E2E deferred); test-strategy agent defines contracts before code; test-builder writes failing tests from spec; pipeline gating, pre-commit hooks, and runtime observability |
+| 04 | Git Workflow | Standard branching, commits (conventional commits), squash-merge, PR review, release tagging, and pre-flight checks via the `git-manager` skill |
+| 05 | Agent Architecture | Design specs for every agent in the system: architect (informed isolation), researcher (codebase + infrastructure lookups via appropriate MCP), infra-init agents, integration-engineer (cross-repo via local MCPs), test-strategy, test-builder, jira-workflow-manager. `todo-manager` migrated to `plan-management` skill |
+| 06 | Plan Management | Protocol for making and maintaining plans: research-first, architect gate, test strategy gate, plan doc structure, session handoff, archival. Plan doc is the single source of truth; TODO.md is a pointer registry, not a task copy |
+| 07 | Rules System | Minimal instruction system: 2 always-on files (CLAUDE.md + filesystem-efficiency.md, ~110 lines total) + 2 path-scoped rules (planning.md, new-repo-setup.md). Detailed guidance lives in agent/skill definitions, not always-on rules |
+| 08 | Skills System | All skills in `~/.claude/skills/` — `git-manager`, `infra-init`, `e2e-init`, and `plan-management` (absorbs `todo-manager` agent) |
+| 09 | Developer Setup | Sequenced implementation guide and setup script that installs all agents, skills, rules, and MCP servers on a new machine via symlinks (not copies) so repo updates propagate immediately |
 
 ---
 

@@ -1,8 +1,4 @@
-# Git Workflow — Sub-Plan
-
-**Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Designing
-**Priority:** 4
+# Git Workflow
 
 ---
 

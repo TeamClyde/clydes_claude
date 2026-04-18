@@ -1,10 +1,6 @@
-# Codebase Knowledge System — Sub-Plan
+# Codebase Knowledge System
 
-**Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Detailed (revised — extraction pipeline wraps graphify. See [graphify-wrap/PLAN.md](graphify-wrap/PLAN.md) for the refactor.)
-**Priority:** 1 (Highest — other subsystems depend on this)
-
-> **2026-04-15 revision.** The original design had `/infra-init` orchestrate multiple LLM sub-agents to extract symbols/calls/imports from source (Phase 2 Batch Indexers). That design has been **replaced** by a wrapper around [graphify](https://github.com/safishamsi/graphify) — deterministic tree-sitter extraction, SHA256-cached — with a custom Python enrichment pass for env vars (which graphify does not extract) and AWS serverless triggers/routes. The external contract (graph schema, FastMCP server, CODEBASE.md) is unchanged. See the graphify-wrap sub-plan for details. Sections below describing Batch Indexers are historical; the current flow is: detect_structure → graphify build → translate + env_var_scan + serverless_enrich + build_indexes → CODEBASE.md sub-agent → MCP setup.
+> **Note:** The original design had `/infra-init` orchestrate multiple LLM sub-agents to extract symbols/calls/imports from source (Phase 2 Batch Indexers). That design has been **replaced** by a wrapper around [graphify](https://github.com/safishamsi/graphify) — deterministic tree-sitter extraction, SHA256-cached — with a custom Python enrichment pass for env vars (which graphify does not extract) and AWS serverless triggers/routes. The external contract (graph schema, FastMCP server, CODEBASE.md) is unchanged. Sections below describing Batch Indexers are historical; the current flow is: detect_structure → graphify build → translate + env_var_scan + serverless_enrich + build_indexes → CODEBASE.md sub-agent → MCP setup.
 
 ---
 
@@ -92,13 +88,13 @@ The primary artifact — a compact JSON file capturing symbols as nodes and rela
       "line_start": 114
     },
     {
-      "id": "src/woosh-client.ts::wooshClient",
+      "id": "src/api-client.ts::apiClient",
       "type": "route",
-      "name": "wooshClient",
-      "file": "src/woosh-client.ts",
+      "name": "apiClient",
+      "file": "src/api-client.ts",
       "line_start": 186,
       "is_entry_point": false,
-      "route_base": "WOOSH_API_BASE_URL",
+      "route_base": "API_BASE_URL",
       "route_prefix": "v2/admin"
     }
   ],
@@ -161,7 +157,7 @@ Full graph: codebase-graph.json (query via codebase MCP tools)
 
 ## Entry Points
 - src/function/send_notification_queue_consumer.py — sqs:SendNotificationQueue
-- src/function/update_filter_life.py — eventbridge:woosh.filterlife
+- src/function/update_filter_life.py — eventbridge:app.filterlife
 - src/function/get_pusher_user_token.py — http:GET:/pusher/token
 
 ## Domain Handlers
@@ -410,7 +406,6 @@ A single agent reads all batch JSON files and compiles them into `codebase-graph
 2. **Enrich env vars**: cross-reference env var nodes against infrastructure files (`serverless.yml`, `.env`, `infra/*.yml`) to populate `env_var_default` values where missing. Batch indexers record where env vars are *read*; this step records where they are *defined*.
 
 Also generates `CODEBASE.md` — a 5-category structured index (Entry Points, Domain Handlers, External Services, Use Cases, Repositories — names vary by repo type) built from the node graph using directory path and naming conventions to assign each file to its category.
-
 
 ---
 

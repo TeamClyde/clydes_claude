@@ -1,8 +1,4 @@
-# Jira Integration System — Sub-Plan
-
-**Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Designing
-**Priority:** 3
+# Jira Integration System
 
 ---
 
@@ -401,12 +397,12 @@ Jira does not consider a ticket truly closed until the Resolution field has a va
 
 ## Deliverables
 
-| # | Deliverable | Location | Notes |
-|---|-------------|----------|-------|
-| 1 | Jira workflow agent | `output/agents/jira-workflow-manager.md` | ✅ Complete |
-| 2 | Ticket types policy | ~~`~/.claude/policies/jira-workflow-manager/ticket-types.md`~~ | ✅ Consolidated into agent file — Claude Code has no `policies/` directory concept |
-| 3 | Ticket format policy | ~~`~/.claude/policies/jira-workflow-manager/ticket-format.md`~~ | ✅ Consolidated into agent file |
-| 4 | Transitions policy | ~~`~/.claude/policies/jira-workflow-manager/transitions.md`~~ | ✅ Consolidated into agent file |
-| 5 | Output format policy | ~~`~/.claude/policies/jira-workflow-manager/output-format.md`~~ | ✅ Consolidated into agent file |
-| 6 | Comment policy | ~~`~/.claude/policies/jira-workflow-manager/comment-policy.md`~~ | ✅ Consolidated into agent file |
-| 7 | Cross-repo strategy | This plan, Origin 4 section | Design complete; implementation depends on Integration Engineer agent (Plan 05) |
+| # | Deliverable | Location |
+|---|-------------|----------|
+| 1 | Jira workflow agent | `agents/jira-workflow-manager.md` |
+| 2 | Ticket types policy | Consolidated into agent file |
+| 3 | Ticket format policy | Consolidated into agent file |
+| 4 | Transitions policy | Consolidated into agent file |
+| 5 | Output format policy | Consolidated into agent file |
+| 6 | Comment policy | Consolidated into agent file |
+| 7 | Cross-repo strategy | Origin 4 section of this document |

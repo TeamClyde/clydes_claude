@@ -1,8 +1,4 @@
-# Developer Setup — Sub-Plan
-
-**Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Designing
-**Priority:** 9
+# Developer Setup
 
 ---
 

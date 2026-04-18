@@ -1,8 +1,4 @@
-# Plan Management System — Sub-Plan
-
-**Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Designing
-**Priority:** 6
+# Plan Management System
 
 ---
 
@@ -154,14 +150,14 @@ Every file path, function name, line number, env var name, ARN, and resource nam
 Users receive no notification when a connected device goes offline. The offline event is already published to EventBridge but nothing consumes it.
 
 ## Context
-Discovered during CLAUDE-14 review. EventBridge rule `woosh.filterlife` fires on device offline, but the consumer is missing. Requested by product in CLAUDE-11.
+Discovered during prior ticket review. EventBridge rule fires on device offline, but the consumer is missing.
 
 ## Epic Goal
 Enable device offline push notifications so users are alerted when a connected device drops.
 
 ## Architecture Blueprint
 - Entry point: new Lambda handler `src/function/device_offline_consumer.py` (to be created)
-- Trigger: EventBridge rule `woosh.filterlife` — defined in `serverless.yml:88`
+- Trigger: EventBridge rule defined in `serverless.yml:88`
 - Reuses: `NotificationService.dispatch` at `src/services/notification.py:8`
 - Reuses: `get_cognito_user` at `src/utils/cognito.py:14`
 - Env vars consumed: `COGNITO_SECRET_NAME` (defined `serverless.yml:109`), `PUSHER_PARAMETER_NAME` (defined `serverless.yml:114`)
@@ -185,8 +181,8 @@ Enable device offline push notifications so users are alerted when a connected d
 - Manual: deploy to dev, trigger a device offline event, confirm notification received
 
 ## Dependencies
-- CLAUDE-14 (notification backend) — provides `NotificationService` and `get_cognito_user`
-- Plan 03 (Testing) — test-strategy output feeds Testing section
+- Notification backend ticket — provides `NotificationService` and `get_cognito_user`
+- Testing system — test-strategy output feeds Testing section
 
 ## Open Questions
 - ~~Should offline events use a separate SQS queue or invoke Lambda directly from EventBridge?~~
@@ -313,14 +309,3 @@ All dependencies below are co-deliverables — part of the same system being bui
 | `test-strategy` agent | Plan 03 | Invoked after architect, before ExitPlanMode; reads plan doc + `.claude/testing-plan.md`; appends `## Testing` — matches §1.7 of this plan (Plan 03, Pillar 3) |
 | `researcher` agent | Plan 05 | Inputs: `question` + optional `scope`; output: direct factual answer — matches dispatch pattern in §1.1 Step 3 (Plan 05 §2) |
 | Codebase graph tools | Plan 01 | Tool names `codebase_search_symbol`, `codebase_find_callers`, `codebase_get_env_var` defined in Plan 01 Phase 4 — match the names used in §1.1 and §1.2 of this plan |
-
----
-
-## Epic / Task Reference
-
-| # | Task | Size | Scope | Jira Key |
-|---|------|------|-------|----------|
-| 1 | Rewrite `plan-docs.md` | S (~3k) | `~/.claude/rules/plan-docs.md` | — |
-| 2 | Rewrite `filesystem/efficiency.md` | S (~2k) | `~/.claude/rules/filesystem/efficiency.md` | — |
-| 3 | Add cold-start section to `workflow-phases.md` | S (~2k) | `~/.claude/rules/workflow-phases.md` | — |
-| 4 | Update `todo-manager` skill workflow | S (~3k) | `~/.claude/skills/todo-manager/` — pointer-entry management per §2.3–§2.5. Implementation spec owned by Plan 05/08. | — |

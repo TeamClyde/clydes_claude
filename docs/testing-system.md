@@ -1,8 +1,4 @@
-# Testing System — Sub-Plan
-
-**Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Planning
-**Priority:** 4
+# Testing System
 
 ---
 

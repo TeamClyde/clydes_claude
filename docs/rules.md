@@ -1,8 +1,4 @@
-# Rules & Instruction System — Sub-Plan
-
-**Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Designing
-**Priority:** 7
+# Rules & Instruction System
 
 ---
 
@@ -125,7 +121,7 @@ The 6-step sequence that replaces the 90-line orchestrator:
 **Source of Truth (~5 lines)**
 Plan doc is the single source of truth. Jira is seeded from the plan doc at ticket-creation time; updates flow in as comments. TODO.md is a pointer registry — one entry per active plan with plan doc path and Epic key — not a copy of task detail.
 
-**Core Rules (~10 lines)**
+#### Core Rules
 - One task in progress at a time. Complete and commit before starting the next.
 - Scan before writing. Ticket descriptions must reference real file and method names — not guesses.
 - Rich ticket descriptions: a human reading them 3 months later should understand what changed and why.
@@ -185,7 +181,7 @@ The planning sequence from Plan 06:
 - Phase 3 — Ask: batch all remaining unknowns into one message; never trickle questions one at a time; questions must cite real file/function context; do not ask for things Claude can find itself
 - Phase 4 — Draft: every step is a concrete action against a real file/function with no placeholders; if a gap remains, return to Phase 2 or 3
 
-**Plan doc requirements (~30 lines)**
+#### Plan doc requirements
 - Sizing table: S (1–3 files) → no plan doc; M (several files, cross-cutting) → no plan doc; L (many files, multi-session) → plan doc required, create before ExitPlanMode
 - Plan doc location: `plans/<slug>/PLAN.md` in the local repo; `~/.claude/plans/` files are session scratch pads only
 - Required sections: Epic/Task Reference table (placeholder rows until execution), Context, Architecture blueprint (file paths, function signatures, enum values, external resource names)
@@ -250,17 +246,6 @@ The template that every new project CLAUDE.md is created from. Includes:
 
 ---
 
-## Implementation Sequence
-
-| Order | Deliverable | Depends On | Notes |
-|-------|-------------|------------|-------|
-| 1 | `~/.claude/rules/filesystem-efficiency.md` | Plan 01 (graph query tools), Plan 02 (plan-doc-first) | Can be written once graph tool names are confirmed. Lean file — minimal blocking dependencies. |
-| 2 | `~/.claude/rules/planning.md` | Plan 02 (research-first protocol), Plan 03 (test-strategy gate), Plan 06 (plan doc format) | Merges content from Plans 02 and 06. Test-strategy invocation spec comes from Plan 03. |
-| 3 | `~/.claude/CLAUDE.md` | Plans 02, 04, 06 | Workflow sequence depends on planning and agent models being final. Delegation table depends on Plan 06 agent names. Write after planning.md so the workflow sequence can reference it correctly. |
-| 4 | `~/.claude/rules/new-repo-setup.md` | Plans 05, 08, 09 | Registry requires all agents (05) and skills (08) to be finalized. Template requires CLAUDE.md structure to be final. Setup script comes from Plan 09. |
-
----
-
 ## Writing Guidelines for Implementation
 
 When writing the actual files:
@@ -287,17 +272,3 @@ When writing the actual files:
 | Plan 06 — Plan Management | `CLAUDE.md`, `planning.md` | Plan doc as source of truth goes in CLAUDE.md. Plan doc format and planning protocol go in planning rule. |
 | Plan 08 — Skills System | `new-repo-setup.md` | Skill registry must include all finalized skill names. Plan-management skill absorbs todo-manager. |
 | Plan 09 — Developer Setup | `new-repo-setup.md` | Setup checklist references setup script. Script must symlink, not copy. |
-
----
-
-## Cross-Plan Ripple Effects
-
-| Decision in 07 | Plans affected | Notes |
-|----------------|----------------|-------|
-| `workflow-phases.md` eliminated as standalone rule | Plans 02, 06 | Orchestrator content absorbed into CLAUDE.md (~15 lines). Plans referencing "the orchestrator rule" should reference CLAUDE.md workflow sequence instead. |
-| `codebase-knowledge.md` eliminated as rule | Plan 01 | Graph usage instructions move to project CLAUDE.md template. `/infra-init` skill must populate this section when it runs. |
-| `testing-protocol.md` eliminated as rule | Plan 03 | Pre-commit gate → hook in settings.json. Test-strategy gate → section in planning rule. `/e2e-init` → step in setup checklist. Plan 03 should define the hook spec. |
-| `jira-policy.md` eliminated as rule | Plan 02 | Philosophy stays as one-liner in CLAUDE.md. All operational Jira logic stays in agent policies. Plan 02 should not expect a separate rule file for main-context Jira guidance. |
-| `planning-protocol.md` and `plan-docs.md` merged | Plan 02, Plan 06 | One `planning.md` rule replaces two. Plans referencing either should reference the merged file. |
-| `infra-init-protocol.md` eliminated as rule | Plan 01 | Skill definition is self-documenting. Project CLAUDE.md carries per-repo graph config. Plan 01 should ensure `/infra-init` writes the project CLAUDE.md section. |
-| Project CLAUDE.md template defined here | All plans | The template in `new-repo-setup.md` is the canonical structure for project-level CLAUDE.md files. Other plans that generate project-level content (Plans 01, 03) must write into the sections defined by this template. |

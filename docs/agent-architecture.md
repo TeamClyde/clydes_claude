@@ -1,8 +1,4 @@
-# Agent Architecture — Sub-Plan
-
-**Parent Plan:** [MAIN-PLAN.md](../MAIN-PLAN.md)
-**Status:** Designing
-**Priority:** 5
+# Agent Architecture
 
 ---
 
@@ -16,17 +12,17 @@ When a plan references a subagent, it is deferring the agent design here. This p
 
 ## Agent Registry
 
-| Agent | File | Responsibility | Owned By | Status |
-|-------|------|----------------|----------|--------|
-| `architect` | `~/.claude/agents/architect.md` | Plan review — quality, soundness, self-containment | Plan 05 | To Build |
-| `researcher` | `~/.claude/agents/researcher.md` | Codebase lookups via local code MCP/graph + live infrastructure value lookups via AWS MCP — keeps lookup work out of the main context window | Plan 05 | To Build |
-| `infra-init-structure` | (spawned by `/infra-init`, no persistent file) | Repo type detection and batch assignment during repo init | Plan 05 | To Build |
-| `infra-init-batch-indexer` | (spawned by `/infra-init`, no persistent file) | Parallel source file extraction during repo init | Plan 05 | To Build |
-| `infra-init-graph-builder` | (spawned by `/infra-init`, no persistent file) | Reduces batch output into codebase-graph.json and CODEBASE.md | Plan 05 | To Build |
-| `integration-engineer` | `~/.claude/agents/integration-engineer.md` | Cross-repo contract mapping using local codebase MCPs from each repo | Plan 05 | To Build |
-| `test-strategy` | `~/.claude/agents/test-strategy.md` | Per-plan validation criteria | Plan 03 | To Build |
-| `test-builder` | `~/.claude/agents/test-builder.md` | Write test code from test strategy output, in parallel with implementation | Plan 03 | To Build |
-| `jira-workflow-manager` | `~/.claude/agents/jira-workflow-manager.md` | All Jira operations | Plan 02 | To Build |
+| Agent | File | Responsibility |
+|-------|------|----------------|
+| `architect` | `~/.claude/agents/architect.md` | Plan review — quality, soundness, self-containment |
+| `researcher` | `~/.claude/agents/researcher.md` | Codebase lookups via local code MCP/graph + live infrastructure value lookups via AWS MCP — keeps lookup work out of the main context window |
+| `infra-init-structure` | (spawned by `/infra-init`, no persistent file) | Repo type detection and batch assignment during repo init |
+| `infra-init-batch-indexer` | (spawned by `/infra-init`, no persistent file) | Parallel source file extraction during repo init |
+| `infra-init-graph-builder` | (spawned by `/infra-init`, no persistent file) | Reduces batch output into codebase-graph.json and CODEBASE.md |
+| `integration-engineer` | `~/.claude/agents/integration-engineer.md` | Cross-repo contract mapping using local codebase MCPs from each repo |
+| `test-strategy` | `~/.claude/agents/test-strategy.md` | Per-plan validation criteria |
+| `test-builder` | `~/.claude/agents/test-builder.md` | Write test code from test strategy output, in parallel with implementation |
+| `jira-workflow-manager` | `~/.claude/agents/jira-workflow-manager.md` | All Jira operations |
 
 **Note:** Skills (`git-manager`, `infra-init`, `e2e-init`) are not agents — they are prompt templates that run in the main context. They are defined in their respective plans.
 
@@ -734,14 +730,14 @@ Main context (working in Repo A)
 
 ## Deliverables
 
-| # | Deliverable | Location | Blocked On |
-|---|-------------|----------|------------|
-| 1 | `architect` agent rewrite | `~/.claude/agents/architect.md` | This plan finalized |
-| 2 | `researcher` agent | `~/.claude/agents/researcher.md` | Nothing — can be built now |
-| 3 | `infra-init-structure` agent spec | Embedded in `~/.claude/skills/infra-init/SKILL.md` — spawned inline by skill, no persistent agent file | Nothing — can be built now |
-| 4 | `infra-init-batch-indexer` agent spec | Embedded in `~/.claude/skills/infra-init/SKILL.md` — spawned inline by skill, no persistent agent file | Plan 01 output schema finalized |
-| 5 | `infra-init-graph-builder` agent spec | Embedded in `~/.claude/skills/infra-init/SKILL.md` — spawned inline by skill, no persistent agent file | Plan 01 graph schema finalized |
-| 6 | `integration-engineer` agent | `~/.claude/agents/integration-engineer.md` | Nothing — can be built now |
+| # | Deliverable | Location |
+|---|-------------|----------|
+| 1 | `architect` agent | `~/.claude/agents/architect.md` |
+| 2 | `researcher` agent | `~/.claude/agents/researcher.md` |
+| 3 | `infra-init-structure` agent spec | Embedded in `~/.claude/skills/infra-init/SKILL.md` — spawned inline by skill, no persistent agent file |
+| 4 | `infra-init-batch-indexer` agent spec | Embedded in `~/.claude/skills/infra-init/SKILL.md` — spawned inline by skill, no persistent agent file |
+| 5 | `infra-init-graph-builder` agent spec | Embedded in `~/.claude/skills/infra-init/SKILL.md` — spawned inline by skill, no persistent agent file |
+| 6 | `integration-engineer` agent | `~/.claude/agents/integration-engineer.md` |
 
 ---
 
