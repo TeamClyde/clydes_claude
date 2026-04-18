@@ -20,7 +20,7 @@ Invoke the `architect` agent before any of these transitions:
 | Trigger | Mode |
 |---------|------|
 | Transitioning a task to Testing or Done | `evaluate_task` |
-| Before calling `ExitPlanMode` | `plan` |
+| Before execution begins (via plan-gate after writing-plans, or manually before `ExitPlanMode` for S-sized ad-hoc work) | `plan` |
 | Diagnosing a bug or unexpected behavior | `debug` |
 
 **Skip for:** S-sized mechanical tasks (renaming, config-only, single-line fixes), status-only transitions (Testing → Done after user confirms).
