@@ -112,7 +112,7 @@ All internal design artifacts from the original project:
 
 ### What is deleted entirely
 
-- `ref_docs/` — contains internal company code (Woosh Air), not appropriate for a public repo
+- `ref_docs/` — contains internal company code, not appropriate for a public repo
 - `output/` — replaced by the flat root structure
 
 ---
@@ -186,7 +186,7 @@ The `mcp-settings.json` template (which contains server config but no credential
 Before any commit of the restructured repo:
 
 1. **Delete `ref_docs/`** from the working directory — this directory was never committed to git history, so no scrubbing is needed. Just delete and add to `.gitignore` as a safety net.
-2. **Audit all tracked files** for: email addresses, company names (Woosh Air), Jira workspace URLs, personal API keys or tokens.
+2. **Audit all tracked files** for: email addresses, company names, Jira workspace URLs, personal API keys or tokens.
 3. **Confirm `.gitignore`** includes `_archive/` and any local secrets files.
 4. **`mcp-settings.json` template** must not contain any credential values — only server command/args structure with empty or placeholder env blocks.
 

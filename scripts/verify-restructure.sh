@@ -22,9 +22,9 @@
 #  11.  pre-commit hook symlink target contains no "output/" segment
 #  12.  docs/ contains exactly 10 .md files
 #  13.  plans/ contains only personal-workflow-repo/ (or is absent after Task 8)
-#  14.  PII: no "woosh air" or "wooshair" in tracked files
-#  15.  PII: no "@wooshair" or "jason@" in tracked files
-#  16.  PII: no "wooshair.atlassian" or ".atlassian.net" in tracked files
+#  14.  PII: no company name keywords in tracked files (customize COMPANY_GREP below)
+#  15.  PII: no personal email domain in tracked files (customize EMAIL_GREP below)
+#  16.  PII: no hardcoded Atlassian workspace URLs in tracked files
 #  17.  mcp-settings.json has no real credential values
 #  18.  git working tree is clean
 #
@@ -36,6 +36,12 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PASS=0
 FAIL=0
+
+# ── PII audit patterns — customize for your organization ──────────────────────
+# Replace these with grep patterns matching your company name and email domain.
+# Example: COMPANY_GREP="acme\|acmecorp"  EMAIL_GREP="@acme\|yourname@"
+COMPANY_GREP=""   # leave empty to skip company-name check
+EMAIL_GREP=""     # leave empty to skip personal-email check
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -211,33 +217,46 @@ else
   fi
 fi
 
-# ── 14. PII: no wooshair / woosh air ──────────────────────────────────────────
+# ── 14. PII: no company name keywords ────────────────────────────────────────
 
 echo ""
-echo "=== 14. PII audit: no 'woosh air' or 'wooshair' ==="
-pii_hits=$(git -C "$REPO_ROOT" grep -i -l "woosh air\|wooshair" -- '*.md' '*.json' '*.sh' '*.py' '*.yaml' '*.yml' 2>/dev/null || true)
-if [[ -z "$pii_hits" ]]; then
-  pass "git grep 'woosh air|wooshair' — no hits in tracked files"
+echo "=== 14. PII audit: company name keywords ==="
+if [[ -z "$COMPANY_GREP" ]]; then
+  pass "company-name check skipped (COMPANY_GREP not set)"
 else
-  fail "git grep found 'woosh air' or 'wooshair' in: $pii_hits"
+  pii_hits=$(git -C "$REPO_ROOT" grep -i -l "$COMPANY_GREP" -- '*.md' '*.json' '*.sh' '*.py' '*.yaml' '*.yml' 2>/dev/null || true)
+  if [[ -z "$pii_hits" ]]; then
+    pass "git grep company name — no hits in tracked files"
+  else
+    fail "git grep found company name pattern in: $pii_hits"
+  fi
 fi
 
-# ── 15. PII: no @wooshair / jason@ ────────────────────────────────────────────
+# ── 15. PII: no personal email domain ────────────────────────────────────────
 
 echo ""
-echo "=== 15. PII audit: no '@wooshair' or 'jason@' ==="
-pii_hits=$(git -C "$REPO_ROOT" grep -i -l "@wooshair\|jason@" -- '*.md' '*.json' '*.sh' '*.py' '*.yaml' '*.yml' 2>/dev/null || true)
-if [[ -z "$pii_hits" ]]; then
-  pass "git grep '@wooshair|jason@' — no hits in tracked files"
+echo "=== 15. PII audit: personal email domain ==="
+if [[ -z "$EMAIL_GREP" ]]; then
+  pass "personal-email check skipped (EMAIL_GREP not set)"
 else
-  fail "git grep found '@wooshair' or 'jason@' in: $pii_hits"
+  pii_hits=$(git -C "$REPO_ROOT" grep -i -l "$EMAIL_GREP" -- '*.md' '*.json' '*.sh' '*.py' '*.yaml' '*.yml' 2>/dev/null || true)
+  if [[ -z "$pii_hits" ]]; then
+    pass "git grep personal email — no hits in tracked files"
+  else
+    fail "git grep found personal email pattern in: $pii_hits"
+  fi
 fi
 
-# ── 16. PII: no wooshair.atlassian / .atlassian.net ──────────────────────────
+# ── 16. PII: no hardcoded Atlassian workspace URLs ────────────────────────────
 
 echo ""
 echo "=== 16. PII audit: no internal Atlassian workspace URLs ==="
-pii_hits=$(git -C "$REPO_ROOT" grep -i -l "wooshair\.atlassian\|\.atlassian\.net" -- '*.md' '*.json' '*.sh' 2>/dev/null || true)
+# Flags any non-placeholder *.atlassian.net URL (real workspace names, not "yourworkspace")
+pii_hits=$(git -C "$REPO_ROOT" grep -i -l "\.atlassian\.net" -- '*.md' '*.json' '*.sh' 2>/dev/null \
+  | xargs -I{} grep -i -l "\.atlassian\.net" {} 2>/dev/null \
+  | xargs grep -i "\.atlassian\.net" 2>/dev/null \
+  | grep -iv "yourworkspace\|<your-workspace>\|example\|placeholder" \
+  | head -5 || true)
 if [[ -z "$pii_hits" ]]; then
   pass "git grep Atlassian workspace URLs — no hits in tracked files"
 else
