@@ -28,10 +28,12 @@ Caller owns decisions (files, message, timing). This skill owns safe, consistent
 
 ## Jira Key Requirement
 
-| Repo CLAUDE.md has Jira project? | Key provided? | Action |
-|----------------------------------|--------------|--------|
-| No | No | Warn once, proceed |
-| No | Yes | Include in footer |
+A "configured Jira project" means CLAUDE.md contains a concrete project key (e.g. `PROJ`, `CLAUDE`) — not a placeholder like `[PROJ]` or a missing/empty field. If the key field is absent, a template placeholder, or not present, treat the project as untracked.
+
+| Repo CLAUDE.md has configured Jira project? | Key provided? | Action |
+|---------------------------------------------|--------------|--------|
+| No (missing, placeholder, or not present) | No | Proceed without Jira footer |
+| No (missing, placeholder, or not present) | Yes | Include in footer |
 | Yes | No | Ask for key before committing |
 | Yes | Yes | Include in footer |
 
