@@ -1,10 +1,10 @@
+# Local-only internal design artifacts (moved here during restructure)
+_archive/
+
 # Repo-specific Claude Code permissions (not part of the deliverable)
 .claude/
 
-# Reference implementations from another project
-ref_docs/
-
-# Internal design review artifacts
+# Internal design review artifacts (now moved to _archive/)
 plans/review/
 plans/test-fixtures/
 plans/REVIEW-PLAN.md
@@ -16,12 +16,6 @@ plans/TRACK3-HANDOFF.md
 plans/**/CATEGORIZATION-*.md
 plans/**/HANDOFF.md
 plans/**/TESTING.md
-
-# Internal build tracking
-output/BUILD-STATUS.md
-
-# Duplicate/outdated setup script (superseded by scripts/setup.sh at repo root)
-output/scripts/
 
 # Test harness for setup script
 scripts/setup-test.sh
