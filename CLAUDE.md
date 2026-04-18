@@ -68,3 +68,32 @@ The plan doc (`plans/<slug>/PLAN.md`) is the single source of truth for what wil
 - Rich ticket descriptions: a person reading them 3 months later should understand what changed and why.
 - If a task turns out significantly larger or smaller than estimated, note it and adjust sub-tasks accordingly.
 - Jira reflects reality. It does not control it. Never let ticket state block execution.
+
+---
+
+## Repository Structure
+
+```
+claude-workflow-improvements/
+├── CLAUDE.md                   — this file (global instructions, symlinked to ~/.claude/CLAUDE.md)
+├── README.md                   — repo overview and restoration guide
+├── agents/                     — agent definition files → symlinked to ~/.claude/agents/
+├── skills/                     — skill directories → each symlinked to ~/.claude/skills/<name>/
+├── rules/                      — rule .md files + filesystem/ subdir → symlinked to ~/.claude/rules/
+│   └── filesystem/             — subdirectory, symlinked as a unit
+├── hooks/
+│   └── pre-commit              — global pre-commit hook → symlinked to ~/.claude/hooks/pre-commit
+├── templates/                  — project templates (not symlinked; copied on use)
+├── docs/                       — public-facing documentation
+│   └── superpowers/specs/      — brainstorming and design specs
+└── scripts/
+    └── setup.sh                — idempotent installer
+```
+
+---
+
+## Working in This Repo
+
+- Read `docs/overview.md` when starting a new session — it contains the system overview and integration picture.
+- Workflow components live at the repo root, mirroring `~/.claude/` directly. Edit in place; symlinks keep `~/.claude/` in sync automatically.
+- After adding or modifying a component, run `setup.sh --force` to recreate symlinks if needed.
