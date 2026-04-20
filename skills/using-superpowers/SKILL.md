@@ -51,7 +51,7 @@ Before exploring any repo, follow this hierarchy — stop as soon as you have wh
 
 **Hard boundaries:**
 - `CODEBASE.md` → read directly (purpose-built for AI orientation, designed to be short)
-- Code graph output from `infra-init` (can be 250K+ lines) → researcher agent only, never read directly
+- code graph output from `infra-init` (can be 250K+ lines) → researcher agent only, never read directly
 - Plan doc → always read during execution; it supersedes all filesystem exploration
 
 # Using Skills
