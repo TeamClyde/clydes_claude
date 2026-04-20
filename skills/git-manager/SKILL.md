@@ -28,7 +28,11 @@ Caller owns decisions (files, message, timing). This skill owns safe, consistent
 
 ## Jira Key Requirement
 
-A "configured Jira project" means CLAUDE.md contains a concrete project key (e.g. `PROJ`, `CLAUDE`) — not a placeholder like `[PROJ]` or a missing/empty field. If the key field is absent, a template placeholder, or not present, treat the project as untracked.
+A "configured Jira project" means `project.json` at the repo root has `jira.enabled: true` and a concrete `jira.project` value (e.g. `"PROJ"`).
+
+If `project.json` is absent, or `jira.enabled` is `false` or missing: treat the project as untracked — no Jira key required.
+
+**Fallback (no project.json):** Check whether CLAUDE.md contains a concrete project key — not a placeholder like `[PROJ]` or a missing field. This fallback exists for repos that have not yet run project-setup.
 
 | Repo CLAUDE.md has configured Jira project? | Key provided? | Action |
 |---------------------------------------------|--------------|--------|
