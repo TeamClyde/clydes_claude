@@ -233,6 +233,18 @@ install_symlink "$REPO_ROOT/rules/filesystem" "$HOME/.claude/rules/filesystem" "
 install_symlink "$REPO_ROOT/CLAUDE.md" "$HOME/.claude/CLAUDE.md" "CLAUDE.md"
 
 # ---------------------------------------------------------------------------
+# Step 5.5 — Symlink cspell.json to ~/.claude/cspell.json
+# ---------------------------------------------------------------------------
+# One maintained wordlist covers both the repo and all ~/.claude/ files
+# (memory, skills, rules). Without this symlink, ~/.claude/ files fall back
+# to the built-in dictionary and generate false-positive spellcheck warnings.
+
+echo ""
+echo "Step 5.5 — Symlinking cspell.json"
+
+install_symlink "$REPO_ROOT/cspell.json" "$HOME/.claude/cspell.json" "cspell.json"
+
+# ---------------------------------------------------------------------------
 # Step 6 — Symlink pre-commit hook
 # ---------------------------------------------------------------------------
 
