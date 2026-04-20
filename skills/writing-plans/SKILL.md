@@ -31,7 +31,7 @@ Before defining tasks, map out which files will be created or modified and what 
 - Files that change together should live together. Split by responsibility, not by technical layer.
 - In existing codebases, follow established patterns. If the codebase uses large files, don't unilaterally restructure - but if a file you're modifying has grown unwieldy, including a split in the plan is reasonable.
 
-If `CODEBASE.md` exists in the repo root, read it before any file navigation. For symbol lookups (where does X live, what calls Y, what env vars does Z read), dispatch a `researcher` instance rather than grepping files directly.
+Follow the orientation hierarchy before any file navigation: read `project.json` → read the file at `codebase-entry` (e.g. CODEBASE.md) → read the plan doc or spec if one exists → stop. Only fall back to targeted Grep or a `researcher` instance if a specific detail is genuinely absent from all three. Never run broad bash scans or read the code graph output directly.
 
 This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
 

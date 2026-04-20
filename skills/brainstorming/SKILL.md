@@ -21,7 +21,7 @@ Every project goes through this process. A todo list, a single-function utility,
 
 You MUST create a task for each of these items and complete them in order:
 
-1. **Explore project context** — check files, docs, recent commits
+1. **Explore project context** — read project.json → read codebase-entry file if set → read plan doc if one exists → stop (see Orientation Protocol in using-superpowers)
 2. **Offer visual companion** (if topic will involve visual questions) — this is its own message, not combined with a clarifying question. See the Visual Companion section below.
 3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
@@ -35,7 +35,7 @@ You MUST create a task for each of these items and complete them in order:
 
 ```dot
 digraph brainstorming {
-    "Explore project context" [shape=box];
+    "Orient to repo context" [shape=box];
     "Visual questions ahead?" [shape=diamond];
     "Offer Visual Companion\n(own message, no other content)" [shape=box];
     "Ask clarifying questions" [shape=box];
@@ -47,7 +47,7 @@ digraph brainstorming {
     "User reviews spec?" [shape=diamond];
     "Invoke writing-plans skill" [shape=doublecircle];
 
-    "Explore project context" -> "Visual questions ahead?";
+    "Orient to repo context" -> "Visual questions ahead?";
     "Visual questions ahead?" -> "Offer Visual Companion\n(own message, no other content)" [label="yes"];
     "Visual questions ahead?" -> "Ask clarifying questions" [label="no"];
     "Offer Visual Companion\n(own message, no other content)" -> "Ask clarifying questions";
@@ -100,8 +100,9 @@ digraph brainstorming {
 
 **Working in existing codebases:**
 
-- If `CODEBASE.md` exists in the repo root, read it before exploring files — it orients entry points and key modules. For symbol lookups during exploration, dispatch a `researcher` instance rather than grepping directly.
-- Explore the current structure before proposing changes. Follow existing patterns.
+- Follow the orientation hierarchy: read `project.json` → read `codebase-entry` file (e.g. CODEBASE.md) → read plan doc if one exists → stop. Do not explore further unless a specific detail is genuinely absent from all three.
+- For symbol lookups (where does X live, what calls Y): dispatch a `researcher` instance — never Grep or run bash on large codebases.
+- Follow existing patterns. Where a file has grown unwieldy, include a targeted split in the design — do not unilaterally restructure.
 - Where existing code has problems that affect the work (e.g., a file that's grown too large, unclear boundaries, tangled responsibilities), include targeted improvements as part of the design - the way a good developer improves code they're working in.
 - Don't propose unrelated refactoring. Stay focused on what serves the current goal.
 
