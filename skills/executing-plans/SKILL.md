@@ -23,14 +23,16 @@ Load plan, review critically, execute all tasks, report when complete.
 
 ### Step 2: Execute Tasks
 
+**Before starting the first task:** Read `project.json` at repo root if it exists. Note whether `jira.enabled` is true. If absent, assume Jira is enabled (legacy fallback).
+
 For each task:
-1. Transition corresponding Jira ticket to In Progress via jira-workflow-manager
+1. If Jira enabled: Transition corresponding Jira ticket to In Progress via jira-workflow-manager. If Jira disabled: skip.
 2. Mark task as in_progress in TodoWrite
 3. Follow each step exactly (plan has bite-sized steps)
 4. Run verifications as specified
 5. Mark task as completed
-6. Transition Jira ticket to Done (or Testing if human verification required) via jira-workflow-manager
-7. Invoke plan-management skill: path, jira-key, status: completed, 1-2 sentence summary
+6. If Jira enabled: Transition Jira ticket to Done (or Testing if human verification required) via jira-workflow-manager. If Jira disabled: skip.
+7. If Jira enabled: Invoke plan-management skill: path, jira-key, status: completed, 1-2 sentence summary. If Jira disabled: invoke plan-management skill with status: completed and summary only (omit jira-key).
 
 ### Step 3: Complete Development
 
