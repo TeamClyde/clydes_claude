@@ -580,6 +580,21 @@ step2 [label="read file"];
 helper1, helper2, step3, pattern4
 **Why bad:** Labels should have semantic meaning
 
+## Phase 3 — Pulser Eval
+
+After TDD cycle is green and loopholes are closed:
+
+1. Run static lint: `pulser --strict`
+   Fix any flagged issues. Check for trigger conflicts with existing skills.
+2. Write `eval.yaml` alongside `SKILL.md` — see `eval-methodology.md` for format.
+   Minimum: 8 tests (positive and negative trigger coverage).
+3. Run eval: `pulser eval --skill <skill-name>`
+   All tests must pass (exit 0). Regressions (exit 3) block deployment.
+4. If trigger conflict flagged in step 1: refine description, re-run, confirm resolved.
+5. Note eval pass in commit message.
+
+**See `eval-methodology.md` for full Pulser usage guide, eval.yaml format, and fallback path (no API key).**
+
 ## STOP: Before Moving to Next Skill
 
 **After writing ANY skill, you MUST STOP and complete the deployment process.**
@@ -620,6 +635,13 @@ Deploying untested skills = deploying untested code. It's a violation of quality
 - [ ] Build rationalization table from all test iterations
 - [ ] Create red flags list
 - [ ] Re-test until bulletproof
+
+**Phase 3 — Pulser Eval:**
+- [ ] Run `pulser --strict` — fix all flagged issues
+- [ ] Write `eval.yaml` with 8+ tests (positive and negative trigger coverage)
+- [ ] Run `pulser eval --skill <skill-name>` — all tests pass (exit 0)
+- [ ] Trigger conflict check: run `pulser` — no overlapping keywords with existing skills
+- [ ] Note eval pass in commit message
 
 **Quality Checks:**
 - [ ] Small flowchart only if decision non-obvious
