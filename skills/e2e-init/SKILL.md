@@ -1,13 +1,10 @@
 ---
 name: e2e-init
 description: >
-  One-time repo testing backbone setup. Reads the repo structure, inventories
-  existing test frameworks, maps service boundaries, and produces two documents:
-  .claude/testing-plan.md (the lightweight foundation consulted by the Test
-  Strategy Agent on every plan) and plans/e2e-plan.md (E2E scenario inventory
-  and tooling gaps). Also generates scripts/run-tests.sh if it does not exist.
-  Re-runnable — re-running diffs proposed changes and asks for confirmation
-  before overwriting. Run during new repo onboarding after /infra-init, before
+  Use when a repo's test suite needs to be established or audited — inventorying
+  existing tests, identifying coverage gaps, setting up missing infrastructure,
+  adding dummy or fixture data, or surfacing failing tests. Useful for first-time
+  setup and for expanding an existing suite. Run after /infra-init, before
   writing any new code.
 argument-hint: "optional"
 ---

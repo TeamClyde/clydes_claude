@@ -1,6 +1,6 @@
 ---
 name: feedback
-description: Non-interrupting workflow feedback capture. Run /feedback <description> at any point to log a friction point, missed skill, or improvement idea to docs/workflow-feedback.md. Fires a background subagent — does not interrupt current work. Pair with /review-workflow to act on accumulated feedback.
+description: Use when experiencing friction, confusion, or a gap mid-session — a skill that didn't trigger, a rule that conflicted with reality, a missing capability, or a process that felt wrong. Captures the observation without interrupting current work.
 argument-hint: "<description of what felt wrong>"
 ---
 

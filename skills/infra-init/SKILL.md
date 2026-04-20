@@ -1,6 +1,6 @@
 ---
 name: infra-init
-description: "Generates the codebase knowledge graph for the current repo by wrapping graphify (deterministic tree-sitter extractor) with a domain-aware enrichment pass. Orchestrates: (1) repo-type detection, (2) graphify build, (3) translate + enrich (env vars, serverless triggers/routes, top-level indexes), (4) CODEBASE.md synthesis, (5) MCP server setup. Produces .claude-init/codebase-graph.json (queryable symbol graph) and .claude-init/CODEBASE.md (human summary). Run once per repo; re-run after major structural changes. Handles resume automatically if interrupted."
+description: Use at the start of a new repo session, before exploring an unfamiliar codebase, or when code structure has changed significantly. Builds a queryable symbol graph and CODEBASE.md so future navigation uses the graph instead of broad file searches.
 ---
 
 # infra-init

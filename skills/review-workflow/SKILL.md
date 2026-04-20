@@ -1,6 +1,6 @@
 ---
 name: review-workflow
-description: Triage accumulated workflow feedback from docs/workflow-feedback.md. Groups entries by category, identifies highest-signal issues, proposes targeted fixes, and dispatches approved changes via writing-skills or CLAUDE.md edits. Run when you have time to act on friction captured by /feedback.
+description: Use when workflow-feedback.md has accumulated friction entries and you want to act on them — grouping patterns, proposing fixes to skills or rules, and routing improvements to the right component. Run periodically or after several feedback entries accumulate.
 argument-hint: "(no arguments needed — reads docs/workflow-feedback.md)"
 ---
 

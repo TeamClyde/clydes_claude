@@ -1,10 +1,10 @@
 ---
 name: git-manager
 description: >
-  All git operations: branch, commit, push, PR via Bitbucket MCP, worktree
-  management. Accepts explicit file list, commit type, description, Jira key
-  (conditional). Does not call Jira, read source code, or decide which files
-  to include.
+  Use when committing files, creating a branch, pushing to remote, syncing with
+  main, opening a pull request, or when a merge conflict needs to be surfaced and
+  handled safely. Invoke for any git action during development — starting work,
+  recording progress, shipping, or managing conflicts.
 argument-hint: "commit files:[file1,file2] type:feat|fix|refactor|chore|docs|test|perf description:'...' jira-key:PROJ-N"
 ---
 

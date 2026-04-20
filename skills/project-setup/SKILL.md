@@ -1,6 +1,6 @@
 ---
 name: project-setup
-description: One-time project initialization wizard. Runs init skills (CLAUDE.md, testing backbone, codebase graph) then generates project.json from interactive answers. Works on new and existing repos. Also verifies symlink health when run in the workflow repo.
+description: Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUDE.md is missing or generic, or the codebase graph hasn't been generated. Configures Jira integration, testing setup, and workflow preferences.
 argument-hint: "(no arguments needed — interactive)"
 ---
 

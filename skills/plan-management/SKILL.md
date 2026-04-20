@@ -1,14 +1,10 @@
 ---
 name: plan-management
 description: >
-  Maintains TODO.md as a high-level pointer registry for all active and planned
-  work. Invoke after Jira ticket transitions (created, in_progress, completed),
-  when capturing backlog items, or when a full reconcile is needed. Tracks work
-  at feature granularity — one TODO entry per meaningful scope item, not per
-  ticket. Also promotes Backlog items to Up Next when a plan is created for them.
-  Absorbed from the todo-manager agent: runs in-context because it is high-frequency,
-  purely structural, and requires no reasoning. Does NOT create or transition Jira
-  tickets, perform git operations, or decide what work to do next.
+  Use after Jira tickets are created or change status (in_progress, done), when
+  adding items to the backlog, or when reconciling TODO.md against current ticket
+  state. Invoke after every ticket creation or status transition to keep TODO.md
+  current.
 argument-hint: "status:created|in_progress|completed|backlog|reconcile ticket-key:PROJ-N plan-doc:plans/slug/PLAN.md summary:'...'"
 ---
 
