@@ -5,6 +5,20 @@ description: Use when implementing any feature or bugfix, before writing impleme
 
 # Test-Driven Development (TDD)
 
+## Project Config Check
+
+Read `project.json` at repo root if it exists:
+
+```bash
+cat project.json 2>/dev/null
+```
+
+If `workflow.tdd` is explicitly `false`: announce "TDD is disabled for this repo (`workflow.tdd: false`). Proceeding with direct implementation." and exit this skill. Do not apply RED-GREEN-REFACTOR discipline.
+
+If `project.json` is absent or `workflow.tdd` is true/missing: continue with the full TDD process below.
+
+---
+
 ## Overview
 
 Write the test first. Watch it fail. Write minimal code to pass.
