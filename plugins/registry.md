@@ -9,15 +9,13 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
 ## skill-creator
 
 - **Source:** https://github.com/claude-ai/skill-creator (claude-plugins-official)
-- **State:** Active
+- **State:** Integrated
 - **Pinned version:** unknown (installed 2026-04-20; no git SHA recorded by plugin system)
 - **Skills provided:** `skill-creator:skill-creator`
-- **Domain ownership:** CSO benchmarking and A/B description comparison — not part of orchestration layer
+- **Domain ownership:** CSO benchmarking and A/B description comparison — delegated to via the eval phase in `writing-skills`.
 - **Last audited:** 2026-04-20
 - **Notes:**
-  - Eval infrastructure (Python scripts, browser viewer, `ANTHROPIC_API_KEY`) is not used in this workflow. The concepts it introduced — trigger accuracy testing, grading, A/B comparison — are adapted locally via `eval-methodology.md` in `writing-skills`.
-  - May be invoked directly for experimentation and CSO benchmarking.
-  - Not integrated into `creating-tools` orchestration. Do not route through it.
+  - Routed through `writing-skills` eval phase. Do not invoke `skill-creator:skill-creator` directly.
   - Windows patches applied at install time.
 
 ---
@@ -35,6 +33,20 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
   - `plugin-dev:create-plugin` (8-phase guided workflow) is also a delegation target.
   - Never invoke plugin-dev skills directly — always route through `creating-tools`.
   - Windows patches applied at install time.
+
+---
+
+## superpowers
+
+- **Source:** https://github.com/claude-ai/superpowers (claude-plugins-official)
+- **State:** Removed
+- **Pinned version:** unknown (installed 2026-04-20; no git SHA recorded by plugin system)
+- **Skills provided:** `superpowers:using-superpowers`, `superpowers:brainstorming`, `superpowers:test-driven-development`, `superpowers:systematic-debugging`, `superpowers:writing-plans`, `superpowers:executing-plans`, `superpowers:writing-skills`, `superpowers:subagent-driven-development`, `superpowers:dispatching-parallel-agents`, `superpowers:using-git-worktrees`, `superpowers:finishing-a-development-branch`, `superpowers:requesting-code-review`, `superpowers:receiving-code-review`, `superpowers:verification-before-completion`, `superpowers:code-reviewer` (agent).
+- **Domain ownership:** Superseded. All skills fully covered by local equivalents in `skills/`.
+- **Last audited:** 2026-04-20
+- **Notes:**
+  - Integrated (local skills took priority), then removed. Local skills (`brainstorming`, `test-driven-development`, `writing-plans`, etc.) are the canonical entry points.
+  - setup.sh enforces removal: `claude plugin uninstall superpowers` runs on every setup run while this entry is Removed.
 
 ---
 

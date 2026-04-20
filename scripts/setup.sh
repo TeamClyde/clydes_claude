@@ -111,6 +111,31 @@ install_symlink() {
 }
 
 # ---------------------------------------------------------------------------
+# Plugin lifecycle helpers
+# ---------------------------------------------------------------------------
+
+# get_plugin_state <plugin-spec>
+# Reads plugins/registry.md and returns the lifecycle state for the given plugin.
+# Returns: Active | Integrated | Deprecated | Removed | unregistered
+get_plugin_state() {
+  local plugin_name="${1%%@*}"  # strip @registry suffix (e.g. plugin-dev@claude-plugins-official → plugin-dev)
+  local registry="$REPO_ROOT/plugins/registry.md"
+  [[ -f "$registry" ]] || { echo "unregistered"; return; }
+  local in_section=false
+  while IFS= read -r line; do
+    if [[ "$line" == "## $plugin_name" ]]; then
+      in_section=true
+    elif $in_section && [[ "$line" =~ ^## ]]; then
+      break
+    elif $in_section && [[ "$line" =~ \*\*State:\*\*[[:space:]]*([A-Za-z]+) ]]; then
+      echo "${BASH_REMATCH[1]}"
+      return
+    fi
+  done < "$registry"
+  echo "unregistered"
+}
+
+# ---------------------------------------------------------------------------
 # Step 1 — Check prerequisites
 # ---------------------------------------------------------------------------
 
@@ -277,16 +302,87 @@ PLUGINS=(
   "pyright-lsp@claude-plugins-official"
   "security-guidance@claude-plugins-official"
   "skill-creator@claude-plugins-official"
-  "superpowers@claude-plugins-official"
 )
 
+# Snapshot installed plugins once so each iteration can check without a subprocess
+PLUGIN_LIST_OUTPUT=""
+PLUGIN_LIST_OUTPUT=$(claude plugin list 2>/dev/null) || true
+
 for plugin in "${PLUGINS[@]}"; do
+  plugin_base="${plugin%%@*}"
+  state=$(get_plugin_state "$plugin_base")
+
+  case "$state" in
+    Removed)
+      skip "skipping removed plugin: $plugin_base (Removed in registry)"
+      (( SKIPPED++ )) || true
+      continue
+      ;;
+    Deprecated)
+      warn "installing deprecated plugin (pending cleanup per registry): $plugin_base"
+      ;;
+  esac
+
+  state_label=""
+  [[ "$state" != "unregistered" ]] && state_label=" [$state]"
+
+  # Skip if already installed and not forcing a reinstall
+  if ! $FORCE && [[ -n "$PLUGIN_LIST_OUTPUT" ]] && echo "$PLUGIN_LIST_OUTPUT" | grep -q "^$plugin_base"; then
+    skip "already installed: $plugin_base$state_label"
+    (( SKIPPED++ )) || true
+    continue
+  fi
+
   if claude plugin install "$plugin" 2>/dev/null; then
-    success "installed plugin: $plugin"
+    success "installed plugin: $plugin_base$state_label"
+    (( LINKED++ )) || true
   else
     warn "plugin install may have failed: $plugin — run manually with: claude plugin install $plugin"
   fi
 done
+
+# Enforce Removed state: uninstall any plugins the registry marks as Removed.
+# This prevents integrated-then-removed plugins from continuing to fire their skills.
+if [[ -f "$REPO_ROOT/plugins/registry.md" ]]; then
+  echo ""
+  echo "  Enforcing Removed plugin states ..."
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^##[[:space:]]+([a-z][a-z0-9_-]*)$ ]]; then
+      reg_name="${BASH_REMATCH[1]}"
+      reg_state=$(get_plugin_state "$reg_name")
+      if [[ "$reg_state" == "Removed" ]]; then
+        if claude plugin uninstall "$reg_name" 2>/dev/null; then
+          success "uninstalled (Removed in registry): $reg_name"
+        else
+          skip "already absent: $reg_name"
+        fi
+      fi
+    fi
+  done < "$REPO_ROOT/plugins/registry.md"
+fi
+
+# Registry consistency check: warn about Active/Integrated registry entries missing from PLUGINS
+if [[ -f "$REPO_ROOT/plugins/registry.md" ]]; then
+  echo ""
+  echo "  Checking registry consistency ..."
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^##[[:space:]]+([a-z][a-z0-9_-]*)$ ]]; then
+      reg_name="${BASH_REMATCH[1]}"
+      reg_state=$(get_plugin_state "$reg_name")
+      if [[ "$reg_state" == "Active" || "$reg_state" == "Integrated" ]]; then
+        found=false
+        for p in "${PLUGINS[@]}"; do
+          [[ "${p%%@*}" == "$reg_name" ]] && found=true && break
+        done
+        if ! $found; then
+          warn "registry gap: $reg_name ($reg_state) is not in the PLUGINS install list — add it to setup.sh"
+        else
+          info "registry ok: $reg_name ($reg_state)"
+        fi
+      fi
+    fi
+  done < "$REPO_ROOT/plugins/registry.md"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 8 — Install MCP packages
