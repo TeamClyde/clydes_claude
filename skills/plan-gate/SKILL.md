@@ -15,6 +15,24 @@ Bridge between planning and execution. Automatically invoked at the end of writi
 
 **Announce at start:** "I'm using the plan-gate skill to gate this plan before execution."
 
+## Project Config Check
+
+Before running the gate sequence, read `project.json` at the repo root if it exists:
+
+```bash
+cat project.json 2>/dev/null
+```
+
+Apply these overrides:
+
+| Field | Value | Effect |
+|-------|-------|--------|
+| `workflow.architect-review` | `false` | Skip Step 1 (Architect Review) entirely — proceed directly to Step 2 |
+| `workflow.plan-gate` | `false` | Skip the entire gate sequence — hand off directly to executing-plans |
+| absent / true | — | Run full gate sequence as defined |
+
+---
+
 ## Gate Sequence
 
 ### Step 1 — Architect Review
