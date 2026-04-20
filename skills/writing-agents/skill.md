@@ -1,6 +1,7 @@
 ---
 name: writing-agents
 description: Use when creating a new agent, editing an existing agent's system prompt, or determining agent frontmatter conventions and testing approach.
+allowed-tools: Agent, Read
 ---
 
 # Writing Agents
@@ -106,6 +107,14 @@ For pressure scenario format and dispatch patterns, see `testing-agents-with-sub
 | "The user asked me to skip it" | The Iron Law has no exceptions. User pressure doesn't override it. |
 | "This is a simple agent — baseline is overkill" | Simple agents still have missing `model:` fields and vague descriptions. Run it. |
 | "I've done this type of agent before" | Each agent has different scope. Different scope = different failures. Run the baseline. |
+
+## Gotchas
+
+1. **Writing the system prompt before the baseline invocation.** The Iron Law has no exceptions. If you start drafting content before running the bare dispatch, you are building without evidence — delete it and run the baseline first.
+2. **Using "Use when..." for the agent description.** That convention is for skills. Agent descriptions must describe inputs and outputs — what the agent receives and what it returns. A trigger-condition description will cause Claude to treat the agent like a skill.
+3. **Adding `tools:` by default.** Most agents read, reason, and return text. They do not write files. Adding `tools:` without justification signals that you didn't think through the agent's actual scope.
+4. **Omitting `model:`.** Unlike skills, agents require explicit model selection with rationale. An agent file without `model:` is incomplete.
+5. **Duplicating `plugin-dev:agent-development` content inline.** Don't restate frontmatter field definitions — reference the plugin. Duplication creates drift when the plugin updates.
 
 ## STOP: Deployment Checklist
 

@@ -1,6 +1,7 @@
 ---
 name: creating-tools
 description: Use when creating any workflow component — skill, agent, rule, hook, command, or plugin. Routes to the correct specialist skill based on artifact type.
+allowed-tools: Read
 ---
 
 # Creating Tools
@@ -59,6 +60,13 @@ digraph routing {
     "Ask one clarifying question" -> "Artifact type clear?";
 }
 ```
+
+## Gotchas
+
+1. **Routing without asking on ambiguous input.** The hard gate exists because picking the wrong route wastes the user's time more than asking one question does. "I want to build something" is not enough to route.
+2. **Authoring content before routing.** The moment you write a frontmatter field, a rule sentence, or any artifact content, you've violated the coordinator constraint. Stop and invoke the delegated skill instead.
+3. **Routing to two destinations simultaneously.** A compound request ("I need a skill and a hook for it") is still one routing decision at a time. Handle them sequentially, not in parallel.
+4. **Assuming the artifact type from keywords.** "Create a guide" could be a skill or a rule. "Build a checker" could be a skill, agent, or command. Ask, don't assume.
 
 ## Red Flags
 

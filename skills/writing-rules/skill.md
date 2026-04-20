@@ -1,6 +1,7 @@
 ---
 name: writing-rules
 description: Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped.
+allowed-tools: Read, Write
 ---
 
 # Writing Rules
@@ -97,6 +98,14 @@ Rules have no eval loop and no automated test. Testing is observational:
 2. Run `setup.sh --force` to symlink it into `~/.claude/rules/`
 3. Verify the symlink: `ls ~/.claude/rules/<name>.md`
 4. Register in `rules/new-repo-setup.md` if it applies to new repo onboarding
+
+## Gotchas
+
+1. **Creating a rule when a skill is the right artifact.** Rules are always-on — if the guidance only matters in specific task contexts, it belongs in a skill. The question is: should this fire in every session, or only when explicitly needed?
+2. **Writing narrative prose instead of a decision table.** Rules are scanned in seconds, not read like documentation. A paragraph explaining why a constraint exists will be skipped; a table will be followed.
+3. **Global when it should be path-scoped (or vice versa).** A rule that only applies to Python files in `src/` loaded into every session wastes context. A rule about commit formatting that only fires on `.py` files will be missed when the user commits a YAML change.
+4. **Adding an eval loop.** Rules are tested observationally — run 2–3 sessions that would trigger the rule and observe compliance. There is no `eval.yaml` for rules; don't create one.
+5. **One file, multiple concerns.** A rule that covers both MCP governance and commit formatting will be partially ignored. Split concerns into separate files so each rule is unambiguous.
 
 ## Checklist
 
