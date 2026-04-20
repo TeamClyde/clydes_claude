@@ -4,7 +4,7 @@
     "description": "Personal Claude Code workflow — skills, agents, rules, hooks"
   },
   "jira": {
-    "enabled": true,
+    "enabled": false,
     "project": "CLAUDE",
     "default-issue-type": "Task"
   },

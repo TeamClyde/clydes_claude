@@ -9,6 +9,7 @@
     "cspell",
     "enum",
     "frontmatter",
+    "init",
     "jira",
     "json",
     "keybindings",
@@ -16,21 +17,21 @@
     "mcp",
     "mem",
     "mkdirp",
-    "init",
     "onboarding",
     "prereqs",
     "pyright",
     "shutil",
     "subagent",
-    "utf",
-    "tdd",
     "symlink",
     "symlinked",
     "symlinks",
+    "tdd",
     "unscoped",
+    "utf",
     "worktree",
     "worktrees",
-    "wooshair"
+    "wooshair",
+    "yaml"
   ],
   "ignorePaths": ["node_modules", ".git"]
 }
