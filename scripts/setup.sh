@@ -10,7 +10,6 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 
 REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SOURCE_DIR="$REPO_ROOT/output"
 
 FORCE=false
 if [[ "${1:-}" == "--force" ]]; then
@@ -194,7 +193,7 @@ success "~/.claude/ directories ready"
 echo ""
 echo "Step 3 — Symlinking agents"
 
-for agent_file in "$SOURCE_DIR/agents/"*.md; do
+for agent_file in "$REPO_ROOT/agents/"*.md; do
   [[ -e "$agent_file" ]] || continue
   name=$(basename "$agent_file")
   install_symlink "$agent_file" "$HOME/.claude/agents/$name" "agents/$name"
@@ -207,7 +206,7 @@ done
 echo ""
 echo "Step 4 — Symlinking skills"
 
-for skill_dir in "$SOURCE_DIR/skills"/*/; do
+for skill_dir in "$REPO_ROOT/skills"/*/; do
   [[ -d "$skill_dir" ]] || continue
   name=$(basename "$skill_dir")
   # Remove trailing slash from target path
@@ -222,13 +221,16 @@ done
 echo ""
 echo "Step 5 — Symlinking rules and CLAUDE.md"
 
-for rule_file in "$SOURCE_DIR/rules/"*.md; do
+for rule_file in "$REPO_ROOT/rules/"*.md; do
   [[ -e "$rule_file" ]] || continue
   name=$(basename "$rule_file")
   install_symlink "$rule_file" "$HOME/.claude/rules/$name" "rules/$name"
 done
 
-install_symlink "$SOURCE_DIR/CLAUDE.md" "$HOME/.claude/CLAUDE.md" "CLAUDE.md"
+# Symlink rules/filesystem/ subdirectory as a unit
+install_symlink "$REPO_ROOT/rules/filesystem" "$HOME/.claude/rules/filesystem" "rules/filesystem/"
+
+install_symlink "$REPO_ROOT/CLAUDE.md" "$HOME/.claude/CLAUDE.md" "CLAUDE.md"
 
 # ---------------------------------------------------------------------------
 # Step 6 — Symlink pre-commit hook
@@ -237,18 +239,49 @@ install_symlink "$SOURCE_DIR/CLAUDE.md" "$HOME/.claude/CLAUDE.md" "CLAUDE.md"
 echo ""
 echo "Step 6 — Symlinking pre-commit hook"
 
-HOOK_TARGET="$SOURCE_DIR/hooks/pre-commit"
+HOOK_TARGET="$REPO_ROOT/hooks/pre-commit"
 HOOK_LINK="$HOME/.claude/hooks/pre-commit"
 
 install_symlink "$HOOK_TARGET" "$HOOK_LINK" "hooks/pre-commit"
 chmod +x "$HOOK_TARGET"
 
 # ---------------------------------------------------------------------------
-# Step 7 — Install MCP packages
+# Step 7 — Install Claude Code plugins
 # ---------------------------------------------------------------------------
 
 echo ""
-echo "Step 7 — Installing MCP packages"
+echo "Step 7 — Installing Claude Code plugins"
+
+PLUGINS=(
+  "atlassian@claude-plugins-official"
+  "aws-serverless@claude-plugins-official"
+  "claude-code-setup@claude-plugins-official"
+  "claude-md-management@claude-plugins-official"
+  "commit-commands@claude-plugins-official"
+  "context7@claude-plugins-official"
+  "explanatory-output-style@claude-plugins-official"
+  "feature-dev@claude-plugins-official"
+  "plugin-dev@claude-plugins-official"
+  "pyright-lsp@claude-plugins-official"
+  "security-guidance@claude-plugins-official"
+  "skill-creator@claude-plugins-official"
+  "superpowers@claude-plugins-official"
+)
+
+for plugin in "${PLUGINS[@]}"; do
+  if claude plugin install "$plugin" 2>/dev/null; then
+    success "installed plugin: $plugin"
+  else
+    warn "plugin install may have failed: $plugin — run manually with: claude plugin install $plugin"
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# Step 8 — Install MCP packages
+# ---------------------------------------------------------------------------
+
+echo ""
+echo "Step 8 — Installing MCP packages"
 
 install_npm_pkg() {
   local pkg="$1"
@@ -282,14 +315,14 @@ for pkg in graphifyy tree-sitter-python tree-sitter-typescript pyyaml jsonschema
 done
 
 # ---------------------------------------------------------------------------
-# Step 8 — Merge MCP settings into ~/.claude/settings.json
+# Step 9 — Merge MCP settings into ~/.claude/settings.json
 # ---------------------------------------------------------------------------
 
 echo ""
-echo "Step 8 — Merging MCP settings into ~/.claude/settings.json"
+echo "Step 9 — Merging MCP settings into ~/.claude/settings.json"
 
 SETTINGS_FILE="$HOME/.claude/settings.json"
-MCP_TEMPLATE="$SOURCE_DIR/templates/mcp-settings.json"
+MCP_TEMPLATE="$REPO_ROOT/templates/mcp-settings.json"
 
 # Convert to native OS paths for Python — on Windows/MinGW, $HOME expands to
 # a MSYS path (/c/Users/...) that Windows Python cannot open.
@@ -350,10 +383,14 @@ with open(settings_path, "w") as f:
 
 print(f"  ✓ settings.json written: {settings_path}")
 PYEOF
+  echo ""
+  echo "  ℹ  Add Bitbucket credentials manually to ~/.claude/settings.json:"
+  echo "       mcpServers.bitbucket.env.BITBUCKET_USERNAME"
+  echo "       mcpServers.bitbucket.env.BITBUCKET_APP_PASSWORD"
 fi
 
 # ---------------------------------------------------------------------------
-# Step 9 — Summary
+# Step 10 — Summary
 # ---------------------------------------------------------------------------
 
 echo ""

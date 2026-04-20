@@ -1,0 +1,23 @@
+{
+  "project": {
+    "name": "claude-workflow-improvements",
+    "description": "Personal Claude Code workflow — skills, agents, rules, hooks"
+  },
+  "jira": {
+    "enabled": true,
+    "project": "CLAUDE",
+    "default-issue-type": "Task"
+  },
+  "git": {
+    "main-branch": "main",
+    "require-jira-key-in-commits": true
+  },
+  "workflow": {
+    "architect-review": true,
+    "tdd": false,
+    "plan-gate": true
+  },
+  "testing": {
+    "python-command": "python"
+  }
+}
