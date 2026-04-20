@@ -4,13 +4,6 @@
 
 ## Up Next
 
-- [ ] Integrated tool creation + plugin lifecycle — [plans/tool-creation-plugin-lifecycle/PLAN.md](plans/tool-creation-plugin-lifecycle/PLAN.md)
-  - [ ] `creating-tools` orchestration skill
-  - [ ] `writing-agents` skill
-  - [ ] `writing-rules` skill
-  - [ ] Integrate skill-creator eval into writing-skills
-  - [ ] Plugin registry + lifecycle governance
-
 ## Backlog
 
 - Mobile app workflow observations — real-world testing of memory capture, skill triggering, and CSO effectiveness in a new repo. Mobile app repo on separate machine will be used to observe whether memory is actually being written/read, which skills auto-trigger vs. get skipped, and what friction surfaces. Signal feeds back into memory system and CSO improvements. [scope]
@@ -18,4 +11,5 @@
 
 ## History
 
+- [x] Integrated tool creation + plugin lifecycle — completed 2026-04-20. Created creating-tools orchestration skill, writing-agents TDD skill, writing-rules skill, integrated Pulser eval as Phase 3 of writing-skills, and established plugin registry + lifecycle governance with rules/plugin-lifecycle.md.
 - [x] Workflow Refinements — project.json, skill patches, token efficiency, feedback system — [plans/workflow-refinements/workflow-refinements-plan.md](plans/workflow-refinements/workflow-refinements-plan.md)
