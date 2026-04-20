@@ -4,7 +4,7 @@
 
 ## Up Next
 
-- [ ] Personal Workflow Repo — Restructure to dotfiles layout — [plans/personal-workflow-repo/PLAN.md](plans/personal-workflow-repo/PLAN.md)
+- [ ] Workflow Refinements — project.json, skill patches, token efficiency, feedback system — [plans/workflow-refinements/workflow-refinements-plan.md](plans/workflow-refinements/workflow-refinements-plan.md)
 
 ## Backlog
 

@@ -1,5 +1,11 @@
 # Workflow Refinements Implementation Plan
 
+**Parent Plan:** —
+**Status:** Ready for execution
+**Priority:** Medium
+**Repo:** claude-workflow-improvements
+**Jira Project:** CLAUDE
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Do NOT use the `superpowers:` prefix — invoke the local forked versions which have git-manager and plan-gate integration.
 
 **Goal:** Eliminate friction between the superpowers skill set and the custom workflow by adding per-repo config, a setup wizard, token-efficient orientation, unified plan doc paths, a lightweight feedback system, and a rules cleanup pass.
@@ -293,6 +299,8 @@ If `project.json` is absent, or `jira.enabled` is `false` or missing: treat the 
 
 **Fallback (no project.json):** Check whether CLAUDE.md contains a concrete project key — not a placeholder like `[PROJ]` or a missing field. This fallback exists for repos that have not yet run project-setup.
 ```
+
+**Spec deviation note (intentional):** The spec states "absence of project.json → no Jira, no key requirements." The replacement above adds a CLAUDE.md fallback for repos that haven't run project-setup yet. This is a deliberate backward-compatibility choice — existing repos relying on CLAUDE.md detection continue to work. New repos use project.json exclusively.
 
 - [ ] **Step 2: Verify the change**
 
@@ -612,6 +620,34 @@ Replace with:
 1. **Explore project context** — read project.json → read codebase-entry file if set → read plan doc if one exists → stop (see Orientation Protocol in using-superpowers)
 ```
 
+- [ ] **Step 2b: Update brainstorming — DOT graph node**
+
+The DOT graph in `skills/brainstorming/SKILL.md` references `"Explore project context"` as a named node. After Step 2, the prose and the diagram will be out of sync unless the graph is also updated.
+
+In `skills/brainstorming/SKILL.md`, find:
+
+```
+    "Explore project context" [shape=box];
+```
+
+Replace with:
+
+```
+    "Orient to repo context" [shape=box];
+```
+
+Then find:
+
+```
+    "Explore project context" -> "Visual questions ahead?";
+```
+
+Replace with:
+
+```
+    "Orient to repo context" -> "Visual questions ahead?";
+```
+
 - [ ] **Step 3: Update writing-plans — existing codebase section**
 
 In `skills/writing-plans/SKILL.md`, find:
@@ -664,14 +700,14 @@ Replace with:
 - **Write design doc** — save to `plans/<slug>/<slug>-design.md` and commit
 ```
 
-Also find any reference to `docs/superpowers/specs/` in the Documentation section and update:
+Also find this two-line block in the Documentation section (both lines must be in the find — the continuation line is part of the replacement):
 
 ```markdown
 - Write the validated design (spec) to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
   - (User preferences for spec location override this default)
 ```
 
-Replace with:
+Replace the entire two-line block with:
 
 ```markdown
 - Write the validated design (spec) to `plans/<slug>/<slug>-design.md`
@@ -1013,3 +1049,115 @@ After all tasks are complete, manually trace these scenarios:
 2. Background subagent appends to docs/workflow-feedback.md
 3. Main context gets one-line confirmation
 4. docs/workflow-feedback.md has a new entry with correct category
+
+---
+
+## Testing
+
+No compiled code exists in this repo. All verification is textual and structural. The tests below are the formal contract — each item states what correct output looks like from the outside and how to confirm it.
+
+### Manual Verification Steps
+
+#### Task 1 — project.json
+
+- [ ] File exists at `C:\Users\jason\repos\claude-workflow-improvements\project.json`
+- [ ] `python -m json.tool project.json` exits 0 and echoes clean JSON (no parse errors)
+- [ ] JSON contains `jira.enabled: true`, `jira.project: "CLAUDE"`, `workflow.tdd: false`, `git.require-jira-key-in-commits: true`
+
+#### Task 2 — project-setup skill
+
+- [ ] `skills/project-setup/SKILL.md` exists
+- [ ] First 5 lines contain frontmatter with `name: project-setup`
+- [ ] File contains all four phases: "Phase 1", "Phase 2", "Phase 3", "Phase 4"
+- [ ] "Symlink Architecture" block is present (workflow-repo-only note)
+
+#### Task 3 — git-manager: project.json-first Jira detection
+
+- [ ] `## Jira Key Requirement` section in `skills/git-manager/SKILL.md` references `project.json` and `jira.enabled` — not CLAUDE.md as the primary check
+- [ ] The CLAUDE.md fallback sentence is present (backward-compatibility for repos without project.json)
+- [ ] No reference to CLAUDE.md as the _sole_ source of truth for Jira detection remains in that section
+
+#### Task 4 — jira-workflow-manager: Step 0 config check
+
+- [ ] `## Step 0 — Project Config Check` section exists in `agents/jira-workflow-manager.md`
+- [ ] Step 0 appears before `## Step 1 — Identify Ticket Origin` in the file (line number of Step 0 is lower than line number of Step 1)
+- [ ] The table inside Step 0 contains rows for all four conditions: file absent, `jira.enabled: false`, `jira.enabled: true` with project, `jira.enabled: true` without project
+
+#### Task 5 — plan-gate: conditional architect-review skip
+
+- [ ] `## Project Config Check` section exists in `skills/plan-gate/SKILL.md`
+- [ ] That section appears before `## Gate Sequence` in the file
+- [ ] The override table covers `workflow.architect-review: false` (skip Step 1) and `workflow.plan-gate: false` (skip entire gate)
+
+#### Task 6 — executing-plans: Jira-gated task loop
+
+- [ ] `skills/executing-plans/SKILL.md` contains the phrase "jira.enabled" at least once in the Step 2 task loop
+- [ ] Steps 1 and 6 in the loop both include an "If Jira disabled: skip" branch
+- [ ] Step 7 includes an "If Jira disabled" branch that invokes plan-management without a jira-key
+
+#### Task 7 — test-driven-development: tdd flag exit
+
+- [ ] `## Project Config Check` section exists in `skills/test-driven-development/SKILL.md`
+- [ ] That section appears before `## Overview` in the file
+- [ ] The section contains the exact exit announcement: "TDD is disabled for this repo (`workflow.tdd: false`). Proceeding with direct implementation."
+
+#### Task 8 — using-superpowers: orientation hierarchy
+
+- [ ] `## Orientation Protocol` section exists in `skills/using-superpowers/SKILL.md`
+- [ ] It appears after `## Platform Adaptation` and before `# Using Skills`
+- [ ] The five-step hierarchy is present (project.json → codebase-entry → plan doc → stop → researcher)
+- [ ] The "Hard boundaries" block listing CODEBASE.md vs. code graph output is present
+
+#### Task 9 — brainstorming and writing-plans: orientation hierarchy
+
+- [ ] `skills/brainstorming/SKILL.md` "Working in existing codebases" block references "orientation hierarchy" and "codebase-entry" — no longer references "If CODEBASE.md exists" as the top-level check
+- [ ] Step 1 of the brainstorming checklist reads "read project.json → read codebase-entry file if set → read plan doc if one exists → stop"
+- [ ] The DOT graph node label is "Orient to repo context" (not "Explore project context") and its edge to "Visual questions ahead?" is intact
+- [ ] `skills/writing-plans/SKILL.md` contains "orientation hierarchy" and "codebase-entry" in place of the old "If CODEBASE.md exists" sentence
+
+#### Task 10 — plan doc path unification
+
+- [ ] `skills/brainstorming/SKILL.md` save-path instruction references `plans/<slug>/<slug>-design.md` — no remaining reference to `docs/superpowers/specs/`
+- [ ] `skills/writing-plans/SKILL.md` save-path instruction reads `plans/<slug>/<slug>-plan.md` — not the old `plans/<slug>/PLAN.md`
+- [ ] `TODO.md` no longer contains the stale line referencing `plans/personal-workflow-repo/PLAN.md`
+
+#### Task 11 — /feedback skill
+
+- [ ] `skills/feedback/SKILL.md` exists with frontmatter `name: feedback`
+- [ ] File contains all three steps: "Step 1 — Capture context snapshot", "Step 2 — Spawn background subagent", "Step 3 — Confirm"
+- [ ] The category list is present and includes at least: `skill-skipped`, `missing-capability`, `workflow-conflict`
+- [ ] Notes block describes the auto-created file header
+
+#### Task 12 — /review-workflow skill
+
+- [ ] `skills/review-workflow/SKILL.md` exists with frontmatter `name: review-workflow`
+- [ ] File contains all five steps: "Step 1 — Load feedback" through "Step 5 — Summary"
+- [ ] The fix-route table maps all eight category values to actions
+- [ ] Notes block contains the "Do not batch fixes" constraint
+
+#### Task 13 — rules audit
+
+- [ ] Only one filesystem-efficiency file remains under `rules/` after the consolidation (either `rules/filesystem/efficiency.md` alone, or a merged version — `rules/filesystem-efficiency.md` must be gone)
+- [ ] `~/.claude/rules/filesystem-efficiency.md` symlink is removed or no longer points to a deleted source file (run `ls -la ~/.claude/rules/` and confirm no broken symlink)
+- [ ] CLAUDE.md delegation table rows are present and unmodified (they are load-bearing global context — verify they were not removed)
+
+### Scenario Traces (graceful degradation)
+
+These are the definitive pass/fail criteria. Trace each scenario by reading the modified skill files and confirming the logic described below is present in the text.
+
+- [ ] **Scenario A (no project.json):** git-manager falls back to CLAUDE.md check. jira-workflow-manager assumes Jira configured and proceeds. plan-gate runs full sequence including architect review. TDD skill runs full discipline. No "file not found" error text in any skill.
+
+- [ ] **Scenario B (jira.enabled: false):** jira-workflow-manager stops with "Jira not configured" message. executing-plans skips all Jira transitions silently. git-manager does not require a key. These three behaviors are expressed as explicit conditional branches in the respective files — not as undefined behavior.
+
+- [ ] **Scenario C (full config, this repo — jira.enabled: true, workflow.tdd: false, workflow.architect-review: true):** git-manager requires Jira key (reads from project.json). plan-gate runs architect review. TDD skill exits immediately with the configured announcement. executing-plans transitions Jira tickets normally.
+
+- [ ] **Scenario D (workflow.architect-review: false):** plan-gate skips Step 1 and proceeds directly to Step 2 (test-strategy). The word "skip" or equivalent is present in the Project Config Check table for this condition.
+
+- [ ] **Scenario E (workflow.plan-gate: false):** plan-gate exits without running any gate steps and hands off directly to executing-plans.
+
+### Log Monitoring Notes
+
+No production services are involved. The only runtime-observable failure modes are:
+
+- A broken symlink in `~/.claude/rules/` after Task 13 would silently drop a rule from all sessions — check with `ls -la ~/.claude/rules/` post-commit
+- A malformed `project.json` (invalid JSON) would cause all skills that `cat project.json` to silently receive no output and fall through to legacy behavior — validate with `python -m json.tool project.json` before committing Task 1
