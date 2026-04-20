@@ -39,6 +39,21 @@ If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "alw
 
 Skills use Claude Code tool names. Non-CC platforms: see `references/copilot-tools.md` (Copilot CLI), `references/codex-tools.md` (Codex) for tool equivalents. Gemini CLI users get the tool mapping loaded automatically via GEMINI.md.
 
+## Orientation Protocol
+
+Before exploring any repo, follow this hierarchy — stop as soon as you have what you need:
+
+1. Read `project.json` at repo root (small, always fast — tells you what features are enabled)
+2. Read the file at `codebase-entry` in project.json if set (typically CODEBASE.md, 50–200 lines — safe to read directly)
+3. Read the plan doc for the current task if one exists (`plans/<slug>/<slug>-plan.md`)
+4. **Stop.** Do not explore further unless a specific detail is genuinely absent from all three sources
+5. For specific symbol/file lookups beyond that: dispatch `researcher` agent — never Grep or run bash on large codebases
+
+**Hard boundaries:**
+- `CODEBASE.md` → read directly (purpose-built for AI orientation, designed to be short)
+- Code graph output from `infra-init` (can be 250K+ lines) → researcher agent only, never read directly
+- Plan doc → always read during execution; it supersedes all filesystem exploration
+
 # Using Skills
 
 ## The Rule
