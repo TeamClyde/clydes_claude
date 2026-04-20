@@ -27,6 +27,23 @@ All Atlassian operations go through the official Atlassian remote MCP (Jira/Conf
 
 ---
 
+## Step 0 — Project Config Check
+
+Before any operation, check `project.json` at the repo root:
+
+```bash
+cat project.json 2>/dev/null
+```
+
+| Condition | Action |
+|-----------|--------|
+| File absent | Proceed — assume Jira is configured (legacy repos without project.json) |
+| `jira.enabled: false` | Respond: "Jira not configured for this project (`jira.enabled: false`). No operations to perform." Stop. |
+| `jira.enabled: true` + `jira.project` present | Use `jira.project` value as the default project key for all operations in this session |
+| `jira.enabled: true`, no `jira.project` | Ask caller for the project key before proceeding |
+
+---
+
 ## Step 1 — Identify Ticket Origin
 
 Every ticket has one of four origins. The origin determines format, lifecycle, and comment rules.
