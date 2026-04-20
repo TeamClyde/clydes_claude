@@ -19,9 +19,24 @@ Never call Glob with these patterns without a `path` parameter:
 
 Always scope with `path="src/function/"` or equivalent. A broad glob on a repo with 50+ files produces noise and consumes tokens with no gain over a targeted read.
 
+## Codebase Graph Tools (When Available)
+
+Prefer graph query tools over Grep for symbol navigation. Use Tool Search to find them:
+
+| Need | Search for |
+|------|-----------|
+| Does this symbol exist? | `codebase_search_symbol` |
+| What calls this function? | `codebase_find_callers` |
+| What does this file import? | `codebase_find_dependencies` |
+| Where is this env var defined? | `codebase_get_env_var` |
+| What are the entry points? | `codebase_get_entry_points` |
+| What routes are exposed? | `codebase_search_api_endpoints` |
+
+Use Grep only when no graph is present or when you need to read actual implementation logic.
+
 ## Plan-Doc-First Rule
 
-During task execution, the plan doc (`plans/CLAUDE-N-description.md`) is the primary reference. Do not use Glob or Grep to locate files that are already documented in the plan. Read the plan doc first; only fall back to filesystem search if a specific detail is genuinely missing.
+During task execution, the plan doc is the primary reference. Do not use Glob or Grep to locate files that are already documented in the plan. Read the plan doc first; only fall back to filesystem search if a specific detail is genuinely missing.
 
 ## Architecture Blueprint — New Epics
 
