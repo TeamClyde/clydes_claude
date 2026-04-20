@@ -1,0 +1,26 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "anthropic",
+    "atlassian",
+    "automate",
+    "cspell",
+    "frontmatter",
+    "jira",
+    "json",
+    "keybindings",
+    "mcp",
+    "mkdirp",
+    "onboarding",
+    "prereqs",
+    "subagent",
+    "symlink",
+    "symlinked",
+    "symlinks",
+    "worktree",
+    "worktrees",
+    "wooshair"
+  ],
+  "ignorePaths": ["node_modules", ".git"]
+}
