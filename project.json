@@ -16,5 +16,8 @@
     "architect-review": true,
     "tdd": false,
     "plan-gate": true
+  },
+  "testing": {
+    "python-command": "python"
   }
 }

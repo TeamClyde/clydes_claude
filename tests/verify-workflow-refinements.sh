@@ -8,6 +8,11 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 PASS=0
 FAIL=0
 
+# Resolve python command from project.json testing.python-command, fall back to python3
+PYTHON_CMD=$(grep -o '"python-command": *"[^"]*"' "$REPO/project.json" 2>/dev/null \
+    | grep -o '"[^"]*"$' | tr -d '"')
+PYTHON_CMD="${PYTHON_CMD:-python3}"
+
 pass() {
     echo "PASS: $1"
     PASS=$((PASS + 1))
@@ -122,7 +127,7 @@ check_file_exists \
     "$REPO/project.json"
 
 if [ -f "$REPO/project.json" ]; then
-    if python3 -m json.tool "$REPO/project.json" > /dev/null 2>&1; then
+    if "$PYTHON_CMD" -m json.tool "$REPO/project.json" > /dev/null 2>&1; then
         pass "Task 1: project.json is valid JSON"
     else
         fail "Task 1: project.json is not valid JSON"
