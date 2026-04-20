@@ -1,6 +1,7 @@
 ---
 name: executing-plans
 description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
+allowed-tools: Read
 ---
 
 # Executing Plans
@@ -30,9 +31,10 @@ For each task:
 2. Mark task as in_progress in TodoWrite
 3. Follow each step exactly (plan has bite-sized steps)
 4. Run verifications as specified
-5. Mark task as completed
-6. If Jira enabled: Transition Jira ticket to Done (or Testing if human verification required) via jira-workflow-manager. If Jira disabled: skip.
-7. If Jira enabled: Invoke plan-management skill: path, jira-key, status: completed, 1-2 sentence summary. If Jira disabled: invoke plan-management skill with status: completed and summary only (omit jira-key).
+5. **If the task created one or more skills:** run `pulser --strict --skill <name> --no-anim` before marking done. Fix any warnings or errors before proceeding. This is a hard gate — do not skip even if pulser was not listed in the plan's testing section.
+6. Mark task as completed
+7. If Jira enabled: Transition Jira ticket to Done (or Testing if human verification required) via jira-workflow-manager. If Jira disabled: skip.
+8. If Jira enabled: Invoke plan-management skill: path, jira-key, status: completed, 1-2 sentence summary. If Jira disabled: invoke plan-management skill with status: completed and summary only (omit jira-key).
 
 ### Step 3: Complete Development
 
@@ -40,6 +42,14 @@ After all tasks complete and verified:
 - Announce: "I'm using the finishing-a-development-branch skill to complete this work."
 - **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
 - Follow that skill to verify tests, present options, execute choice
+
+## Gotchas
+
+1. **Skipping Step 1 (plan review) to save time.** Plans have gaps. Reviewing critically before touching any code catches blockers before they cost two hours of work. Read the whole plan first.
+2. **Not checking `project.json` before starting.** Jira and git behavior depend on it. Starting without reading it produces commits with missing keys or broken transitions.
+3. **Marking a task complete before its verification passes.** Verification is part of the task. A task with failing tests or a failing pulser check is not done — it is still in progress.
+4. **Skipping the pulser gate for skill-creation tasks.** This is the most common way newly-created skills ship with a lower score than they should. Step 5 is a hard gate — no exceptions.
+5. **Batching task completions.** Mark each task done the moment it is verified, before starting the next. Batching makes it easy to lose track of which step failed if something goes wrong.
 
 ## When to Stop and Ask for Help
 
