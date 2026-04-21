@@ -29,7 +29,7 @@ A plan doc is complete when it has: context, an architecture blueprint, an Epic/
 When a user presents a completed plan doc with intent to proceed:
 
 1. **Read the plan doc.** It is the sole source of implementation truth. Do not Grep or Glob for information it should already contain.
-2. Check the **Epic / Task Reference** section. Create tickets via `jira-workflow-manager` and update the table rows with the assigned keys. (If keys are already listed from a prior session, verify they exist.) Then invoke `todo-manager` with the plan doc path, Epic key, and `status: created` — this syncs the plan doc's ticket table into TODO.md for the first time.
+2. Check the **Epic / Task Reference** section. Create tickets via `jira-workflow-manager` and update the table rows with the assigned keys. (If keys are already listed from a prior session, verify they exist.) Then invoke `plan-management` skill with: plan doc path, Epic key, `status: created` — this syncs the plan doc's ticket table into TODO.md for the first time.
 3. Begin execution. Follow Phase 2 for all status transitions.
 
 The plan doc is the handoff artifact. Receiving it does not bypass ticket creation or status transitions.
@@ -59,8 +59,8 @@ different levels of granularity. They must stay in sync:
 | Event | Action |
 | ----- | ------ |
 | Jira ticket transitions to Done | Prepend `✅` to the corresponding row in the plan doc's Epic/Task Reference table |
-| Jira ticket transitions to Done | Invoke `todo-manager` with: ticket key, plan doc path, `status: completed`, 1-2 sentence summary. The agent determines if the linked TODO.md item is fully done or partially done and marks it accordingly. |
-| One TODO.md item maps to multiple Jira tickets | todo-manager handles this internally — invoke it after every Done transition; it accumulates progress |
+| Jira ticket transitions to Done | Invoke `plan-management` skill with: ticket key, plan doc path, `status: completed`, 1-2 sentence summary. The skill determines if the linked TODO.md item is fully done or partially done and marks it accordingly. |
+| One TODO.md item maps to multiple Jira tickets | Invoke `plan-management` after every Done transition; it accumulates progress across partial completions. |
 
 A Jira ticket being Done means the plan doc row is done. They are equivalent records of the same
 work, not separate tracking systems.
@@ -80,7 +80,7 @@ work, not separate tracking systems.
 After a task commit is confirmed:
 
 1. Invoke `jira-workflow-manager` to transition the ticket to Done (or Testing if AWS verification required).
-2. After the ticket transitions to Done, invoke `todo-manager` with: ticket key, plan doc path, `status: completed`, 1-2 sentence summary.
+2. After the ticket transitions to Done, invoke `plan-management` skill with: ticket key, plan doc path, `status: completed`, 1-2 sentence summary.
 
 Commit format: `type: description [PROJ-N]`
 
