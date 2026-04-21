@@ -9,7 +9,7 @@ Route every operation through the correct abstraction. Never run git commands di
 | Git commit, branch, push, PR, tag | `git-manager` skill (`Skill` tool) |
 | Jira ticket creation, status transitions, updates | `jira-workflow-manager` agent (`Agent` tool) |
 | Plan doc registration, TODO.md updates, archival | `plan-management` skill (`Skill` tool) |
-| Independent plan/code review | `architect` agent (`Task` tool, `subagent_type: architect`) |
+| Independent plan/code review | `architect` agent (`Agent` tool, `subagent_type: architect`) |
 
 ---
 
@@ -45,7 +45,7 @@ When in doubt, size up. Token estimates are rough — use them to calibrate, not
 
 1. **Assess** — size the work. L-sized or scope unclear → continue to Design.
 2. **Design** — invoke the `brainstorming` skill. It asks clarifying questions, proposes approaches, and produces a design doc at `plans/<slug>/<slug>-design.md`. Commit the design doc. Skip for S-sized work where the approach is already clear.
-3. **Plan** — `brainstorming` hands off to `writing-plans`. Read the design doc and any existing plan doc in `plans/`; produce `plans/<slug>/<slug>-plan.md`. Invoke `architect` before `ExitPlanMode`.
+3. **Plan** — `brainstorming` hands off to `writing-plans`. Read the design doc and any existing plan doc in `plans/`; produce `plans/<slug>/<slug>-plan.md`. `writing-plans` fires `plan-gate` automatically — plan-gate handles architect review (Case A). For ad-hoc plan mode without `writing-plans`, invoke architect manually before `ExitPlanMode` (Case B).
 4. **Tickets** — create via `jira-workflow-manager` from the plan doc. Write Jira keys back into the Task Reference table. Register the plan in TODO.md via `plan-management` skill (pointer entry: plan doc path + Epic key).
 5. **Execute** — one task at a time. Transition to In Progress via `jira-workflow-manager` before starting.
 6. **Commit** — via `git-manager` skill. Every commit includes the Jira key.
