@@ -1,6 +1,7 @@
 ---
 name: test-driven-development
-description: Use when implementing any feature or bugfix, before writing implementation code
+description: Use when implementing any feature or bugfix, before writing implementation code — requires a failing test first, then minimum code to pass, then refactor. No implementation without a red test.
+allowed-tools: Read, Write, Edit, Bash
 ---
 
 # Test-Driven Development (TDD)
@@ -385,3 +386,9 @@ Otherwise → not TDD
 ```
 
 No exceptions without your human partner's permission.
+
+## Gotchas
+
+1. Write the failing test first — always. If the test passes before implementation, the test is wrong.
+2. Write the minimum implementation to make the test pass — do not add features not covered by a failing test.
+3. Run the full test suite after each green step, not just the new test.

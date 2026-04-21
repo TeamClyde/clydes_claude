@@ -1,6 +1,7 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code
+description: Use when you have a spec or requirements for a multi-step task, before touching code — produces a plan doc with concrete file paths, task breakdown, and architecture blueprint. Hands off to plan-gate automatically.
+allowed-tools: Read, Write, Agent, Skill, Glob, Grep
 ---
 
 # Writing Plans
@@ -144,3 +145,9 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 **REQUIRED NEXT STEP: invoke plan-gate immediately. Do not wait for user input.**
 
 plan-gate will: run architect review, generate your testing contract, write failing tests, create Jira tickets, and register the plan in TODO.md — then hand off to executing-plans.
+
+## Gotchas
+
+1. Every task in the plan must have exact file paths — no "the appropriate file" or "wherever it lives".
+2. plan-gate fires automatically when this skill completes — do not also invoke architect manually.
+3. Plans must be self-contained: a model with an empty context window should be able to execute the plan from the doc alone.

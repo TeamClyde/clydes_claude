@@ -1,6 +1,7 @@
 ---
 name: verification-before-completion
 description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
+allowed-tools: Read, Bash, Grep
 ---
 
 # Verification Before Completion
@@ -137,3 +138,9 @@ From 24 failure memories:
 Run the command. Read the output. THEN claim the result.
 
 This is non-negotiable.
+
+## Gotchas
+
+1. Run this before every commit, not just before claiming the task is done — it catches regressions.
+2. A passing type-check or linter is not the same as a passing test suite — both must pass.
+3. If verification reveals a regression in unrelated code, do not silently fix it — surface it to the user.

@@ -1,6 +1,7 @@
 ---
 name: requesting-code-review
 description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
+allowed-tools: Bash, Read
 ---
 
 # Requesting Code Review
@@ -103,3 +104,9 @@ You: [Fix progress indicators]
 - Request clarification
 
 See template at: requesting-code-review/code-reviewer.md
+
+## Gotchas
+
+1. Run tests and ensure they pass before requesting review — never submit a failing build for review.
+2. Include the Jira key in the PR title if `jira.enabled: true` in project.json.
+3. The PR description must link to the plan doc — reviewers need context the diff doesn't provide.

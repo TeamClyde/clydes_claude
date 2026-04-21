@@ -1,6 +1,7 @@
 ---
 name: systematic-debugging
-description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
+description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes — requires reproducing the issue, isolating root cause, and validating the fix rather than guessing.
+allowed-tools: Read, Bash, Grep, Glob
 ---
 
 # Systematic Debugging
@@ -294,3 +295,9 @@ From debugging sessions:
 - Random fixes approach: 2-3 hours of thrashing
 - First-time fix rate: 95% vs 40%
 - New bugs introduced: Near zero vs common
+
+## Gotchas
+
+1. Do not skip the baseline — reproduce the bug before attempting a fix, or you may fix the wrong thing.
+2. Diagnose root cause before switching approaches — one failed attempt is not sufficient evidence to abandon the approach.
+3. If three focused fixes fail, surface the diagnosis to the user before trying a fourth.

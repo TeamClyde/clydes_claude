@@ -1,6 +1,7 @@
 ---
 name: subagent-driven-development
-description: Use when executing implementation plans with independent tasks in the current session
+description: Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with two-stage review (spec compliance, then code quality) after each task.
+allowed-tools: Agent, Read, Skill, Write
 ---
 
 # Subagent-Driven Development
@@ -275,3 +276,9 @@ Done!
 
 **Alternative workflow:**
 - **superpowers:executing-plans** - Use for parallel session instead of same-session execution
+
+## Gotchas
+
+1. Only use for tasks from a plan doc that have been verified as independent — do not parallelize tasks with shared file dependencies.
+2. Each subagent receives the full task context from the plan doc — do not rely on subagents inferring shared state.
+3. Collect all subagent results before committing — partial commits from parallel work create messy history.

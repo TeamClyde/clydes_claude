@@ -1,6 +1,7 @@
 ---
 name: using-superpowers
 description: Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions
+allowed-tools: Read
 ---
 
 <SUBAGENT-STOP>
@@ -148,3 +149,9 @@ These agents are available in addition to superpowers skills:
 ## Skills Registry Addition
 
 - `plan-gate`: Runs automatically after writing-plans. Gates the plan through architect review, test-strategy, test-builder, Jira ticket creation, and TODO.md registration before execution begins. Can also be invoked manually against any plan doc at `plans/<slug>/<slug>-plan.md`.
+
+## Gotchas
+
+1. Skills listed in this orientation may not be symlinked yet on a fresh install — run setup.sh first.
+2. Plugin skills (like `plugin-dev:*`) that are in Integrated state must be invoked via `creating-tools`, not directly — see `rules/plugin-lifecycle.md`.
+3. If a skill doesn't trigger when expected, check the description trigger pattern — it must match the user's phrasing.

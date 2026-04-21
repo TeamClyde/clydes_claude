@@ -1,6 +1,7 @@
 ---
 name: using-git-worktrees
 description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification
+allowed-tools: Bash, Read
 ---
 
 # Using Git Worktrees
@@ -216,3 +217,9 @@ Ready to implement auth feature
 
 **Pairs with:**
 - **finishing-a-development-branch** - REQUIRED for cleanup after work complete
+
+## Gotchas
+
+1. Clean up worktrees when done — abandoned worktrees cause `git worktree list` clutter and disk waste.
+2. Do not run `setup.sh` or `infra-init` from inside a worktree — they write to `~/.claude/` which is shared.
+3. `finishing-a-development-branch` is the cleanup pair for this skill — invoke it when work is done.

@@ -1,6 +1,7 @@
 ---
 name: receiving-code-review
 description: Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation
+allowed-tools: Read, Write, Edit, Bash
 ---
 
 # Code Review Reception
@@ -211,3 +212,9 @@ When replying to inline review comments on GitHub, reply in the comment thread (
 Verify. Question. Then implement.
 
 No performative agreement. Technical rigor always.
+
+## Gotchas
+
+1. Read every comment before implementing any — a later comment may contradict an earlier one.
+2. Do not implement suggestions you disagree with without surfacing the disagreement first.
+3. Commit after all review items from a single reviewer are addressed — not after each item.
