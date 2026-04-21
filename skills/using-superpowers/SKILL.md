@@ -147,4 +147,4 @@ These agents are available in addition to superpowers skills:
 
 ## Skills Registry Addition
 
-- `plan-gate`: Runs automatically after writing-plans. Gates the plan through architect review, test-strategy, test-builder, Jira ticket creation, and TODO.md registration before execution begins. Can also be invoked manually against any plan doc at `plans/<slug>/PLAN.md`.
+- `plan-gate`: Runs automatically after writing-plans. Gates the plan through architect review, test-strategy, test-builder, Jira ticket creation, and TODO.md registration before execution begins. Can also be invoked manually against any plan doc at `plans/<slug>/<slug>-plan.md`.

@@ -5,7 +5,7 @@ description: >
   adding items to the backlog, or when reconciling TODO.md against current ticket
   state. Invoke after every ticket creation or status transition to keep TODO.md
   current.
-argument-hint: "status:created|in_progress|completed|backlog|reconcile ticket-key:PROJ-N plan-doc:plans/slug/PLAN.md summary:'...'"
+argument-hint: "status:created|in_progress|completed|backlog|reconcile ticket-key:PROJ-N plan-doc:plans/slug/<slug>-plan.md summary:'...'"
 ---
 
 # plan-management Skill
@@ -22,7 +22,7 @@ Keep TODO.md current as a high-level pointer registry for all active work. Every
 |-----------|----------|--------|
 | `status` | Always | `created` \| `in_progress` \| `completed` \| `backlog` \| `reconcile` |
 | `ticket-key` | Required for `created`, `in_progress`, `completed`; optional for `backlog` | e.g. `PROJ-42` |
-| `plan-doc` | Required for `created`, `in_progress`, `completed` | e.g. `plans/slug/PLAN.md` |
+| `plan-doc` | Required for `created`, `in_progress`, `completed` | e.g. `plans/slug/<slug>-plan.md` |
 | `summary` | Required for `completed`; optional for others | 1–2 sentences describing what was done |
 
 ---
@@ -44,7 +44,7 @@ Fixed section order — never reorder, never rename sections:
 
 **Plan-backed item** (used in In Progress and Up Next):
 ```markdown
-- [ ] [PROJ-N] Plan summary — [plan doc link](plans/slug/PLAN.md)
+- [ ] [PROJ-N] Plan summary — [plan doc link](plans/slug/<slug>-plan.md)
   - [ ] Sub-task 1
   - [ ] Sub-task 2
 ```

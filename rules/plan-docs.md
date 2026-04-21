@@ -6,9 +6,11 @@ Two types of plan-related files exist. Do not conflate them.
 
 Created automatically by Claude Code for every plan mode session. All plan mode work produces this file. S and M-sized tasks that use plan mode still produce this file — they do not require a local counterpart.
 
-## Epic Plan Doc (`plans/CLAUDE-N-description.md` in the local repo)
+## Implementation Plan Doc (`plans/<slug>/<slug>-plan.md` in the local repo)
 
-Required when plan mode wraps up for **L-sized work**: several files affected, many implementation steps. Create this file **before calling `ExitPlanMode`** using the Write tool at `plans/CLAUDE-N-description.md` in the project root. This is a separate file from the global plan mode file — do not reference or substitute one for the other.
+Required when plan mode wraps up for **L-sized work**: several files affected, many implementation steps. Create this file **before calling `ExitPlanMode`** using the Write tool at `plans/<slug>/<slug>-plan.md` in the project root. This is a separate file from the global plan mode file — do not reference or substitute one for the other.
+
+If a design doc exists for this work (`plans/<slug>/<slug>-design.md`), the implementation plan was produced by the `writing-plans` skill after `brainstorming` completed — read the design doc as the starting point.
 
 ### Required sections
 

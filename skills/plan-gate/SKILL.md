@@ -1,6 +1,6 @@
 ---
 name: plan-gate
-description: Runs automatically after writing-plans. Gates the plan through architect review, test-strategy, test-builder, Jira ticket creation, and TODO.md registration before execution begins. Can also be invoked manually against any plan doc at plans/<slug>/PLAN.md.
+description: Runs automatically after writing-plans. Gates the plan through architect review, test-strategy, test-builder, Jira ticket creation, and TODO.md registration before execution begins. Can also be invoked manually against any plan doc at plans/<slug>/<slug>-plan.md.
 ---
 
 # Plan Gate
@@ -11,7 +11,7 @@ Bridge between planning and execution. Automatically invoked at the end of writi
 
 **Trigger:** Automatically invoked after writing-plans saves a plan doc. Can also be invoked manually.
 
-**Input:** Path to a completed plan doc at `plans/<slug>/PLAN.md`.
+**Input:** Path to a completed plan doc at `plans/<slug>/<slug>-plan.md`.
 
 **Announce at start:** "I'm using the plan-gate skill to gate this plan before execution."
 
@@ -83,7 +83,7 @@ The agent assigns Jira keys and writes them back into the Task Reference table r
 ### Step 5 — TODO.md Registration
 
 Invoke the `plan-management` skill:
-- `path`: `plans/<slug>/PLAN.md`
+- `path`: `plans/<slug>/<slug>-plan.md`
 - `jira-key`: the Epic key assigned in Step 4
 - `status`: `created`
 
@@ -93,7 +93,7 @@ Invoke the `plan-management` skill:
 
 After all 5 steps complete successfully:
 
-> "Plan gated and ready. Invoke executing-plans with `plans/<slug>/PLAN.md` to begin."
+> "Plan gated and ready. Invoke executing-plans with `plans/<slug>/<slug>-plan.md` to begin."
 
 ---
 

@@ -44,7 +44,7 @@ Surface both. Neither is automatically BLOCKING.
 
 You cannot search files on your own. When you encounter a reference to another plan doc, function, file path, or symbol that you cannot confirm from the plan doc text alone:
 
-1. Invoke `researcher` with a narrow, specific question (e.g. "Does `plans/07-slack-integration/PLAN.md` exist?" or "Where is `slack_notifier` defined?").
+1. Invoke `researcher` with a narrow, specific question (e.g. "Does `plans/slack-integration/slack-integration-plan.md` exist?" or "Where is `slack_notifier` defined?").
 2. Wait for the answer before classifying the finding.
 3. Researcher confirms → note as LOOKS GOOD or omit.
 4. Researcher returns "not found" → classify as BLOCKING.

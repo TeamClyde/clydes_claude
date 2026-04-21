@@ -43,18 +43,19 @@ When in doubt, size up. Token estimates are rough — use them to calibrate, not
 
 ## Workflow Sequence
 
-1. **Assess** — size the work. L-sized or scope unclear → `EnterPlanMode`.
-2. **Plan** — read existing plan doc in `plans/` if one exists, or create `plans/<slug>/PLAN.md`. Follow planning rules (loads automatically when reading plan docs). Invoke `architect` before `ExitPlanMode`.
-3. **Tickets** — create via `jira-workflow-manager` from the plan doc. Write Jira keys back into the Task Reference table. Register the plan in TODO.md via `plan-management` skill (pointer entry: plan doc path + Epic key).
-4. **Execute** — one task at a time. Transition to In Progress via `jira-workflow-manager` before starting.
-5. **Commit** — via `git-manager` skill. Every commit includes the Jira key.
-6. **Close** — transition to Done (or Testing if human verification needed) via `jira-workflow-manager`. Mark the Task Reference row ✅ in the plan doc. Invoke `plan-management` skill with status and 1–2 sentence summary.
+1. **Assess** — size the work. L-sized or scope unclear → continue to Design.
+2. **Design** — invoke the `brainstorming` skill. It asks clarifying questions, proposes approaches, and produces a design doc at `plans/<slug>/<slug>-design.md`. Commit the design doc. Skip for S-sized work where the approach is already clear.
+3. **Plan** — `brainstorming` hands off to `writing-plans`. Read the design doc and any existing plan doc in `plans/`; produce `plans/<slug>/<slug>-plan.md`. Invoke `architect` before `ExitPlanMode`.
+4. **Tickets** — create via `jira-workflow-manager` from the plan doc. Write Jira keys back into the Task Reference table. Register the plan in TODO.md via `plan-management` skill (pointer entry: plan doc path + Epic key).
+5. **Execute** — one task at a time. Transition to In Progress via `jira-workflow-manager` before starting.
+6. **Commit** — via `git-manager` skill. Every commit includes the Jira key.
+7. **Close** — transition to Done (or Testing if human verification needed) via `jira-workflow-manager`. Mark the Task Reference row ✅ in the plan doc. Invoke `plan-management` skill with status and 1–2 sentence summary.
 
 ---
 
 ## Source of Truth
 
-The plan doc (`plans/<slug>/PLAN.md`) is the single source of truth for what will be built and what was built.
+The implementation plan doc (`plans/<slug>/<slug>-plan.md`) is the single source of truth for what will be built and what was built. The paired design doc (`plans/<slug>/<slug>-design.md`) is the upstream artifact — it captures approach decisions and is produced by the `brainstorming` skill before the implementation plan is written.
 
 - **Jira** is seeded from the plan doc at ticket-creation time. Deviations go in Jira comments — never rewrite descriptions to match what was done instead of what was planned.
 - **TODO.md** is a pointer registry: one entry per active plan containing the plan doc path and Epic key. It does not duplicate task rows or status details.
@@ -85,7 +86,7 @@ claude-workflow-improvements/
 │   └── pre-commit              — global pre-commit hook → symlinked to ~/.claude/hooks/pre-commit
 ├── templates/                  — project templates (not symlinked; copied on use)
 ├── docs/                       — public-facing documentation
-│   └── superpowers/specs/      — brainstorming and design specs
+│   └── superpowers/specs/      — archived design specs (old location; new: plans/<slug>/<slug>-design.md)
 └── scripts/
     └── setup.sh                — idempotent installer
 ```

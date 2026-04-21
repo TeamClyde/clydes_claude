@@ -60,12 +60,13 @@ When in doubt, size up.
 
 | Plan type | Location |
 |---|---|
-| L — architectural work | `plans/<slug>/PLAN.md` in the local repo |
+| Design doc (from brainstorming) | `plans/<slug>/<slug>-design.md` |
+| L — implementation plan | `plans/<slug>/<slug>-plan.md` |
 | S/M — session scratch | `~/.claude/plans/` only (session-scoped, not durable) |
-| Sub-plan (significant, standalone) | `plans/<parent-slug>/<child-slug>/PLAN.md` |
+| Sub-plan (significant, standalone) | `plans/<parent-slug>/<child-slug>/<child-slug>-plan.md` |
 | Sub-plan (small addition to existing plan) | Appended section in the parent plan doc |
 
-`~/.claude/plans/` files are ephemeral scratch pads. They are never the durable record — only `plans/<slug>/PLAN.md` in the repo survives session boundaries.
+Both the design doc and implementation plan live under the same `plans/<slug>/` directory. `~/.claude/plans/` files are ephemeral scratch pads. They are never the durable record — only `plans/<slug>/<slug>-plan.md` in the repo survives session boundaries.
 
 ### Required Sections (L-sized plan docs)
 
@@ -111,7 +112,7 @@ draft plan → architect → test-strategy → ExitPlanMode
 Architect runs first — it reviews the plan for design soundness and self-containment. Test-strategy runs after architect approval — it appends the Testing section.
 
 ```
-Task { subagent_type: "architect", prompt: "plan\n\nPlan doc: plans/<slug>/PLAN.md" }
+Task { subagent_type: "architect", prompt: "plan\n\nPlan doc: plans/<slug>/<slug>-plan.md" }
 ```
 
 **Iteration rules (max 3 rounds):**
@@ -130,7 +131,7 @@ Each re-invocation is a fresh pass — no memory of prior rounds. If BLOCKING is
 After the architect returns APPROVED, invoke the `test-strategy` agent:
 
 ```
-Agent { subagent_type: "test-strategy", prompt: "Review this plan and produce a Testing section. Plan doc: plans/<slug>/PLAN.md" }
+Agent { subagent_type: "test-strategy", prompt: "Review this plan and produce a Testing section. Plan doc: plans/<slug>/<slug>-plan.md" }
 ```
 
 The agent appends a `## Testing` section to the plan doc. "Existing tests cover this — no new tests required" is a valid and complete output. MUST NOT begin implementation without validation criteria present in the plan doc.
@@ -144,6 +145,6 @@ When all Task Reference rows are ✅ and all Jira tickets are Done:
 1. Add a Completion block to the plan doc (date + 1–2 sentence summary of what was built and deviations from the original design).
 2. Invoke `plan-management` skill:
    ```
-   Skill { skill: "plan-management", args: "path: plans/<slug>/PLAN.md jira-key: CLAUDE-N status: completed summary: '<1–2 sentences>'" }
+   Skill { skill: "plan-management", args: "path: plans/<slug>/<slug>-plan.md jira-key: CLAUDE-N status: completed summary: '<1–2 sentences>'" }
    ```
 3. `TodoWrite` is session-scoped and resets between conversations — it is NOT a substitute for plan doc updates. Both must be maintained independently: `TodoWrite` tracks in-session task state; the plan doc is the durable record.
