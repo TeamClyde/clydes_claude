@@ -212,6 +212,35 @@ mkdir -p "$HOME/.claude/hooks"
 success "~/.claude/ directories ready"
 
 # ---------------------------------------------------------------------------
+# Step 2.5 — Remove orphaned symlinks
+# ---------------------------------------------------------------------------
+# When a component is deleted from the repo (e.g. a retired agent), its
+# ~/.claude/ symlink stays in place and will be loaded by Claude Code on
+# every session. This step removes broken symlinks from all three dirs.
+
+echo ""
+echo "Step 2.5 — Removing orphaned symlinks"
+
+remove_orphaned() {
+  local dir="$1"
+  local label="$2"
+  [[ -d "$dir" ]] || return 0
+  local found=false
+  for link in "$dir"/*; do
+    [[ -L "$link" ]] || continue   # skip non-symlinks
+    [[ -e "$link" ]] && continue   # skip valid (non-broken) symlinks
+    rm -f "$link"
+    success "removed orphaned symlink: $label/$(basename "$link")"
+    found=true
+  done
+  $found || skip "no orphaned symlinks in $label"
+}
+
+remove_orphaned "$HOME/.claude/agents" "agents"
+remove_orphaned "$HOME/.claude/skills" "skills"
+remove_orphaned "$HOME/.claude/rules"  "rules"
+
+# ---------------------------------------------------------------------------
 # Step 3 — Symlink agents
 # ---------------------------------------------------------------------------
 
