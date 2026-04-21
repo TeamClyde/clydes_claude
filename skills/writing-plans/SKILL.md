@@ -34,6 +34,8 @@ Before defining tasks, map out which files will be created or modified and what 
 
 Follow the orientation hierarchy before any file navigation: read `project.json` → read the file at `codebase-entry` (e.g. CODEBASE.md) → read the plan doc or spec if one exists → stop. Only fall back to targeted Grep or a `researcher` instance if a specific detail is genuinely absent from all three. Never run broad bash scans or read the code graph output directly.
 
+**File access during planning:** When a specific detail requires opening a file you haven't read yet, apply the Explore-first heuristic: targeted question about an unknown-size file → dispatch Explore. Full logic review or line-level reference → Read with `offset`/`limit`. Do not read a 500-line file in full to extract 5 lines of facts — the efficiency rule has the full decision tree.
+
 This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
 
 ## Bite-Sized Task Granularity

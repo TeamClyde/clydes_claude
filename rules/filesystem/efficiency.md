@@ -4,6 +4,20 @@
 
 Before reading or searching files, identify the minimum set needed. Do not read files speculatively. If a plan doc exists for the current task, read it first — it should contain the file paths, function names, and data structures needed. Only use Glob or Grep if the plan doc is missing that context.
 
+## Explore vs. Read — Targeted Question Heuristic
+
+Before accessing a file, apply this decision tree:
+
+| Question type | Line range known? | Tool |
+|---|---|---|
+| Need a specific fact or summary (step list, function names, structure overview) | No | Dispatch Explore with a targeted question |
+| Need specific lines already identified | Yes | Read with `offset` + `limit` |
+| Need full file logic or complete structure | Either | Read (full) |
+
+**Dispatch Explore when** your question could be answered in ~15 lines and you don't know where in the file the answer lives. A targeted Explore call returns a concise summary without loading hundreds of lines into context.
+
+**Do not Read a file in full** to extract one piece of information from an unknown location. This is the most common avoidable token waste during planning.
+
 ## Targeted Reads
 
 When extracting a specific function or section from a file, read only the relevant lines. The heuristic: a single function or method is typically 20–40 lines. Use `offset` and `limit` parameters on Read rather than dumping the whole file.
