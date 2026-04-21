@@ -11,5 +11,6 @@
 
 ## History
 
+- [x] Workflow Audit & Map — completed 2026-04-21. Fixed 4 semantic coherence issues (todo-manager refs, architect tool, plan-gate Case A/B, brainstorming dead path). Created docs/workflow-map.md canonical reference. Brought all 26 skills to Pulser 100/100 (Gotchas + allowed-tools on 21 skills, writing-skills split to 399 lines). Cleaned up committed session artifacts (plans/, tests/). Added adherence-audit skill for ongoing drift detection.
 - [x] Integrated tool creation + plugin lifecycle — completed 2026-04-20. Created creating-tools orchestration skill, writing-agents TDD skill, writing-rules skill, integrated Pulser eval as Phase 3 of writing-skills, and established plugin registry + lifecycle governance with rules/plugin-lifecycle.md.
 - [x] Workflow Refinements — project.json, skill patches, token efficiency, feedback system — completed 2026-04-20
