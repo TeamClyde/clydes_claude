@@ -68,6 +68,10 @@ When in doubt, size up.
 
 Both the design doc and implementation plan live under the same `plans/<slug>/` directory. `~/.claude/plans/` files are ephemeral scratch pads. They are never the durable record — only `plans/<slug>/<slug>-plan.md` in the repo survives session boundaries.
 
+**`plans/` is gitignored.** Plan docs are session-scoped working artifacts — useful during a
+session, not committed deliverables. For committed reference documentation (workflow map, API
+docs, architecture guides), use `docs/`.
+
 ### Required Sections (L-sized plan docs)
 
 Every L-sized plan doc MUST contain:

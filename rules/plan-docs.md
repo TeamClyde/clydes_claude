@@ -42,6 +42,10 @@ The trigger is work scope, not whether plan mode was invoked:
 | M — several files, some cross-cutting | No |
 | L — many files, significant work, many steps | **Yes — create before ExitPlanMode** |
 
+**`plans/` is gitignored.** Plan docs are session-scoped working artifacts. The `_archive/`
+directory in this repo preserves completed plan docs for reference; that directory is also
+gitignored. Committed documentation (workflow map, guides, overviews) belongs in `docs/`.
+
 ### Plan doc refinements
 
 Editing or refining an existing plan doc is an **S-sized task**. It does not:
