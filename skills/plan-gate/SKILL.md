@@ -1,6 +1,7 @@
 ---
 name: plan-gate
-description: Runs automatically after writing-plans. Gates the plan through architect review, test-strategy, test-builder, Jira ticket creation, and TODO.md registration before execution begins. Can also be invoked manually against any plan doc at plans/<slug>/<slug>-plan.md.
+description: Triggers on writing-plans completion. Gates the plan through architect review, test-strategy, test-builder, Jira ticket creation, and TODO.md registration before execution begins. Can also be invoked manually against any plan doc at plans/<slug>/<slug>-plan.md.
+allowed-tools: Agent, Read, Skill
 ---
 
 # Plan Gate
@@ -124,3 +125,9 @@ Never skip a gate step. If an agent is unavailable, surface the blocker to the u
 
 **Followed by:**
 - `executing-plans` skill
+
+## Gotchas
+
+1. This skill fires automatically after `writing-plans` — do not invoke it manually in Case A.
+2. If architect returns NEEDS REVISION, update the plan doc and re-invoke architect — do not proceed to test-strategy until APPROVED.
+3. Maximum 3 architect iterations — surface remaining BLOCKING issues to the user after the third pass.

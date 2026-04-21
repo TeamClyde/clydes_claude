@@ -2,6 +2,7 @@
 name: feedback
 description: Use when experiencing friction, confusion, or a gap mid-session — a skill that didn't trigger, a rule that conflicted with reality, a missing capability, or a process that felt wrong. Captures the observation without interrupting current work.
 argument-hint: "<description of what felt wrong>"
+allowed-tools: Read, Write, Edit
 ---
 
 # feedback
@@ -80,3 +81,9 @@ Report the single-line confirmation from the subagent to the user. Continue with
   ```
 - One entry per /feedback invocation — no batching
 - The subagent classifies the category; the user does not need to choose it
+
+## Gotchas
+
+1. Write to `workflow-feedback.md` even if the friction feels minor — the review-workflow skill needs volume to identify patterns.
+2. Do not try to resolve the friction in the same session as capturing it — capture first, `review-workflow` addresses later.
+3. One entry per friction point — do not batch multiple observations into one entry.

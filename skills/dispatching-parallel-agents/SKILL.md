@@ -1,6 +1,7 @@
 ---
 name: dispatching-parallel-agents
 description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
+allowed-tools: Agent, Read
 ---
 
 # Dispatching Parallel Agents
@@ -180,3 +181,9 @@ From debugging session (2025-10-03):
 - All investigations completed concurrently
 - All fixes integrated successfully
 - Zero conflicts between agent changes
+
+## Gotchas
+
+1. Only dispatch agents in parallel when tasks are genuinely independent — shared state (same file, same TODO.md row) causes merge conflicts.
+2. Each agent needs a fully self-contained prompt — it has no memory of prior agents or the current conversation.
+3. Collect all results before synthesizing — do not act on partial results from a subset of agents.

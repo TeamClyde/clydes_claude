@@ -1,6 +1,7 @@
 ---
 name: brainstorming
-description: Use before designing a new feature, planning a significant refactor, or exploring solution approaches — any time the right implementation isn't obvious and options need to be considered before writing code. Do not skip when requirements feel clear; surface assumptions first.
+description: Use when designing a new feature, planning a significant refactor, or exploring solution approaches — any time the right implementation isn't obvious and options need to be considered before writing code. Do not skip when requirements feel clear; surface assumptions first.
+allowed-tools: Read, Write, Agent, Skill, Glob, Grep
 ---
 
 # Brainstorming Ideas Into Designs
@@ -166,3 +167,9 @@ A question about a UI topic is not automatically a visual question. "What does p
 
 If they agree to the companion, read the detailed guide before proceeding:
 `skills/brainstorming/visual-companion.md`
+
+## Gotchas
+
+1. Do not skip brainstorming for M-sized work just because the approach "seems obvious" — the hard gate exists to surface assumptions before they become sunk cost.
+2. The design doc goes to `plans/<slug>/<slug>-design.md`, not `docs/superpowers/specs/`. The old path is archived.
+3. Do not hand off to `writing-plans` until the user explicitly approves the design doc — the hard gate is a stop point, not a suggestion.

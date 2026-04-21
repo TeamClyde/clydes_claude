@@ -1,6 +1,7 @@
 ---
 name: infra-init
-description: Use at the start of a new repo session, before exploring an unfamiliar codebase, or when code structure has changed significantly. Builds a queryable symbol graph and CODEBASE.md so future navigation uses the graph instead of broad file searches.
+description: Use when starting a new repo session, before exploring an unfamiliar codebase, or when code structure has changed significantly. Builds a queryable symbol graph and CODEBASE.md so future navigation uses the graph instead of broad file searches.
+allowed-tools: Bash, Read, Write, Agent
 ---
 
 # infra-init
@@ -240,3 +241,9 @@ Run inline:
 - Re-extract symbols from source with an LLM — graphify does that deterministically
 - Modify any file in the repo outside of `.claude-init/`, `graphify-out/`, the project's `CLAUDE.md`, and the project's `.gitignore`
 - Pin graphify to a specific version (intentional — upstream churn is acceptable, the translator is drift-defensive)
+
+## Gotchas
+
+1. Requires python3.11 or python3.14 specifically — not generic python3.
+2. Invoke graphify via `python -m graphify`, not the bare `graphify` binary — it may not be on PATH.
+3. Check `.claude-init/progress.json` before starting — if all phases are complete, confirm before overwriting.

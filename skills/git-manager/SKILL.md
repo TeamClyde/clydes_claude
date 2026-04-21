@@ -6,6 +6,7 @@ description: >
   handled safely. Invoke for any git action during development — starting work,
   recording progress, shipping, or managing conflicts.
 argument-hint: "commit files:[file1,file2] type:feat|fix|refactor|chore|docs|test|perf description:'...' jira-key:PROJ-N"
+allowed-tools: Skill, Bash, Read
 ---
 
 # git-manager
@@ -177,3 +178,9 @@ All PRs squash-merge into `main`. Squash commit message = PR title (conventional
 ## Out of Scope
 
 This skill does not: call Jira, read source code, decide which files to commit, bypass hooks, or auto-resolve conflicts.
+
+## Gotchas
+
+1. Never run git commands directly with Bash — this skill is the abstraction layer; use it from within.
+2. Commit message format is `type: description [PROJ-N]` — do not omit the Jira key unless the repo has `jira.enabled: false` in project.json.
+3. Do not push to main/master directly — always push a feature branch.

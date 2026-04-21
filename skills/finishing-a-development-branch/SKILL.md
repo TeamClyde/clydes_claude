@@ -1,6 +1,7 @@
 ---
 name: finishing-a-development-branch
 description: Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup
+allowed-tools: Bash, Read
 ---
 
 # Finishing a Development Branch
@@ -198,3 +199,10 @@ git worktree remove <worktree-path>
 
 **Pairs with:**
 - **using-git-worktrees** - Cleans up worktree created by that skill
+
+## Gotchas
+
+1. Never proceed with failing tests — present options only after all tests pass.
+2. Present exactly 4 options (merge, PR, keep, discard) — no paraphrasing or combining.
+3. Require typed "discard" for Option 4 — no shorthand confirmation.
+4. Only clean up the worktree for Options 1 and 4 — Options 2 and 3 keep it.

@@ -2,6 +2,7 @@
 name: review-workflow
 description: Use when workflow-feedback.md has accumulated friction entries and you want to act on them — grouping patterns, proposing fixes to skills or rules, and routing improvements to the right component. Run periodically or after several feedback entries accumulate.
 argument-hint: "(no arguments needed — reads docs/workflow-feedback.md)"
+allowed-tools: Read, Write, Edit, Glob
 ---
 
 # review-workflow
@@ -76,3 +77,9 @@ Report: N entries reviewed, M resolved, K deferred (and why).
 - Do not attempt fixes without user approval — propose first, execute second
 - Entries with `Status: resolved` are skipped in Step 2
 - If a fix requires a plan doc (L-sized work), create one via brainstorming rather than executing inline
+
+## Gotchas
+
+1. Run only when `workflow-feedback.md` has accumulated multiple entries — single-entry reviews produce changes too narrow to be useful.
+2. Propose changes to skill files, not to CLAUDE.md directly — rules changes require more scrutiny.
+3. After proposing improvements, route new skills through `creating-tools`, not direct `writing-skills` invocation.

@@ -7,6 +7,7 @@ description: >
   setup and for expanding an existing suite. Run after /infra-init, before
   writing any new code.
 argument-hint: "optional"
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
 # e2e-init — Testing Backbone Setup
@@ -362,3 +363,9 @@ After both output files are written:
 - Does NOT overwrite `scripts/run-tests.sh` if it already exists.
 - On re-run: always diffs proposed changes to both output files and waits for
   explicit user confirmation before writing.
+
+## Gotchas
+
+1. Run only once per repo per major framework change — re-running overwrites `testing-plan.md` and `run-tests.sh`.
+2. The output `run-tests.sh` must be executable (`chmod +x`) — the pre-commit hook calls it directly.
+3. Do not invent test patterns that don't exist in the codebase — derive the testing plan from what's actually there.

@@ -1,11 +1,12 @@
 ---
 name: plan-management
 description: >
-  Use after Jira tickets are created or change status (in_progress, done), when
+  Use when Jira tickets are created or change status (in_progress, done), when
   adding items to the backlog, or when reconciling TODO.md against current ticket
   state. Invoke after every ticket creation or status transition to keep TODO.md
   current.
 argument-hint: "status:created|in_progress|completed|backlog|reconcile ticket-key:PROJ-N plan-doc:plans/slug/<slug>-plan.md summary:'...'"
+allowed-tools: Read, Write, Edit
 ---
 
 # plan-management Skill
@@ -150,3 +151,10 @@ Fixed section order — never reorder, never rename sections:
 - Call `jira-workflow-manager` except during `reconcile` when the caller explicitly requests a status read
 - Perform git operations — delegate to `git-manager`
 - Auto-resolve conflicts — surface them and wait for instruction
+
+## Gotchas
+
+1. When adding a new plan (`status: created`), classify it: is it a deeper dive into existing TODO scope, or net new? Annotate an existing item rather than creating a duplicate.
+2. The section order in TODO.md is fixed: In Progress → Up Next → Backlog → History. Never reorder sections.
+3. Do not move an item to History until all sub-tasks are checked — partial progress stays In Progress.
+4. `reconcile` surfaces keys to the caller — it does not call Jira directly.

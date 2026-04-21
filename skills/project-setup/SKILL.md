@@ -2,6 +2,7 @@
 name: project-setup
 description: Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUDE.md is missing or generic, or the codebase graph hasn't been generated. Configures Jira integration, testing setup, and workflow preferences.
 argument-hint: "(no arguments needed — interactive)"
+allowed-tools: Read, Write, Edit, Bash, Glob
 ---
 
 # project-setup
@@ -135,3 +136,9 @@ Report any symlinks that were created or repaired.
 - Running project-setup on a repo that already has `project.json` will overwrite it after confirmation.
 - project.json is intentionally minimal — only include sections for features you are using.
 - The `codebase-entry` file should be the human/AI-readable orientation summary (50–200 lines), NOT the code graph output from infra-init.
+
+## Gotchas
+
+1. Run setup.sh before running this skill — symlinks must be in place first.
+2. Fill every placeholder in the generated CLAUDE.md before starting work — a half-filled template misleads future sessions.
+3. Do not run infra-init until the repo has actual code to graph — running it on an empty repo produces a useless graph.
