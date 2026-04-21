@@ -70,7 +70,8 @@ Fixed section order — never reorder, never rename sections:
 3. If a match is found: annotate the backlog entry with the Jira ticket key and plan-doc link, then move it to **Up Next** as a plan-backed item.
 4. If no match: add a new plan-backed item directly to **Up Next** with the Jira key and plan-doc path.
 5. Check for duplicates before adding — never create a second entry for overlapping scope.
-6. Write TODO.md.
+6. Classify the plan before adding: is this a **deeper dive** (extends an existing TODO item's scope) or **net new** (introduces work not captured anywhere)? For a deeper dive, annotate the existing item rather than creating a parallel entry.
+7. Write TODO.md.
 
 ---
 

@@ -59,4 +59,4 @@ tickets and sync to TODO.md.
 
 ### After completing a plan
 
-Invoke the `todo-manager` agent with: plan doc path, Jira key, status `completed`, and a 1–2 sentence summary of what was done.
+Invoke the `plan-management` skill with: plan doc path, Jira key, status `completed`, and a 1–2 sentence summary of what was done.

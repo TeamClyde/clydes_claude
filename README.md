@@ -30,7 +30,6 @@ Invoked via the `Agent` tool with `subagent_type: <name>`.
 | `researcher` | Codebase and infrastructure lookups — keeps search out of the main context window |
 | `test-builder` | Writes failing tests from the test strategy before implementation begins |
 | `test-strategy` | Derives per-plan validation criteria after architect approval |
-| `todo-manager` | Maintains TODO.md as a pointer registry for active plans |
 
 ### Skills (19)
 
