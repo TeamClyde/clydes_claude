@@ -4,18 +4,10 @@ _archive/
 # Repo-specific Claude Code permissions (not part of the deliverable)
 .claude/
 
-# Internal design review artifacts (now moved to _archive/)
-plans/review/
-plans/test-fixtures/
-plans/REVIEW-PLAN.md
-plans/REVIEW-RESULTS.md
-plans/BENCHMARK-HANDOFF.md
-plans/BENCHMARK-RESULTS.md
-plans/SETUP-TEST-RESULTS.md
-plans/TRACK3-HANDOFF.md
-plans/**/CATEGORIZATION-*.md
-plans/**/HANDOFF.md
-plans/**/TESTING.md
+# Session artifacts — not committed; use docs/ for committed reference material
+plans/
+tests/
+skills/git-manager-workspace/
 
 # Test harness for setup script
 scripts/setup-test.sh
