@@ -36,7 +36,29 @@ Follow the orientation hierarchy before any file navigation: read `project.json`
 
 **File access during planning:** When a specific detail requires opening a file you haven't read yet, apply the Explore-first heuristic: targeted question about an unknown-size file → dispatch Explore. Full logic review or line-level reference → Read with `offset`/`limit`. Do not read a 500-line file in full to extract 5 lines of facts — the efficiency rule has the full decision tree.
 
+**Symbol navigation during planning:** Use codebase graph tools before Grep/Glob for these specific tasks:
+
+| Need | Tool |
+|------|------|
+| Trace who calls a function (DI wiring, call paths) | `codebase_find_callers` |
+| Confirm a symbol exists or find its location | `codebase_search_symbol` |
+| Map what a file imports and what imports it | `codebase_find_dependencies` |
+| Find where an env var / dart-define is consumed | `codebase_get_env_var` |
+| Identify all app entry points and triggers | `codebase_get_entry_points` |
+| Map API routes this app exposes or calls | `codebase_search_api_endpoints` |
+
+Using Grep for symbol tracing when graph tools are available is a plan quality failure — graph tools return complete call graphs; Grep returns partial text matches that miss injected or aliased usages.
+
 This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
+
+## Agent Answers Are Ground Truth
+
+When a researcher or Explore agent answers a code question during planning, that answer is settled. Do not reason past it in context. Specifically:
+- Accept the agent's answer and move on
+- If the answer is incomplete or raises a follow-up, dispatch a narrower follow-up agent
+- Never reason in-context about something an agent has already answered or could answer with a targeted dispatch
+
+Circular reasoning past agent answers is a plan quality failure — it produces incorrect assumptions that architect review must correct.
 
 ## Bite-Sized Task Granularity
 
@@ -146,7 +168,7 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 
 **REQUIRED NEXT STEP: invoke plan-gate immediately. Do not wait for user input.**
 
-plan-gate will: run architect review, generate your testing contract, write failing tests, create Jira tickets, and register the plan in TODO.md — then hand off to executing-plans.
+plan-gate will: run architect review, generate your testing contract, pause for your review and approval of the test strategy, then write failing tests, create Jira tickets, and register the plan in TODO.md — then hand off to executing-plans.
 
 ## Gotchas
 

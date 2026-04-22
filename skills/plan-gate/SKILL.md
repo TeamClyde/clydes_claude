@@ -55,7 +55,15 @@ Dispatch the `test-strategy` agent with the plan doc path.
 
 The agent appends a `## Testing Plan` section to the plan doc. No output is needed back to the main context — the agent writes directly to the plan doc.
 
-Proceed to Step 3 when the agent completes.
+---
+
+### Checkpoint — Human Approval Required
+
+After Step 2 completes, surface the Testing Plan to the user:
+
+> "Test strategy is complete. Review the `## Testing Plan` section in `plans/<slug>/<slug>-plan.md` before I proceed with test builder, Jira ticket creation, and TODO.md registration. Reply 'proceed' to continue."
+
+**Wait for explicit user approval before proceeding to Step 3.** Do not proceed automatically.
 
 ---
 
