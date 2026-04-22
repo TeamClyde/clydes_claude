@@ -65,9 +65,19 @@ After executing each fix, mark the corresponding feedback entries as resolved:
 
 Change `**Status:** open` to `**Status:** resolved — [brief description of fix]`
 
-### Step 5 — Summary
+### Step 5 — Commit changes
 
-Report: N entries reviewed, M resolved, K deferred (and why).
+After all approved fixes are executed, invoke the `git-manager` skill to commit all modified files in a single commit:
+
+```
+Skill { skill: "git-manager", args: "commit files: [<all modified skill/rule/agent/feedback files>] type: chore description: 'apply workflow improvements from feedback review'" }
+```
+
+Include every file touched during Step 4 — skill files, rule files, agent files, and `docs/workflow-feedback.md`. Do not skip the commit step even if changes feel small.
+
+### Step 6 — Summary
+
+Report: N entries reviewed, M resolved, K deferred (and why). Include the commit hash.
 
 ---
 
