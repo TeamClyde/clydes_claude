@@ -1,13 +1,13 @@
 ---
 name: feedback
-description: Use when experiencing friction, confusion, or a gap mid-session — a skill that didn't trigger, a rule that conflicted with reality, a missing capability, or a process that felt wrong. Captures the observation without interrupting current work.
+description: Use when experiencing friction, confusion, or a gap mid-session — a skill that didn't trigger, a rule that conflicted with reality, a missing capability, or a process that felt wrong. Captures the observation as a GitHub issue without interrupting current work.
 argument-hint: "<description of what felt wrong>"
-allowed-tools: Read, Write, Edit
+allowed-tools: Read, Agent
 ---
 
 # feedback
 
-Log workflow friction without interrupting current work.
+Log workflow friction as a GitHub issue without interrupting current work.
 
 **Usage:** `/feedback <what felt wrong>`
 
@@ -17,13 +17,15 @@ Examples:
 - `/feedback had to explain the Jira project key again`
 - `/feedback claude argued with itself about whether to use git-manager`
 
+**Requires:** `gh` CLI authenticated (`gh auth login` once per machine).
+
 ---
 
 ## Behavior
 
 ### Step 1 — Capture context snapshot (runs in main context)
 
-Before spawning the background agent, capture:
+Before spawning the agent, capture:
 
 ```
 SNAPSHOT:
@@ -34,56 +36,65 @@ SNAPSHOT:
 - Timestamp: [current date/time]
 ```
 
-### Step 2 — Spawn background subagent
+### Step 2 — Create GitHub issue via subagent
 
-Spawn a background Agent with this prompt (substitute snapshot values):
+Spawn an Agent with this prompt (substitute all SNAPSHOT values before spawning):
 
-> Append a feedback entry to `docs/workflow-feedback.md` in the repo at [current working directory].
->
-> Context snapshot:
-> - Active plan: [ACTIVE_PLAN]
-> - Current task: [CURRENT_TASK]
-> - Last skill: [LAST_SKILL]
-> - Timestamp: [TIMESTAMP]
+> Classify the following workflow friction, then create a GitHub issue using the `gh` CLI.
 >
 > Feedback: "[VERBATIM_FEEDBACK]"
+> Active plan: [ACTIVE_PLAN]
+> Current task: [CURRENT_TASK]
+> Last skill: [LAST_SKILL]
+> Timestamp: [TIMESTAMP]
 >
-> Classify the feedback into one of these categories:
-> skill-skipped | skill-too-heavy | circular-reasoning | missing-capability | memory-gap | workflow-conflict | agent-failing | rule-too-strict | other
+> Step A — Classify into exactly one category:
+> `skill-skipped` | `skill-too-heavy` | `circular-reasoning` | `missing-capability` | `memory-gap` | `workflow-conflict` | `agent-failing` | `rule-too-strict` | `other`
 >
-> Append this entry to `docs/workflow-feedback.md` (create the file if it does not exist):
+> Step B — Create the issue:
+> ```bash
+> gh issue create \
+>   --repo TeamClyde/clydes_claude \
+>   --title "[workflow-friction] [short description]" \
+>   --body "## Workflow Friction
 >
-> ```markdown
-> ## [TIMESTAMP] [SHORT_DESCRIPTION]
->
-> **Context:** [what was being worked on]
-> **Active plan:** [path or "none"]
-> **Skill involved:** [skill name or "unknown"]
-> **Feedback:** [verbatim]
+> **Feedback:** [VERBATIM_FEEDBACK]
 > **Category:** [chosen category]
-> **Status:** open
+>
+> ### Context
+> | Field | Value |
+> |-------|-------|
+> | Active plan | [ACTIVE_PLAN] |
+> | Current task | [CURRENT_TASK] |
+> | Last skill | [LAST_SKILL] |
+> | Timestamp | [TIMESTAMP] |" \
+>   --label "workflow-friction"
+> ```
+> If the `workflow-friction` label does not exist, create it first:
+> ```bash
+> gh label create "workflow-friction" --repo TeamClyde/clydes_claude --color "#e4e669" --force
 > ```
 >
-> Return only: "Logged: [short description]"
+> If `gh` is not authenticated, return: "AUTH_FAILED: run `gh auth login` in a terminal, then retry."
+>
+> Otherwise return only: "Logged: [short description] — [issue URL]"
 
 ### Step 3 — Confirm (in main context)
 
-Report the single-line confirmation from the subagent to the user. Continue with current work.
+If the agent returned `AUTH_FAILED:`, surface the message to the user and stop.
+
+Otherwise report the single-line confirmation and continue with current work.
 
 ---
 
 ## Notes
 
-- If `docs/workflow-feedback.md` does not exist, the subagent creates it with a header:
-  ```markdown
-  # Workflow Feedback Log
-  Entries appended by /feedback. Review and triage with /review-workflow.
-  ```
-- One entry per /feedback invocation — no batching
-- The subagent classifies the category; the user does not need to choose it
+- One issue per /feedback invocation — no batching
+- The agent classifies the category; the user does not need to choose it
+- Issues are always created in TeamClyde/clydes_claude regardless of the active working repo
 
 ## Gotchas
 
-1. Write to `workflow-feedback.md` even if the friction feels minor — the review-workflow skill needs volume to identify patterns.
-2. Do not try to resolve the friction in the same session as capturing it — capture first, `review-workflow` addresses later.
-3. One entry per friction point — do not batch multiple observations into one entry.
+1. Log even if the friction feels minor — review-workflow needs volume to identify patterns.
+2. Do not try to resolve the friction in the same session as capturing it — capture first, /review-workflow addresses later.
+3. One issue per friction point — do not batch multiple observations into one issue.

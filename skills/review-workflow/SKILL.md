@@ -1,13 +1,13 @@
 ---
 name: review-workflow
-description: Use when workflow-feedback.md has accumulated friction entries and you want to act on them — grouping patterns, proposing fixes to skills or rules, and routing improvements to the right component. Run periodically or after several feedback entries accumulate.
-argument-hint: "(no arguments needed — reads docs/workflow-feedback.md)"
-allowed-tools: Read, Write, Edit, Glob
+description: Use when workflow friction issues have accumulated in TeamClyde/clydes_claude and you want to act on them — grouping patterns, proposing fixes to skills or rules, and routing improvements to the right component. Run periodically or after several feedback entries accumulate.
+argument-hint: "(no arguments needed — reads open workflow-friction GitHub issues)"
+allowed-tools: Read, Write, Edit, Glob, Agent
 ---
 
 # review-workflow
 
-Triage and act on accumulated workflow feedback.
+Triage and act on accumulated workflow feedback from GitHub issues.
 
 **Announce at start:** "I'm using the review-workflow skill to triage workflow feedback."
 
@@ -17,19 +17,25 @@ Triage and act on accumulated workflow feedback.
 
 ### Step 1 — Load feedback
 
-Read `docs/workflow-feedback.md`. If the file does not exist or is empty, respond: "No feedback logged yet. Use /feedback to capture friction as you work." and stop.
+Spawn an Agent to fetch open issues:
+
+> Run: `gh issue list --repo TeamClyde/clydes_claude --label "workflow-friction" --state open --json number,title,body,url`
+> Parse the JSON and return each issue as: `#[number] [title] | Category: [value of **Category:** field in body] | URL: [url]`
+> If the list is empty, return: "No open workflow-friction issues."
+
+If the agent returns no open issues, respond: "No feedback logged yet. Use /feedback to capture friction as you work." and stop.
 
 ### Step 2 — Group and analyze
 
-Group open entries by `Category`. For each category group, note:
-- How many entries
+Group open issues by `Category`. For each category group, note:
+- How many issues
 - Which skills appear most often
 - Any pattern in the context (same repo? same plan type?)
 
 Identify the top 2–3 highest-signal items using these signals:
 - Same category appears 3+ times → systemic issue
-- Same skill appears in 2+ entries → that skill needs work
-- "circular-reasoning" or "missing-capability" entries → high priority regardless of count
+- Same skill appears in 2+ issues → that skill needs work
+- "circular-reasoning" or "missing-capability" issues → high priority regardless of count
 
 ### Step 3 — Propose fixes
 
@@ -61,23 +67,28 @@ For each approved fix:
 | Rule update | Make the edit directly using Edit tool |
 | Agent update | Make the edit directly using Edit tool |
 
-After executing each fix, mark the corresponding feedback entries as resolved:
+After executing each fix, close the corresponding GitHub issues with a resolution comment. Spawn an Agent:
 
-Change `**Status:** open` to `**Status:** resolved — [brief description of fix]`
+> For each of the following issue numbers, run:
+> ```bash
+> gh issue comment [N] --repo TeamClyde/clydes_claude --body "Resolved: [brief description of the fix applied]"
+> gh issue close [N] --repo TeamClyde/clydes_claude
+> ```
+> Issues to close: [#N, #N, ...]
 
 ### Step 5 — Commit changes
 
 After all approved fixes are executed, invoke the `git-manager` skill to commit all modified files in a single commit:
 
 ```
-Skill { skill: "git-manager", args: "commit files: [<all modified skill/rule/agent/feedback files>] type: chore description: 'apply workflow improvements from feedback review'" }
+Skill { skill: "git-manager", args: "commit files: [<all modified skill/rule/agent files>] type: chore description: 'apply workflow improvements from feedback review'" }
 ```
 
-Include every file touched during Step 4 — skill files, rule files, agent files, and `docs/workflow-feedback.md`. Do not skip the commit step even if changes feel small.
+Include every file touched during Step 4 — skill files, rule files, agent files. Do not skip the commit step even if changes feel small.
 
 ### Step 6 — Summary
 
-Report: N entries reviewed, M resolved, K deferred (and why). Include the commit hash.
+Report: N issues reviewed, M resolved (closed), K deferred (and why). Include the commit hash.
 
 ---
 
@@ -85,11 +96,11 @@ Report: N entries reviewed, M resolved, K deferred (and why). Include the commit
 
 - Do not batch fixes — present one at a time and wait for approval
 - Do not attempt fixes without user approval — propose first, execute second
-- Entries with `Status: resolved` are skipped in Step 2
+- Closed GitHub issues are skipped in Step 2 (the label filter returns only open issues)
 - If a fix requires a plan doc (L-sized work), create one via brainstorming rather than executing inline
 
 ## Gotchas
 
-1. Run only when `workflow-feedback.md` has accumulated multiple entries — single-entry reviews produce changes too narrow to be useful.
+1. Run only when multiple issues have accumulated — single-issue reviews produce changes too narrow to be useful.
 2. Propose changes to skill files, not to CLAUDE.md directly — rules changes require more scrutiny.
 3. After proposing improvements, route new skills through `creating-tools`, not direct `writing-skills` invocation.
