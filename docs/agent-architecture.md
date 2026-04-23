@@ -22,6 +22,7 @@ When a plan references a subagent, it is deferring the agent design here. This p
 | `integration-engineer` | `~/.claude/agents/integration-engineer.md` | Cross-repo contract mapping using local codebase MCPs from each repo |
 | `test-strategy` | `~/.claude/agents/test-strategy.md` | Per-plan validation criteria |
 | `test-builder` | `~/.claude/agents/test-builder.md` | Write test code from test strategy output, in parallel with implementation |
+| `test-runner` | `~/.claude/agents/test-runner.md` | Post-implementation test executor — runs the test suite, classifies results (PASS / BUILD FAILURE / TEST FAILURE / ENVIRONMENT FAILURE), writes to `.claude/test-results.md`, and mandates `systematic-debugging` via REQUIRED NEXT STEP block on any failure |
 | `jira-workflow-manager` | `~/.claude/agents/jira-workflow-manager.md` | All Jira operations |
 
 **Note:** Skills (`git-manager`, `infra-init`, `e2e-init`) are not agents — they are prompt templates that run in the main context. They are defined in their respective plans.
@@ -661,6 +662,42 @@ If both are yes → fix inline, no ticket (commit message is the record). If eit
 **MCP routing:** All Atlassian operations go through the official Atlassian remote MCP (Jira/Confluence). Do not call MCP tools directly — this agent is the abstraction layer.
 
 **Full spec:** See Plan 02 for complete ticket formats, lifecycle rules, comment policy, and all decisions. This plan owns the agent implementation.
+
+---
+
+### 10. `test-runner` — Test Suite Executor
+
+**Purpose:** Post-implementation test executor. The closing step of the TDD cycle: test-builder wrote the failing tests, implementation made them pass, test-runner verifies that claim. Invoked after implementation is committed and before `verification-before-completion`. Does not propose fixes. Blocks any fix attempt behind `systematic-debugging` on failure.
+
+**Model:** Sonnet
+
+**When invoked:**
+- By `executing-plans` (main context) — once per task, after implementation commit
+- By `subagent-driven-development` (orchestrator) — once per task; leaf implementer subagents never invoke it
+- Caller must have Skill tool access so the REQUIRED NEXT STEP block on failure is actionable
+
+**Inputs:**
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `plan_doc` | Yes | — | Path to plan doc; reads Testing section for expected scenarios |
+| `testing_plan` | Yes | — | Path to `.claude/testing-plan.md` |
+| `results_file` | No | `.claude/test-results.md` | Output file for full run |
+| `defer_write` | No | `false` | Skip writing results to disk |
+
+**Result types:** PASS / TEST FAILURE / BUILD FAILURE / ENVIRONMENT FAILURE / SETUP REQUIRED
+
+**Retry policy:** TEST FAILURE only, up to `flakiness_tolerance` additional runs. BUILD FAILURE and ENVIRONMENT FAILURE are deterministic — retrying cannot fix them.
+
+**On FAILURE:** Emits REQUIRED NEXT STEP block mandating `systematic-debugging` before any fix. This is reinforced by `CLAUDE.md` global rule: no fix attempt until systematic-debugging Phase 1 is complete.
+
+**On SETUP REQUIRED:** Returns immediately if `.claude/testing-plan.md` is absent. Instructs caller to run `e2e-init`. Does not create the file itself.
+
+**What it does NOT do:**
+- Propose or suggest fixes — ever
+- Read implementation source files (reads only `testing_plan` and the Testing section of `plan_doc`)
+- Accumulate result files (always overwrites `.claude/test-results.md`)
+- Retry on BUILD FAILURE or ENVIRONMENT FAILURE
 
 ---
 
