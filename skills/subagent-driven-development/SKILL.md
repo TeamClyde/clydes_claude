@@ -57,6 +57,10 @@ digraph process {
         "Code quality reviewer subagent approves?" [shape=diamond];
         "Implementer subagent fixes quality issues" [shape=box];
         "Mark task complete in TodoWrite" [shape=box];
+        "Orchestrator invokes test-runner (if testing-plan.md exists)" [shape=box];
+        "Tests pass?" [shape=diamond];
+        "Orchestrator invokes systematic-debugging" [shape=box];
+        "Re-dispatch implementer subagent to fix" [shape=box];
     }
 
     "Read plan, extract all tasks with full text, note context, create TodoWrite" [shape=box];
@@ -69,7 +73,12 @@ digraph process {
     "Implementer subagent asks questions?" -> "Answer questions, provide context" [label="yes"];
     "Answer questions, provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
     "Implementer subagent asks questions?" -> "Implementer subagent implements, tests, commits, self-reviews" [label="no"];
-    "Implementer subagent implements, tests, commits, self-reviews" -> "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)";
+    "Implementer subagent implements, tests, commits, self-reviews" -> "Orchestrator invokes test-runner (if testing-plan.md exists)";
+    "Orchestrator invokes test-runner (if testing-plan.md exists)" -> "Tests pass?";
+    "Tests pass?" -> "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" [label="yes / no testing-plan.md"];
+    "Tests pass?" -> "Orchestrator invokes systematic-debugging" [label="no"];
+    "Orchestrator invokes systematic-debugging" -> "Re-dispatch implementer subagent to fix";
+    "Re-dispatch implementer subagent to fix" -> "Orchestrator invokes test-runner (if testing-plan.md exists)";
     "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" -> "Spec reviewer subagent confirms code matches spec?";
     "Spec reviewer subagent confirms code matches spec?" -> "Implementer subagent fixes spec gaps" [label="no"];
     "Implementer subagent fixes spec gaps" -> "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" [label="re-review"];
@@ -104,7 +113,26 @@ Use the least powerful model that can handle each role to conserve cost and incr
 
 Implementer subagents report one of four statuses. Handle each appropriately:
 
-**DONE:** Proceed to spec compliance review.
+**DONE:** If `.claude/testing-plan.md` exists in the repo, invoke test-runner before spec review:
+
+```
+Agent {
+  subagent_type: "test-runner",
+  prompt: "plan_doc: [plan path]\ntesting_plan: .claude/testing-plan.md"
+}
+```
+
+- **PASS**: proceed to spec compliance review.
+- **FAILURE**: invoke `Skill { skill: "systematic-debugging" }` as the orchestrator. After
+  systematic-debugging completes Phase 1, re-dispatch the implementer to fix the root cause.
+  Re-run test-runner after the fix before dispatching spec review.
+- **SETUP REQUIRED**: no testing-plan.md — proceed to spec review without test-runner.
+
+test-runner must always be invoked by the orchestrator (this context), never by the implementer
+subagent — the implementer does not have Skill tool access needed to act on the REQUIRED NEXT
+STEP block if tests fail.
+
+If `.claude/testing-plan.md` does not exist: proceed directly to spec review.
 
 **DONE_WITH_CONCERNS:** The implementer completed the work but flagged doubts. Read the concerns before proceeding. If the concerns are about correctness or scope, address them before review. If they're observations (e.g., "this file is getting large"), note them and proceed to review.
 
@@ -247,6 +275,8 @@ Done!
 - Let implementer self-review replace actual review (both are needed)
 - **Start code quality review before spec compliance is ✅** (wrong order)
 - Move to next task while either review has open issues
+- Dispatch test-runner from within an implementer subagent (orchestrator must invoke it directly)
+- Dispatch spec reviewer before test-runner passes when testing-plan.md exists
 
 **If subagent asks questions:**
 - Answer clearly and completely
