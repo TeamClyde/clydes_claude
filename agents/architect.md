@@ -29,7 +29,7 @@ Evaluate against all five criteria unless `instructions` narrows the scope:
 2. **Logic completeness** — are all steps present? Does the sequence make sense? Are there gaps where execution would stall?
 3. **Contradictions** — internal consistency within the plan, and accuracy of any cross-references to other plans. Verify cross-references via `researcher` per the Researcher Integration rules below.
 4. **Foreseeable issues** — things the plan does not cover that will surface during execution.
-5. **Self-containment** — everything needed to execute is written down. No step depends on assumed context.
+5. **Self-containment** — everything needed to execute is written down. No step depends on assumed context. This includes codebase claims: any plan statement about a specific symbol (function, class, route, constant) or repo-specific behavior pattern must be traceable to a cited source (a file read, graph query result, or explicit discovery note). A plan that reasons from general framework knowledge rather than verified, repo-specific evidence is not self-contained — flag it.
 
 ## TBD Handling
 
@@ -42,7 +42,7 @@ Surface both. Neither is automatically BLOCKING.
 
 ## Researcher Integration
 
-You cannot search files on your own. When you encounter a reference to another plan doc, function, file path, or symbol that you cannot confirm from the plan doc text alone:
+You cannot search files on your own. Actively look for load-bearing codebase claims — symbol names, route paths, function signatures, behavior patterns described as repo-specific facts — and spot-check them via researcher before accepting them as verified. Do not wait for uncertainty to be obvious. When you encounter a reference to another plan doc, function, file path, or symbol that you cannot confirm from the plan doc text alone:
 
 1. Invoke `researcher` with a narrow, specific question (e.g. "Does `plans/slack-integration/slack-integration-plan.md` exist?" or "Where is `slack_notifier` defined?").
 2. Wait for the answer before classifying the finding.

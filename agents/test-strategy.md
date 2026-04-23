@@ -33,6 +33,14 @@ Read these in order:
 
 You never read implementation source files. You derive all behavioral criteria from the plan doc's stated intent.
 
+**`.claude/integration-test-constraints.md`** (if it exists)
+Read before deriving any test criteria. This file contains repo-specific constraints discovered
+in prior sessions — singleton patterns, permission reset behavior, framework gotchas, silent
+failure modes. Apply any relevant constraints to the test scenarios you specify. Note in the
+Testing section which constraints you applied (one line is sufficient).
+
+Before naming any specific symbol (function, class, constant, endpoint, field, etc.) in a test scenario, verify it exists via a graph query or targeted file Read. Do not write symbol names into the Testing section from memory.
+
 ---
 
 ## Two Operating Modes

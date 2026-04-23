@@ -31,6 +31,10 @@ exists.
   both output files at Step 6 without requiring additional confirmation (the
   user invoked the skill intentionally).
 
+Also check whether `.claude/integration-test-constraints.md` exists. If it does,
+**do NOT overwrite or diff it** on re-run — constraints accumulate over time and
+are not regenerated. Only create it on first run.
+
 ---
 
 ## Step 1 — Repo Orientation
@@ -340,6 +344,38 @@ The single highest-value E2E test to add next:
   response code, DB record, message on queue, email sent, UI state, etc.]
 **Why this one first:** [1 sentence — why this scenario has the highest risk
   if it breaks undetected]
+```
+
+---
+
+### Output 3: `.claude/integration-test-constraints.md`
+
+Only written on first run (when the file does not already exist). Never overwritten on re-run.
+
+Use Glob and Grep to discover static constraints from the codebase before writing. Look for:
+- Singleton patterns (top-level instances of routers, stores, or service objects that persist across tests)
+- Permission types declared in manifests or config files that reset on reinstall/relaunch
+- Framework-specific test isolation requirements (e.g. shared state that must be reset in setUp)
+- Known silent failure modes in the test framework version in use
+
+```markdown
+# Integration Test Constraints
+Generated: [YYYY-MM-DD]
+
+## Statically Discoverable Constraints
+Populated by e2e-init from code analysis. Update when project type or framework version changes.
+
+- [constraint — cite file path and line where discovered, e.g. "router at routes.dart:64 is a
+  top-level singleton — call router.go('/') in every setUp to reset navigation state"]
+- [or "none discovered" if no patterns found]
+
+## Runtime-Discovered Constraints
+Appended by the main context after systematic-debugging confirms a root cause during test
+execution. Never appended automatically — requires human confirmation.
+
+Format per entry: `[YYYY-MM-DD] [constraint description] — discovered via [failure type]`
+
+<!-- Mark stale entries with [STALE - reason] rather than deleting them -->
 ```
 
 ---

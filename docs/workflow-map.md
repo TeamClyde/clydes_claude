@@ -115,7 +115,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | Skill | When it fires | Purpose |
 |-------|--------------|---------|
 | `infra-init` | New repo session or codebase changed | Builds codebase graph + CODEBASE.md |
-| `e2e-init` | New repo, test backbone needed | Generates testing-plan.md, run-tests.sh |
+| `e2e-init` | New repo, test backbone needed | Generates testing-plan.md, run-tests.sh, integration-test-constraints.md (static section) |
 | `project-setup` | Onboarding new repo to Claude workflow | CLAUDE.md + project.json setup wizard |
 | `adherence-audit` | Periodic / when adding new tools | Semantic consistency check across all components |
 

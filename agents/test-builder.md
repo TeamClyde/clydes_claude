@@ -33,13 +33,19 @@ Read the Testing section only — the checklist of scenarios, pass/fail criteria
 **`.claude/testing-plan.md`**
 Read for: test framework name and version, how to run tests (command), service boundaries, file naming conventions if not already in the Testing section.
 
+**`.claude/integration-test-constraints.md`** (if it exists)
+Read before writing any test code. This file contains repo-specific runtime constraints
+confirmed in prior sessions — singleton patterns that require setUp cleanup, permission
+behaviors, framework gotchas, silent failure modes. Apply relevant constraints directly in
+the test code (e.g. router reset in setUp, permission grant in setUpAll).
+
 ### Optionally — only when needed
 
 **Existing test files** (via `test_dir`)
 Only when the Testing section does not already supply conventions. Read to extract: file naming pattern, import style, assertion library, test structure (describe/it blocks, class-based, flat functions). Read conventions only — do not read existing tests to understand feature behavior or derive expectations from them.
 
 **`codebase-graph.json`** (via `codegraph`)
-Only for function signatures: symbol names, parameter types, and return types. This is sufficient to construct correct test inputs and verify expected outputs. The graph contains no implementation logic — only public interface shape. Use it when you need to know what types to pass or what shape to assert on, not to understand what a function does internally.
+The codegraph is not optional when your test code references a specific symbol. Before asserting against any symbol name, verify it via graph query or targeted file Read. If neither confirms the symbol, flag the assertion as unverified in the status summary — do not guess. The graph contains no implementation logic — only public interface shape: symbol names, parameter types, and return types.
 
 ### Never
 
@@ -133,6 +139,7 @@ The main context receives this summary and nothing else. It learns which scenari
 - Black-box only — specification is the Testing section checklist, not implementation internals
 - Follows the test-strategy's explicit directives on which tests to reuse, update, or create — does not override those directives based on its own reading of the codebase
 - Flags untestable scenarios as gaps rather than approximating coverage
+- Does not assert against any symbol name without first verifying it via graph query or targeted file Read — flags unverified symbols in the status summary rather than guessing
 - Does not read implementation source files under any circumstance
 - Does not make architectural decisions
 - Does not return test code to the main context — status summary only
