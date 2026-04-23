@@ -27,7 +27,10 @@ flowchart TD
 
     EP --> Task{Per task}
     Task --> Impl[implementation]
-    Impl --> VBC[verification-before-completion]
+    Impl --> TR[test-runner agent\nExecutes test suite]
+    TR -->|pass| VBC[verification-before-completion\nConfirms completion claims]
+    TR -->|fail| SD[systematic-debugging skill\nRoot cause before fixes]
+    SD --> Impl
     VBC --> GM[git-manager skill\nCommit + push]
     GM --> JW[jira-workflow-manager agent\nTransition ticket]
     JW --> PMS[plan-management skill\nUpdate TODO.md]
@@ -78,6 +81,7 @@ All agents invoked via: `Agent { subagent_type: "<name>", prompt: "..." }`
 | `integration-engineer` | Planning phase | Cross-repo contract analysis — maps endpoints, finds callers in other repos. Read-only. |
 | `test-strategy` | `plan-gate` (after architect APPROVED) | Derives per-plan validation criteria. Appends `## Testing` section to plan doc. |
 | `test-builder` | `plan-gate` (after test-strategy, in parallel with implementation) | Writes failing tests to disk from the Testing section. Never reads implementation source. |
+| `test-runner` | `executing-plans` (main context), `subagent-driven-development` (orchestrator) | Post-implementation test executor. Runs the test suite, classifies failures (BUILD / TEST / ENVIRONMENT), writes results to `.claude/test-results.md`, and mandates `systematic-debugging` via REQUIRED NEXT STEP block on any failure. Caller must have Skill tool access — never dispatch as a leaf implementer subagent. |
 | `todo-manager` | — | **Removed.** Superseded by `plan-management` skill. |
 
 ---
