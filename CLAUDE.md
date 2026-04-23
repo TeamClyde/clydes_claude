@@ -1,4 +1,63 @@
-# Global Claude Workflow
+# Claude Behavioral Guidelines
+
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it — don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+  1. [Step] → verify: [check]
+  2. [Step] → verify: [check]
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
 
 ## Delegation — Mandatory
 
@@ -11,92 +70,17 @@ Route every operation through the correct abstraction. Never run git commands di
 | Plan doc registration, TODO.md updates, archival | `plan-management` skill (`Skill` tool) |
 | Independent plan/code review | `architect` agent (`Agent` tool, `subagent_type: architect`) |
 
----
-
 ## Architect Review — Mandatory
 
-Invoke the `architect` agent before any of these transitions:
+Invoke `architect` before:
+- Execution begins (via `plan-gate` after `writing-plans`, or manually before `ExitPlanMode`)
+- Any task transitions to Testing or Done
 
-| Trigger | What to pass |
-|---------|-------------|
-| Before execution begins — via `plan-gate` after `writing-plans`, or manually before `ExitPlanMode` for ad-hoc work | `plan_doc_path` only (full review) |
-| Before transitioning a task to Testing or Done | `plan_doc_path` + `instructions: "review task N implementation for completeness"` |
+Skip for S-sized mechanical tasks (renaming, config-only, single-line fixes). Maximum 3 review iterations — surface BLOCKING issues to user after the third pass.
 
-**Skip for:** S-sized mechanical tasks (renaming, config-only, single-line fixes), status-only transitions (Testing → Done after user confirms).
+## Hard Prohibitions
 
-Maximum 3 review iterations. If BLOCKING issues remain after the third pass, surface them to the user — do not attempt a fourth round.
-
----
-
-## Task Sizing
-
-| Size | Token Estimate | Scope | Ticket |
-|------|---------------|-------|--------|
-| S | ~1–5k | 1–3 files, targeted change | Single Task |
-| M | ~5–15k | Several files, cross-cutting concern | Single Task |
-| L | ~15k+ | Many files, multi-session, significant refactor | Task + sub-tasks (or single Task if atomic) |
-
-When in doubt, size up. Token estimates are rough — use them to calibrate, not count.
-
----
-
-## Workflow Sequence
-
-1. **Assess** — size the work. L-sized or scope unclear → continue to Design.
-2. **Design** — invoke the `brainstorming` skill. It asks clarifying questions, proposes approaches, and produces a design doc at `plans/<slug>/<slug>-design.md`. Commit the design doc. Skip for S-sized work where the approach is already clear.
-3. **Plan** — `brainstorming` hands off to `writing-plans`. Read the design doc and any existing plan doc in `plans/`; produce `plans/<slug>/<slug>-plan.md`. `writing-plans` fires `plan-gate` automatically — plan-gate handles architect review (Case A). For ad-hoc plan mode without `writing-plans`, invoke architect manually before `ExitPlanMode` (Case B).
-4. **Tickets** — create via `jira-workflow-manager` from the plan doc. Write Jira keys back into the Task Reference table. Register the plan in TODO.md via `plan-management` skill (pointer entry: plan doc path + Epic key).
-5. **Execute** — one task at a time. Transition to In Progress via `jira-workflow-manager` before starting.
-6. **Commit** — via `git-manager` skill. Every commit includes the Jira key.
-7. **Close** — transition to Done (or Testing if human verification needed) via `jira-workflow-manager`. Mark the Task Reference row ✅ in the plan doc. Invoke `plan-management` skill with status and 1–2 sentence summary.
-
----
-
-## Source of Truth
-
-The implementation plan doc (`plans/<slug>/<slug>-plan.md`) is the single source of truth for what will be built and what was built. The paired design doc (`plans/<slug>/<slug>-design.md`) is the upstream artifact — it captures approach decisions and is produced by the `brainstorming` skill before the implementation plan is written.
-
-- **Jira** is seeded from the plan doc at ticket-creation time. Deviations go in Jira comments — never rewrite descriptions to match what was done instead of what was planned.
-- **TODO.md** is a pointer registry: one entry per active plan containing the plan doc path and Epic key. It does not duplicate task rows or status details.
-
----
-
-## Core Rules
-
+- Never skip commit hooks (`--no-verify`) unless explicitly asked.
+- Never stage with `git add -A` or `git add .` — always stage specific files.
+- When `test-runner` returns FAILURE: invoke `systematic-debugging` before any fix attempt.
 - One task in progress at a time. Complete and commit before starting the next.
-- Scan before writing. Ticket descriptions must reference real file and method names — not guesses.
-- Rich ticket descriptions: a person reading them 3 months later should understand what changed and why.
-- If a task turns out significantly larger or smaller than estimated, note it and adjust sub-tasks accordingly.
-- Jira reflects reality. It does not control it. Never let ticket state block execution.
-- When test-runner returns a FAILURE result, invoke `systematic-debugging` before any fix
-  attempt. Do not propose fixes until `systematic-debugging` has completed Phase 1 (root
-  cause investigation).
-
----
-
-## Repository Structure
-
-```
-claude-workflow-improvements/
-├── CLAUDE.md                   — this file (global instructions, symlinked to ~/.claude/CLAUDE.md)
-├── README.md                   — repo overview and restoration guide
-├── agents/                     — agent definition files → symlinked to ~/.claude/agents/
-├── skills/                     — skill directories → each symlinked to ~/.claude/skills/<name>/
-├── rules/                      — rule .md files + filesystem/ subdir → symlinked to ~/.claude/rules/
-│   └── filesystem/             — subdirectory, symlinked as a unit
-├── hooks/
-│   └── pre-commit              — global pre-commit hook → symlinked to ~/.claude/hooks/pre-commit
-├── templates/                  — project templates (not symlinked; copied on use)
-├── docs/                       — public-facing documentation
-│   └── superpowers/specs/      — archived design specs (old location; new: plans/<slug>/<slug>-design.md)
-└── scripts/
-    └── setup.sh                — idempotent installer
-```
-
----
-
-## Working in This Repo
-
-- Read `docs/overview.md` when starting a new session — it contains the system overview and integration picture.
-- Workflow components live at the repo root, mirroring `~/.claude/` directly. Edit in place; symlinks keep `~/.claude/` in sync automatically.
-- After adding or modifying a component, run `setup.sh --force` to recreate symlinks if needed.
