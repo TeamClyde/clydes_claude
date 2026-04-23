@@ -37,12 +37,172 @@ The `description` is the primary discovery mechanism. Claude reads only `name` a
 
 ## Skill Registry
 
-| Skill | File | Responsibility | Owned By |
-|-------|------|----------------|----------|
-| `git-manager` | `~/.claude/skills/git-manager/SKILL.md` | All git operations: commits, branching, push, PR, worktrees | Plan 04 |
-| `infra-init` | `~/.claude/skills/infra-init/SKILL.md` | Codebase graph generation: 3-phase init (structure → batch-index → graph-build) | Plans 01, 06 |
-| `e2e-init` | `~/.claude/skills/e2e-init/SKILL.md` | Per-repo testing backbone setup: produces `.claude/testing-plan.md` and `plans/e2e-plan.md` | Plan 04 |
-| `plan-management` | `~/.claude/skills/plan-management/SKILL.md` | TODO.md maintenance and plan doc status tracking; absorbs `todo-manager` agent | Plans 06, 08 |
+All skills invoked via: `Skill { skill: "<name>", args: "..." }`
+
+### Orchestration
+
+| Skill | Responsibility | Hands off to |
+|-------|----------------|-------------|
+| `brainstorming` | Design-first exploration for M/L work; proposes approaches with trade-offs | `writing-plans` |
+| `writing-plans` | Produces plan doc: concrete file paths, task breakdown, architecture blueprint | `plan-gate` (auto) |
+| `plan-gate` | Gates plan through architect → test-strategy → test-builder → execution handoff | `executing-plans` or `subagent-driven-development` |
+| `executing-plans` | Task-by-task execution with test-runner per task; manages Jira transitions | `finishing-a-development-branch` |
+| `subagent-driven-development` | Dispatches fresh subagent per task with two-stage review; orchestrator runs test-runner | `finishing-a-development-branch` |
+| `finishing-a-development-branch` | Presents merge/PR/keep/discard options after all tasks complete | User decision |
+
+### Component Creation
+
+| Skill | Responsibility | Invoked via |
+|-------|----------------|-------------|
+| `creating-tools` | Entry point for all component creation; routes by artifact type | Direct |
+| `writing-skills` | TDD methodology for skill creation; baseline test required first | `creating-tools` only |
+| `writing-agents` | TDD methodology for agent creation; baseline invocation test required first | `creating-tools` only |
+| `writing-rules` | Rule-vs-skill decision, scope selection, observational testing guidance | `creating-tools` only |
+
+### Infrastructure & Quality
+
+| Skill | Responsibility |
+|-------|----------------|
+| `infra-init` | Codebase graph: 3-phase orchestration (structure → batch-index → graph-build) |
+| `e2e-init` | Per-repo testing backbone: produces `testing-plan.md`, `e2e-plan.md`, `run-tests.sh` |
+| `project-setup` | New-repo onboarding wizard; generates `project.json`; configures Jira and workflow preferences |
+| `adherence-audit` | Semantic consistency checker: dead references, mismatches, orphaned components |
+| `pulser` | Structural quality check for new skills/agents against Anthropic's 7 principles |
+
+### Git / Plan / Jira
+
+| Skill | Responsibility |
+|-------|----------------|
+| `git-manager` | All git operations: commits, branching, push, PR, worktrees — never Bash git directly |
+| `git-manager-workspace` | Variant of `git-manager` for multi-worktree contexts |
+| `plan-management` | TODO.md maintenance and plan doc status tracking after Jira ticket transitions |
+
+### Thinking & Debugging
+
+| Skill | Responsibility |
+|-------|----------------|
+| `different-viewpoint` | Full CIA Phoenix Checklist sweep — surfaces frame shifts and hypothesis flaws |
+| `different-viewpoints-lite` | 5-question adversarial challenge; faster than full sweep |
+| `dispatching-parallel-agents` | Coordinates 2+ independent tasks as parallel agent dispatches |
+| `verification-before-completion` | Pre-completion gate: verifies tests pass and no regressions before claiming done |
+| `systematic-debugging` | Structured root-cause diagnosis before any fix; mandatory after test-runner FAILURE |
+| `test-driven-development` | TDD cycle helper for feature/bugfix: write failing test → implement → verify |
+| `feedback` | Captures workflow friction mid-session to `docs/workflow-feedback.md` |
+| `review-workflow` | Deep workflow audit: Explore scan + Phoenix analysis + proposals |
+
+### Code Review
+
+| Skill | Responsibility |
+|-------|----------------|
+| `requesting-code-review` | Prepares and opens PR with structured review request |
+| `receiving-code-review` | Processes and implements reviewer feedback systematically |
+
+### Support
+
+| Skill | Responsibility |
+|-------|----------------|
+| `using-git-worktrees` | Creates and manages git worktrees for feature isolation |
+| `using-superpowers` | Conversation-start orientation: skill discovery, instruction priority, Orientation Protocol |
+
+---
+
+## Orchestration Skill Designs
+
+The six orchestration skills form the primary workflow chain from user request to committed code. They are the spine of the system — all other skills are invoked from within this chain or in support of it.
+
+---
+
+### 1. `brainstorming` — Design-First Exploration
+
+**Purpose:** Turn a vague feature idea or refactor goal into a fully formed design before any planning begins. Asks clarifying questions one at a time, proposes 2–3 approaches with trade-offs, gets design approval, and documents the outcome.
+
+**When to invoke:** M/L work where the right implementation isn't obvious and options need surfacing before code is touched. Do not skip when requirements feel clear — brainstorming surfaces assumptions.
+
+**Output:** Design doc at `plans/<slug>/<slug>-design.md`. Committed before handing off.
+
+**Hands off to:** `writing-plans` automatically after design is approved.
+
+---
+
+### 2. `writing-plans` — Implementation Plan Author
+
+**Purpose:** Produce a self-contained plan doc from a spec or design doc. Every task has exact file paths, complete code, exact commands with expected output. Assumes zero codebase knowledge in the executor.
+
+**When to invoke:** After brainstorming completes, or directly for S/M work with a clear approach.
+
+**Output:** `plans/<slug>/<slug>-plan.md`
+
+**Hands off to:** `plan-gate` automatically after saving the plan doc.
+
+**Plan doc required sections:** Goal, Architecture, Tech Stack, Task Reference table, task steps with checkboxes.
+
+---
+
+### 3. `plan-gate` — Pre-Execution Gate
+
+**Purpose:** Bridge between planning and execution. Ensures no plan starts implementation without passing all mandatory gates.
+
+**Gate sequence:**
+1. `architect` agent review → APPROVED or NEEDS REVISION (up to 3 iterations)
+2. `test-strategy` agent → appends `## Testing` section to plan doc
+3. Checkpoint: human reviews and approves test strategy
+4. `test-builder` agent → writes failing tests to disk (in parallel with implementation start)
+5. Jira ticket creation (if enabled)
+6. TODO.md registration via `plan-management`
+
+**When to invoke:** Auto-fires after `writing-plans`. Can be invoked manually against any plan doc at `plans/<slug>/<slug>-plan.md`.
+
+**Hands off to:** `executing-plans` or `subagent-driven-development`.
+
+---
+
+### 4. `executing-plans` — Sequential Task Executor
+
+**Purpose:** Load a plan, review it critically, and execute tasks one at a time with verification at each step.
+
+**Per-task loop:**
+1. Read the task from the plan doc
+2. Implement (or dispatch implementer)
+3. Invoke `test-runner` (if `.claude/testing-plan.md` exists)
+4. On PASS: invoke `verification-before-completion` → `git-manager` commit → Jira transition
+5. On FAILURE: mandatory `systematic-debugging` before any fix attempt
+6. Update plan doc row (✅) and TODO.md via `plan-management`
+
+**When to invoke:** After plan-gate completes, or when resuming work in a new session with an existing plan doc.
+
+**Hands off to:** `finishing-a-development-branch` when all tasks complete.
+
+---
+
+### 5. `subagent-driven-development` — Parallel Subagent Executor
+
+**Purpose:** Execute a plan by dispatching a fresh subagent per task. Preserves orchestrator context for coordination work; gives each implementer an isolated context window.
+
+**Per-task loop:**
+1. Dispatch implementer subagent with task content + full plan as context
+2. Receive implementation back
+3. Run two-stage review: spec compliance → code quality
+4. Orchestrator invokes `test-runner` (caller must have Skill tool access; subagents never invoke test-runner directly)
+5. On PASS: `git-manager` commit → Jira transition → `plan-management` update
+6. On FAILURE: mandatory `systematic-debugging` in orchestrator context
+
+**When to use over `executing-plans`:** When tasks are mostly independent and you are staying in the same session (executing-plans is better for multi-session plans).
+
+**Hands off to:** `finishing-a-development-branch` when all tasks complete.
+
+---
+
+### 6. `finishing-a-development-branch` — Branch Completion
+
+**Purpose:** Wrap up a development branch cleanly after all tasks complete.
+
+**What it does:**
+1. Verifies tests pass (final sanity check)
+2. Determines target base branch
+3. Presents 4 options: (1) merge locally, (2) push and create PR, (3) keep branch as-is, (4) discard work
+4. Executes the chosen path via `git-manager`
+
+**When to invoke:** After all tasks in a plan are complete and verified passing.
 
 ---
 
