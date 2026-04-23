@@ -17,11 +17,10 @@ Route every operation through the correct abstraction. Never run git commands di
 
 Invoke the `architect` agent before any of these transitions:
 
-| Trigger | Mode |
-|---------|------|
-| Transitioning a task to Testing or Done | `evaluate_task` |
-| Before execution begins (via plan-gate after writing-plans, or manually before `ExitPlanMode` for S-sized ad-hoc work) | `plan` |
-| Diagnosing a bug or unexpected behavior | `debug` |
+| Trigger | What to pass |
+|---------|-------------|
+| Before execution begins — via `plan-gate` after `writing-plans`, or manually before `ExitPlanMode` for ad-hoc work | `plan_doc_path` only (full review) |
+| Before transitioning a task to Testing or Done | `plan_doc_path` + `instructions: "review task N implementation for completeness"` |
 
 **Skip for:** S-sized mechanical tasks (renaming, config-only, single-line fixes), status-only transitions (Testing → Done after user confirms).
 
