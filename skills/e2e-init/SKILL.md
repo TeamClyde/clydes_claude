@@ -269,6 +269,18 @@ Full suite trigger paths: [list directories that trigger full suite on change]
 - Merge gate: [what blocks a merge — e.g. "test stage must pass; lint is advisory"]
 - Fragility notes: [known flaky tests, manual steps, environment dependencies — or "none identified"]
 
+## Test Runner Config
+- flakiness_tolerance: 0
+- recording: false
+- setup_steps:
+  - # Add shell commands to run before the test suite (e.g. emulator launch, DB seed)
+  - # Remove this section if no setup is needed
+
+`flakiness_tolerance`: integer — additional retries after the first run before declaring TEST FAILURE (default: 0).
+`recording`: Boolean — enable video/screenshot capture during test run (default: false; v1 field reserved, not yet implemented).
+`setup_steps`: ordered list of shell commands run before the test suite; first non-zero exit triggers ENVIRONMENT FAILURE.
+All three fields are optional. Remove unused fields or leave at defaults.
+
 ## E2E Plan
 See `plans/e2e-plan.md` for E2E scenario inventory, known gaps, and instrumentation notes.
 [If no e2e-plan.md yet: "PLANNED GAP — run /e2e-init to generate"]
