@@ -115,6 +115,13 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | `project-setup` | Onboarding new repo to Claude workflow | CLAUDE.md + project.json setup wizard |
 | `adherence-audit` | Periodic / when adding new tools | Semantic consistency check across all components |
 
+### Thinking tools
+
+| Skill | When it fires | Purpose |
+|-------|--------------|---------|
+| `different-viewpoint` | User-invoked for any problem or decision | Full CIA Phoenix Checklist sweep — surfaces frame shifts and hypothesis flaws. Accepts optional hypothesis. |
+| `different-viewpoints-lite` | User-invoked for quick adversarial challenge | 5-question adversarial challenge — selects questions most likely to falsify the hypothesis. Accepts optional hypothesis. |
+
 ### Support
 
 | Skill | When it fires | Purpose |
@@ -127,7 +134,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | `systematic-debugging` | Bug, test failure, unexpected behavior | Structured diagnosis before fixing |
 | `test-driven-development` | Feature or bugfix implementation | TDD cycle for code changes |
 | `feedback` | Friction or confusion mid-session | Captures workflow friction to workflow-feedback.md |
-| `review-workflow` | workflow-feedback.md has accumulated entries | Analyzes friction, proposes improvements |
+| `review-workflow` | Open workflow-friction GitHub issues have accumulated | Explore scan + Phoenix analysis + multi-angle proposals + adversarial review |
 | `requesting-code-review` | Implementation complete | Opens PR with structured review request |
 | `receiving-code-review` | PR review feedback received | Processes and implements reviewer feedback |
 | `using-superpowers` | Start of any conversation | Orientation: finds available skills and how to use them |
