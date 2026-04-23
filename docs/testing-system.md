@@ -18,6 +18,7 @@ The Testing System spans six concerns:
 2. **Pipeline as a Rigid Gatekeeper** — CI/CD knowledge lives in planning context; code conforms to it
 3. **Test Strategy Agent** — per-plan checkpoint that defines validation criteria before execution begins
 3b. **Test Builder Agent** — writes the actual test code from the Testing section spec, before implementation begins (TDD)
+3c. **Test Runner Agent** — executes the test suite after implementation is committed; classifies results and gates fixes behind `systematic-debugging` on failure
 4. **Pre-Commit Quality Gates** — automated quality checks before code reaches the build pipeline
 5. **Runtime Observability & Bug Triage** — log monitoring with context-appropriate cadence and structured bug triage
 6. **E2E Infrastructure** — out of scope for this plan; deferred until after unit/integration TDD bootstrapping is established
@@ -445,6 +446,83 @@ Writes test files directly to disk. Returns a **status summary only** to the mai
 - Any gaps flagged (scenarios that could not be implemented with available infrastructure)
 
 The main context does not receive test code. This keeps the TDD contract intact — implementation is driven by the spec and the failing tests' pass/fail signal, not by reading what the tests assert internally.
+
+---
+
+## Pillar 3c — Test Runner Agent *(Per-Task, Phase 2)*
+
+### Role in the TDD Cycle
+
+The test runner is the closing step of each task's TDD loop: test-builder wrote the failing tests before implementation began, implementation made them pass, and test-runner verifies that claim. It runs after implementation is committed and before `verification-before-completion`.
+
+Test-runner does not propose or suggest fixes under any circumstance. Its only job is to run the suite, classify the result, and block fixes behind `systematic-debugging` if anything fails.
+
+### When It Runs
+
+Invoked once per task by the main context (`executing-plans`) or the orchestrator (`subagent-driven-development`) — not by a leaf implementer subagent. The caller must have Skill tool access so the REQUIRED NEXT STEP block on failure is actionable.
+
+If `testing-plan.md` does not exist, test-runner returns SETUP REQUIRED immediately and instructs the caller to run `e2e-init`.
+
+### Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `plan_doc` | Yes | — | Path to the plan doc; read Testing section for expected scenarios |
+| `testing_plan` | Yes | — | Path to `.claude/testing-plan.md` |
+| `results_file` | No | `.claude/test-results.md` | Where to write the full run output |
+| `defer_write` | No | `false` | Skip writing results to disk |
+
+### Execution Flow
+
+1. **Check for testing-plan.md** — if absent, return SETUP REQUIRED; stop.
+2. **Read config** — extract run command, `flakiness_tolerance` (default 0), `setup_steps` (optional ordered list).
+3. **Run setup steps** — if defined, run each in order. Any non-zero exit → ENVIRONMENT FAILURE; stop.
+4. **Execute test command** — run via Bash; capture exit code, stdout/stderr, elapsed time.
+5. **Classify result** — exit 0 → PASS; exit non-zero with test output present → TEST FAILURE; exit non-zero with no test output → BUILD FAILURE.
+6. **Retry** — TEST FAILURE only: re-run up to `flakiness_tolerance` times. If any pass → PASS. BUILD/ENVIRONMENT failures are deterministic; never retry them.
+7. **Write results** — overwrite `.claude/test-results.md` with full output. Never accumulate files.
+8. **Return summary** — structured output to caller.
+
+### Result Classification
+
+| Result | Condition |
+|--------|-----------|
+| **PASS** | Exit code 0 |
+| **TEST FAILURE** | Exit non-zero AND test output present (some tests ran and failed) |
+| **BUILD FAILURE** | Exit non-zero AND no test output (compile/parse/import error before tests ran) |
+| **ENVIRONMENT FAILURE** | A setup step exited non-zero before the test command ran |
+| **SETUP REQUIRED** | `.claude/testing-plan.md` not found |
+
+### On Failure: The Mandatory Gate
+
+When any FAILURE result is returned, test-runner emits:
+
+```
+⚠️ REQUIRED NEXT STEP — DO NOT PROPOSE FIXES YET
+Invoke systematic-debugging before any fix is attempted:
+  Skill { skill: "systematic-debugging" }
+
+No fix attempt is permitted until systematic-debugging has completed Phase 1
+(root cause investigation).
+```
+
+This gate is enforced by `CLAUDE.md` (global): "When test-runner returns a FAILURE result, invoke `systematic-debugging` before any fix attempt."
+
+**Failure type guidance for systematic-debugging:**
+- ENVIRONMENT FAILURE → investigate setup steps and environment configuration first
+- BUILD FAILURE → investigate compilation errors before test logic
+- TEST FAILURE → start with the failed test names and first-line error messages
+
+### Integration Points
+
+| Component | Relationship |
+|-----------|-------------|
+| `executing-plans` | Invokes test-runner once per task after implementation commit |
+| `subagent-driven-development` | Orchestrator invokes test-runner per task; leaf subagents never invoke it |
+| `test-builder` | Wrote the tests test-runner now executes; test-runner never reads implementation source |
+| `systematic-debugging` | Mandatory next step on any FAILURE result |
+| `verification-before-completion` | Runs after test-runner returns PASS |
+| `e2e-init` | Must be run first to create `.claude/testing-plan.md` that test-runner reads |
 
 ---
 
