@@ -51,6 +51,32 @@ You cannot search files on your own. Actively look for load-bearing codebase cla
 
 **Never issue a BLOCKING finding for an unverifiable reference without first attempting a researcher lookup.** This is the primary mechanism for distinguishing real gaps from false positives.
 
+## Exhaustiveness Check
+
+Complete both steps before writing any output labels.
+
+**Step 1 — Candidate issue dump**
+
+Read the entire plan doc. List every potential issue you observed, without classification yet.
+Do not filter during this pass — include things you are uncertain about. Marginal issues that
+get mentally discarded during scanning are the ones most likely to surface in round 7.
+
+**Step 2 — Per-criterion attestation**
+
+For each of the five review criteria, state which sections of the plan you checked and what
+you found. Use this table structure internally (it does not need to appear in your output):
+
+| Criterion | Sections checked | Findings or "none" |
+|-----------|-----------------|---------------------|
+| Design soundness | | |
+| Logic completeness | | |
+| Contradictions | | |
+| Foreseeable issues | | |
+| Self-containment | | |
+
+Only after completing both steps: classify the candidates from Step 1 into
+BLOCKING / MINOR / LOOKS GOOD and emit your VERDICT.
+
 ## Output Format
 
 Structure your output using exactly these four labels. Each section must be present even if empty.

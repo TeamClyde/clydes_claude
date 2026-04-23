@@ -159,7 +159,7 @@ Rules are in `rules/` and `CLAUDE.md`.
 | `rules/filesystem/efficiency.md` | Search and read patterns | No unscoped globs; plan-doc-first during execution; prefer graph tools over Grep |
 | `rules/mcp-governance.md` | MCP tool access | No direct Atlassian MCP calls; JQL must include `project=` filter |
 | `rules/plugin-lifecycle.md` | Plugin routing, conflict suppression | Integrated plugins route via `creating-tools`; do not invoke directly |
-| `rules/cspell.md` | Spellcheck false positives | Auto-add to `cspell.json` without asking |
+| `rules/cspell.md` | Spellcheck false positives | Auto-add to `cspell.json` and `.vscode/settings.json` without asking |
 
 ---
 

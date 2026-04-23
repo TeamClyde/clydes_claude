@@ -42,8 +42,8 @@ For each task:
     - **PASS**: proceed to step 5.
     - **FAILURE**: invoke `systematic-debugging` before any fix attempt:
       `Skill { skill: "systematic-debugging" }`. Do not mark the task complete or attempt fixes
-      until systematic-debugging has completed Phase 1. Re-run test-runner after the fix to
-      confirm PASS before proceeding.
+      until systematic-debugging has completed Phase 3 (hypothesis validation). Re-run
+      test-runner after all confirmed fixes are applied to confirm PASS before proceeding.
     - **SETUP REQUIRED**: `.claude/testing-plan.md` is missing — run `e2e-init` first, or skip
       test-runner for this repo if testing is not yet configured.
     - If `.claude/testing-plan.md` does not exist: skip this step silently.

@@ -79,13 +79,36 @@ questions, and worst-case framing.
 
 ## Selection Criteria
 
-For each candidate question, ask: "If the answer to this question contradicts the hypothesis
-or reveals a flaw in the problem framing, how significant is that?"
+Follow this three-step process. Do not select directly from the full 32.
 
-Select the 5 with the highest damage potential.
+**Step 1 — Identify threat categories**
 
-Tiebreak: prefer questions that expose *different types* of flaws — scope wrong, information
-incomplete, wrong component, constraint missed — over 5 questions that expose the same type.
+Before looking at the question bank, name the 2–3 threat categories this specific hypothesis
+is most vulnerable to. Choose from:
+- Scope wrong (the problem or fix is broader/narrower than framed)
+- Information incomplete (key facts not yet known)
+- Wrong component/mechanism (the proposed fix targets the wrong part)
+- Constraint missed (a hard limit that makes the fix unworkable)
+- Timing/ordering error (sequence assumption is wrong)
+- Success criteria undefined (no way to verify it worked)
+- Reversibility not considered (fix creates a new, harder problem)
+
+**Step 2 — Generate a candidate pool**
+
+From those 2–3 threat categories, identify ~8 questions from the bank that probe those
+specific threats. Ignore questions that are not relevant to the named categories.
+
+**Step 3 — Apply negative constraint, then select 5**
+
+From the candidate pool, select 5 with the highest damage potential for THIS hypothesis.
+
+Before finalizing: if more than 2 of {P6, S16, P8, S6, P15} appear in your selection,
+each must be explicitly justified as the most threatening question for this specific
+hypothesis — or replaced with a more hypothesis-specific alternative. These 5 are a known
+default set; defaulting to them signals the threat-category step was skipped.
+
+Per-question reasoning must be tied to the specific hypothesis, not generic
+("this is always a good question" is not valid justification).
 
 ---
 

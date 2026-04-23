@@ -120,6 +120,29 @@ You MUST complete each phase before proceeding to the next.
    - Keep tracing up until you find the source
    - Fix at source, not at symptom
 
+6. **Enumerate All Candidate Hypotheses**
+
+   **Before reading any implementation source files**, form a complete hypothesis table from
+   the error output, stack traces, logs, and recent changes gathered above.
+
+   | # | Hypothesis | Probability | Confirming signal to look for |
+   |---|-----------|-------------|-------------------------------|
+   | 1 | "X fails because Y" | High/Med/Low | What file/log would prove it |
+   | … | … | … | … |
+
+   Each hypothesis must be:
+   - **Specific and falsifiable** — "navigation fails because DeviceSelector is absent when
+     getMyDevices() returns empty" not "navigation is broken"
+   - **Distinct** — if two hypotheses have the same confirming signal, merge them
+
+   Do NOT proceed to Phase 2 until the table has at least one hypothesis. Do NOT fix anything
+   until Phase 3 is complete.
+
+   **When 3+ hypotheses exist:** Consider parallel investigation — dispatch one agent per
+   hypothesis via `dispatching-parallel-agents`. Each agent reads the files relevant to its
+   hypothesis and returns CONFIRMED / DENIED. Main context collects results and proceeds to
+   Phase 4. This is faster than sequential investigation for multi-failure test runs.
+
 ### Phase 2: Pattern Analysis
 
 **Find the pattern before fixing:**
@@ -143,30 +166,30 @@ You MUST complete each phase before proceeding to the next.
    - What settings, config, environment?
    - What assumptions does it make?
 
-### Phase 3: Hypothesis and Testing
+### Phase 3: Hypothesis Validation
 
-**Scientific method:**
+**Goal: confirm or deny every hypothesis in the table before fixing anything.**
 
-1. **Form Single Hypothesis**
-   - State clearly: "I think X is the root cause because Y"
-   - Write it down
-   - Be specific, not vague
+For each hypothesis:
 
-2. **Test Minimally**
-   - Make the SMALLEST possible change to test hypothesis
-   - One variable at a time
-   - Don't fix multiple things at once
+1. **Identify the 1–2 implementation files most likely to confirm or deny it**
+   - Read them. Mark the hypothesis: **CONFIRMED / DENIED / UNRESOLVED**
+   - One variable at a time — test each hypothesis independently
 
-3. **Verify Before Continuing**
-   - Did it work? Yes → Phase 4
-   - Didn't work? Form NEW hypothesis
-   - DON'T add more fixes on top
+2. **3-file escalation rule**
+   - If a hypothesis is still UNRESOLVED after reading 3 implementation files, stop reading
+   - Do not add more files hoping to find confirmation
+   - Mark it UNRESOLVED and escalate: state "I cannot confirm or deny this without more
+     context" before proceeding
+
+3. **Do not fix until the full table is marked**
+   - Complete CONFIRMED / DENIED / UNRESOLVED for every row before touching any code
+   - The goal is a complete picture, not the first actionable finding
 
 4. **When You Don't Know**
    - Say "I don't understand X"
-   - Don't pretend to know
-   - Ask for help
-   - Research more
+   - Don't pretend to know — mark the hypothesis UNRESOLVED
+   - Ask for help or use `dispatching-parallel-agents` for parallel investigation
 
 ### Phase 4: Implementation
 
@@ -179,11 +202,11 @@ You MUST complete each phase before proceeding to the next.
    - MUST have before fixing
    - Use the `superpowers:test-driven-development` skill for writing proper failing tests
 
-2. **Implement Single Fix**
-   - Address the root cause identified
-   - ONE change at a time
-   - No "while I'm here" improvements
-   - No bundled refactoring
+2. **Implement All Confirmed Fixes**
+   - Address every CONFIRMED root cause from Phase 3 in a single code pass
+   - One logical change per root cause — no "while I'm here" improvements
+   - Apply all confirmed fixes before re-running tests
+   - Do NOT re-run after fixing only some confirmed hypotheses — finish the batch first
 
 3. **Verify Fix**
    - Test passes now?
@@ -219,6 +242,8 @@ If you catch yourself thinking:
 - "Quick fix for now, investigate later"
 - "Just try changing X and see if it works"
 - "Add multiple changes, run tests"
+- Fixing one confirmed hypothesis before all hypotheses are marked (skips the batch)
+- Re-running tests after partial fixes rather than completing the full confirmed batch
 - "Skip the test, I'll manually verify"
 - "It's probably X, let me fix that"
 - "I don't fully understand but this might work"
@@ -260,10 +285,10 @@ If you catch yourself thinking:
 
 | Phase | Key Activities | Success Criteria |
 |-------|---------------|------------------|
-| **1. Root Cause** | Read errors, reproduce, check changes, gather evidence | Understand WHAT and WHY |
-| **2. Pattern** | Find working examples, compare | Identify differences |
-| **3. Hypothesis** | Form theory, test minimally | Confirmed or new hypothesis |
-| **4. Implementation** | Create test, fix, verify | Bug resolved, tests pass |
+| **1. Root Cause** | Read errors, reproduce, check changes, gather evidence, enumerate ALL hypotheses as table | Complete hypothesis table before reading implementation files |
+| **2. Pattern** | Find working examples, compare working vs broken | Identify differences that map to hypotheses |
+| **3. Validation** | Confirm/deny each hypothesis (3-file limit per hypothesis), parallel dispatch for 3+ | Every hypothesis marked CONFIRMED / DENIED / UNRESOLVED |
+| **4. Implementation** | Create test, fix ALL confirmed hypotheses in one pass, verify with single re-run | All confirmed root causes fixed, tests pass |
 
 ## When Process Reveals "No Root Cause"
 
