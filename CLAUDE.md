@@ -69,6 +69,9 @@ The implementation plan doc (`plans/<slug>/<slug>-plan.md`) is the single source
 - Rich ticket descriptions: a person reading them 3 months later should understand what changed and why.
 - If a task turns out significantly larger or smaller than estimated, note it and adjust sub-tasks accordingly.
 - Jira reflects reality. It does not control it. Never let ticket state block execution.
+- When test-runner returns a FAILURE result, invoke `systematic-debugging` before any fix
+  attempt. Do not propose fixes until `systematic-debugging` has completed Phase 1 (root
+  cause investigation).
 
 ---
 
