@@ -81,9 +81,14 @@ The architect cannot search files on its own. When it needs to verify a cross-re
 Only `plan` mode is in scope. `evaluate_task` and `debug` modes in the existing `~/.claude/agents/architect.md` will be removed during the rewrite.
 
 **When invoked:**
-End-of-planning gate only — never mid-draft. Two triggers:
-- **Manual** — user explicitly calls it when planning is complete
-- **Automatic** — Claude invokes it before calling `ExitPlanMode`
+Two scenarios, both before a significant state transition:
+
+1. **End of planning** — before execution begins:
+   - **Manual** — user explicitly calls it when planning is complete
+   - **Automatic** — Claude invokes it before calling `ExitPlanMode` (via `plan-gate` after `writing-plans`)
+
+2. **Before task completion** — before transitioning a task from In Progress to Testing or Done:
+   - Ensures implementation matches the original plan intent and has no foreseeable issues that would fail in testing
 
 **Iteration and question handling:**
 Max 3 review rounds total. Each re-review is a completely fresh pass — no memory of prior rounds.
