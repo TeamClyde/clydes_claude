@@ -639,6 +639,7 @@ S-sized bugs found during active testing are fixed in place without interrupting
 | 4 | Test Strategy Agent | `~/.claude/agents/test-strategy.md` | Pillar 3 |
 | 5 | Testing section format | Documented in this plan (Pillar 3) | Pillar 3 |
 | 6 | Test Builder Agent | `~/.claude/agents/test-builder.md` | Pillar 3b |
-| 7 | Pre-commit hook (global) | `~/.claude/hooks/pre-commit` | Pillar 4 |
-| 8 | Pre-commit script (per repo) | `scripts/run-tests.sh` | Pillar 4 |
-| 9 | Bug triage protocol | Documented in this plan (Pillar 5) | Pillar 5 |
+| 7 | Test Runner Agent | `~/.claude/agents/test-runner.md` | Pillar 3c |
+| 8 | Pre-commit hook (global) | `~/.claude/hooks/pre-commit` | Pillar 4 |
+| 9 | Pre-commit script (per repo) | `scripts/run-tests.sh` | Pillar 4 |
+| 10 | Bug triage protocol | Documented in this plan (Pillar 5) | Pillar 5 |
