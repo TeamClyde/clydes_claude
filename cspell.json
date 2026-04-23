@@ -9,6 +9,7 @@
     "automate",
     "claude",
     "clydes",
+    "codegraph",
     "cspell",
     "enum",
     "frontmatter",
@@ -29,6 +30,8 @@
     "prereqs",
     "pyright",
     "shutil",
+    "ntesting",
+    "stdout",
     "subagent",
     "symlink",
     "symlinked",
@@ -40,6 +43,7 @@
     "worktree",
     "worktrees",
     "wooshair",
+    "Xs",
     "yaml"
   ],
   "ignorePaths": ["node_modules", ".git"]
