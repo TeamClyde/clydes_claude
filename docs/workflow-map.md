@@ -3,7 +3,7 @@
 Canonical reference for how skills, agents, rules, hooks, and plugins connect in the
 Claude workflow. Update this file whenever a component is added, removed, or rewired.
 
-Last updated: 2026-04-20
+Last updated: 2026-04-22
 
 ---
 
