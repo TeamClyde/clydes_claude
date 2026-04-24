@@ -1,24 +1,19 @@
 {
-  "_comment": "Merged additively into ~/.claude/settings.json by setup.sh. _comment keys are metadata and are stripped during merge. Do not add these _comment fields to settings.json directly.",
+  "_comment": "Reference only — MCP servers are registered via `claude mcp add -s user` in setup.sh (Step 9), not by merging this file. ~/.claude.json is the authoritative MCP config.",
   "mcpServers": {
-    "bitbucket": {
-      "_comment": "PR management, repo discovery, file browsing via Bitbucket Cloud API",
-      "command": "npx",
-      "args": ["-y", "@aashari/mcp-server-atlassian-bitbucket"],
-      "env": {
-        "BITBUCKET_USERNAME": "${BITBUCKET_USERNAME}",
-        "BITBUCKET_APP_PASSWORD": "${BITBUCKET_APP_PASSWORD}"
-      }
-    },
-    "atlassian": {
-      "_comment": "Jira ticket creation, transitions, Confluence. Auth via browser session — run 'claude mcp auth atlassian' once to authenticate.",
-      "type": "sse",
-      "url": "https://mcp.atlassian.com/v1/sse"
-    },
     "git": {
-      "_comment": "Local git operations — reading history, blame, diffs. No auth required. Requires uv (https://docs.astral.sh/uv/).",
+      "_comment": "Local git operations — history, blame, diffs. Registered by setup.sh.",
       "command": "uvx",
       "args": ["mcp-server-git", "--repository", "."]
+    },
+    "codebase-memory-mcp": {
+      "_comment": "Symbol graph for /infra-init. Binary path resolved at install time by setup.sh.",
+      "command": "<absolute path to ~/.local/bin/codebase-memory-mcp>"
+    },
+    "bitbucket": {
+      "_comment": "Requires credentials — register manually: claude mcp add -s user bitbucket npx -- -y @aashari/mcp-server-atlassian-bitbucket -e BITBUCKET_USERNAME=... -e BITBUCKET_APP_PASSWORD=...",
+      "command": "npx",
+      "args": ["-y", "@aashari/mcp-server-atlassian-bitbucket"]
     }
   }
 }
