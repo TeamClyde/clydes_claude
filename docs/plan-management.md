@@ -28,9 +28,9 @@ A good prompt from the user contains intent but rarely all the context needed to
 
 **Step 2 — Use the codebase graph for navigation:**
 The graph is the efficient path to structural facts. Use Tool Search to find the right query tool, then query it. The graph answers what exists, where it lives, and what connects to what — without reading implementation:
-- "Does a utility for this already exist?" → `codebase_search_symbol`
-- "What will break if I change this function?" → `codebase_find_callers`
-- "What env vars does this module consume?" → `codebase_get_env_var`
+- "Does a utility for this already exist?" → `search_graph`
+- "What will break if I change this function?" → `query_graph` (CALLS)
+- "What env vars does this module consume?" → Read `.claude-init/enrichments.json`
 
 Only read actual source code when you need to understand **how** something works, not just **what** it is or **where** it lives. The graph gives you file:line — that's enough to write accurate plan references without reading the full implementation.
 
@@ -308,4 +308,4 @@ All dependencies below are co-deliverables — part of the same system being bui
 | `architect` agent | Plan 05 | Question-surfacing behavior in Plan 05 §1 matches the gate protocol in §1.6 of this plan |
 | `test-strategy` agent | Plan 03 | Invoked after architect, before ExitPlanMode; reads plan doc + `.claude/testing-plan.md`; appends `## Testing` — matches §1.7 of this plan (Plan 03, Pillar 3) |
 | `researcher` agent | Plan 05 | Inputs: `question` + optional `scope`; output: direct factual answer — matches dispatch pattern in §1.1 Step 3 (Plan 05 §2) |
-| Codebase graph tools | Plan 01 | Tool names `codebase_search_symbol`, `codebase_find_callers`, `codebase_get_env_var` defined in Plan 01 Phase 4 — match the names used in §1.1 and §1.2 of this plan |
+| Codebase graph tools | Plan 01 | Tool names `search_graph`, `query_graph`, `get_architecture` from codebase-memory-mcp — match the names used in §1.1 and §1.2 of this plan |

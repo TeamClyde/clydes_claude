@@ -116,9 +116,9 @@ If BLOCKING issues remain after 3 rounds, escalate to the user — do not attemp
 
 | Scenario | Use researcher? | Tool |
 |----------|----------------|------|
-| "Where does `get_cognito_user` live?" | Yes | Local codebase MCP (`codebase_search_symbol`) |
-| "Which files import `NotificationService`?" | Yes | Local codebase MCP (`codebase_find_callers`) |
-| "What env vars does the notification service read?" | Yes | Local codebase MCP (`codebase_get_env_var`) |
+| "Where does `get_cognito_user` live?" | Yes | codebase-memory-mcp (`search_graph`) |
+| "Which files import `NotificationService`?" | Yes | codebase-memory-mcp (`query_graph` with CALLS/IMPORTS) |
+| "What env vars does the notification service read?" | Yes | Read `.claude-init/enrichments.json` |
 | "What does the notification service do?" (light summarization) | Yes — CODEBASE.md or 10–20 line targeted read; NOT a full codebase scan | Read CODEBASE.md or targeted function read |
 | "What is the ARN of the `SendNotificationQueue`?" | Yes | AWS MCP |
 | "What is the current value of `/backend/notification/pusher` in SSM?" | Yes | AWS MCP |
@@ -342,7 +342,7 @@ The orchestrator (the `/infra-init` skill) assigns batches before spawning agent
 
 This system spans dozens of repos across mobile, backend, firmware, and internal tooling. Cross-repo integration questions are a routine part of planning, not an edge case. The integration-engineer exists to answer those questions with precision and minimum context cost.
 
-**Primary navigation: local codebase MCP.** For any repo that has run `/infra-init`, the integration-engineer queries its local MCP tools (`codebase_search_api_endpoints`, `codebase_find_callers`, `codebase_find_dependencies`) to get structured cross-repo context without reading whole files. For example: a dashboard repo needing to understand another repo's API surface queries that repo's codebase MCP rather than grepping files — getting exactly the endpoint list and contract details with no noise. When the graph is not present, the agent falls back to direct file search. A repo not having a graph is not a blocker — but repos with `/infra-init` set up get significantly faster and more precise cross-repo analysis.
+**Primary navigation: codebase-memory-mcp.** For any repo that has run `/infra-init`, the integration-engineer queries its local codebase-memory-mcp tools (`search_graph`, `query_graph`) to get structured cross-repo context without reading whole files. For example: a dashboard repo needing to understand another repo's API surface queries that repo's codebase MCP rather than grepping files — getting exactly the endpoint list and contract details with no noise. When the graph is not present, the agent falls back to direct file search. A repo not having a graph is not a blocker — but repos with `/infra-init` set up get significantly faster and more precise cross-repo analysis.
 
 **Model:** Sonnet (reasoning required — must correlate across codebases)
 

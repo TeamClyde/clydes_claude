@@ -3,7 +3,7 @@
 # Codebase Summary
 <!-- last-updated: YYYY-MM-DD, commit: <short-hash> -->
 Repo type: [detected-type]
-Full graph: .claude-init/codebase-graph.json (query via codebase MCP tools)
+Graph: indexed via codebase-memory-mcp (query via search_graph, query_graph, get_architecture)
 
 ## [Category 1 name]
 <!-- Files where is_entry_point: true AND trigger != null -->
@@ -26,7 +26,7 @@ Full graph: .claude-init/codebase-graph.json (query via codebase MCP tools)
 <!-- - relative/path/to/repository.py — one-line description of what data it accesses -->
 
 ---
-For symbol-level lookups, use the codebase MCP tools listed in the project CLAUDE.md.
+For symbol-level lookups, use the codebase-memory-mcp tools (search_graph, query_graph, get_architecture) listed in the project CLAUDE.md.
 Files not listed above remain in the graph and are queryable via MCP tools.
 
 ---
@@ -36,7 +36,7 @@ Files not listed above remain in the graph and are queryable via MCP tools.
 # Codebase Summary
 <!-- last-updated: 2026-03-15, commit: a4f3c12 -->
 Repo type: aws-lambda
-Full graph: .claude-init/codebase-graph.json (query via codebase MCP tools)
+Graph: indexed via codebase-memory-mcp (query via search_graph, query_graph, get_architecture)
 
 ## Entry Points
 - src/function/send_notification_queue_consumer.py — sqs:SendNotificationQueue
@@ -60,7 +60,7 @@ Full graph: .claude-init/codebase-graph.json (query via codebase MCP tools)
 - src/repositories/dynamodb.py — base DynamoDB access layer
 
 ---
-For symbol-level lookups, use the codebase MCP tools listed in the project CLAUDE.md.
+For symbol-level lookups, use the codebase-memory-mcp tools (search_graph, query_graph, get_architecture) listed in the project CLAUDE.md.
 Files not listed above remain in the graph and are queryable via MCP tools.
 
 END EXAMPLE -->
