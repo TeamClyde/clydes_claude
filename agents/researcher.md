@@ -30,9 +30,9 @@ Use whichever MCP is appropriate for the question. Do not guess or substitute a 
 
 | Question type | Tool |
 |---------------|------|
-| Symbol location ("where does `get_cognito_user` live?") | Local codebase MCP (`codebase_search_symbol`) |
-| File imports ("which files import `NotificationService`?") | Local codebase MCP (`codebase_find_callers`) |
-| Env vars ("what env vars does the notification service read?") | Local codebase MCP (`codebase_get_env_var`) |
+| Symbol location ("where does `get_cognito_user` live?") | codebase-memory-mcp (`search_graph`) |
+| File imports ("which files import `NotificationService`?") | codebase-memory-mcp (`query_graph` with CALLS/IMPORTS) |
+| Env vars ("what env vars does the notification service read?") | Read `.claude-init/enrichments.json` |
 | Light summarization ("what does X do?") | Read CODEBASE.md first; if insufficient, targeted 10–20 line read of the specific symbol |
 | Queue or topic ARN | AWS MCP |
 | SSM parameter value | AWS MCP |

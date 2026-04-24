@@ -40,12 +40,12 @@ Follow the orientation hierarchy before any file navigation: read `project.json`
 
 | Need | Tool |
 |------|------|
-| Trace who calls a function (DI wiring, call paths) | `codebase_find_callers` |
-| Confirm a symbol exists or find its location | `codebase_search_symbol` |
-| Map what a file imports and what imports it | `codebase_find_dependencies` |
-| Find where an env var / dart-define is consumed | `codebase_get_env_var` |
-| Identify all app entry points and triggers | `codebase_get_entry_points` |
-| Map API routes this app exposes or calls | `codebase_search_api_endpoints` |
+| Trace who calls a function (DI wiring, call paths) | `query_graph` (Cypher: `MATCH (x)-[:CALLS]->(f:Function {name:"X"}) RETURN x`) |
+| Confirm a symbol exists or find its location | `search_graph` |
+| Map what a file imports and what imports it | `query_graph` (Cypher: `MATCH (f {file:"X"})-[:IMPORTS]->(d) RETURN d`) |
+| Find where an env var / dart-define is consumed | Read `.claude-init/enrichments.json` directly |
+| Identify all app entry points and triggers | `get_architecture` |
+| Map API routes this app exposes or calls | `search_graph` (filter: Route nodes) |
 
 Using Grep for symbol tracing when graph tools are available is a plan quality failure — graph tools return complete call graphs; Grep returns partial text matches that miss injected or aliased usages.
 
