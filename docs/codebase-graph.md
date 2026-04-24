@@ -28,7 +28,7 @@ Three artifacts, each with a distinct purpose:
 
 ### 1. SQLite Graph (codebase-memory-mcp)
 
-The primary artifact — a SQLite-backed graph database managed globally by the `codebase-memory-mcp` binary. Indexed via `index_repository` when `/infra-init` runs. Queried on demand via MCP tools: `search_graph`, `query_graph`, `get_architecture`, `trace_call_path`, `search_code`. Never injected into context wholesale; never stored as a per-project JSON file.
+The primary artifact — a SQLite-backed graph database managed globally by the `codebase-memory-mcp` binary. Indexed via `index_repository` when `/infra-init` runs. Queried on demand via MCP tools: `search_graph`, `query_graph`, `get_architecture`, `trace_path`, `search_code`. Never injected into context wholesale; never stored as a per-project JSON file.
 
 ### 2. Supplemental Enrichments (`.claude-init/enrichments.json`)
 

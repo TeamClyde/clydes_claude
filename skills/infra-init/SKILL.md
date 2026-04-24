@@ -158,7 +158,7 @@ Wait for this agent to complete. It writes `.claude-init/CODEBASE.md` and sets `
    - `search_graph` — find a symbol by name or type
    - `query_graph` — Cypher-like traversal (callers: `MATCH (x)-[:CALLS]->(f:Function {name:"X"}) RETURN x`)
    - `get_architecture` — entry points, modules, architectural overview
-   - `trace_call_path` — trace call chain between two specific symbols
+   - `trace_path` — trace call chain between two specific symbols
    - `search_code` — full-text code search
 
    ### Env vars and serverless triggers
