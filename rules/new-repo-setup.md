@@ -29,7 +29,7 @@ All agents and skills are global — they live in `~/.claude/` and are available
 |-------|------|
 | `infra-init-structure` | Phase 1: repo type detection and batch assignment |
 | `infra-init-batch-indexer` | Phase 2: parallel source file extraction per batch |
-| `infra-init-graph-builder` | Phase 3: reduces batch output into `codebase-graph.json` and `CODEBASE.md` |
+| `infra-init-graph-builder` | Phase 3: queries codebase-memory-mcp and produces `CODEBASE.md` |
 
 ### Skills — invoke via Skill tool (`skill: <name>`)
 
@@ -50,7 +50,7 @@ All agents and skills are global — they live in `~/.claude/` and are available
 Run these steps in order when onboarding any new repository.
 
 1. **Run `scripts/setup.sh`** — symlinks global agents, skills, and rules into `~/.claude/`. Idempotent; safe to re-run.
-2. **Run `/infra-init`** — required for repos with 200+ source files. Generates `.claude-init/codebase-graph.json` and `.claude-init/CODEBASE.md`. Skip for small repos.
+2. **Run `/infra-init`** — required for repos with 200+ source files. Indexes repo via codebase-memory-mcp; generates `.claude-init/CODEBASE.md` and `.claude-init/enrichments.json`. Skip for small repos.
 3. **Run `/e2e-init`** — generates `.claude/testing-plan.md`, `plans/e2e-plan.md`, and `scripts/run-tests.sh`. Run after `/infra-init` if both are needed.
 4. **Create project `CLAUDE.md`** from the template below. Populate all placeholders before starting work.
 5. **Create initial `TODO.md`** — sections: `In Progress` / `Up Next` / `Backlog` / `History`.
@@ -123,9 +123,9 @@ Never push directly to the production repository. All changes go to the sandbox 
 
 > Populated by `/infra-init` when run. Leave blank until then.
 
-- **Graph:** `.claude-init/codebase-graph.json` — generated: [date]
 - **Summary:** `.claude-init/CODEBASE.md` — generated: [date]
-- **Query tools:** `codebase_search_symbol`, `codebase_find_callers`, `codebase_get_env_var`
+- **Enrichments:** `.claude-init/enrichments.json` — env vars and serverless triggers
+- **Query tools:** `search_graph`, `query_graph`, `get_architecture`, `search_code`
 
 **Read `.claude-init/CODEBASE.md` first when starting any new task.** It contains repo type, entry points, and key modules. Use query tools for symbol-level lookups. Only fall back to Grep or direct file reads when the graph is absent or you need implementation logic the graph doesn't capture.
 

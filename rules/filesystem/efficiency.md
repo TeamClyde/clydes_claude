@@ -37,14 +37,14 @@ Always scope with `path="src/function/"` or equivalent. A broad glob on a repo w
 
 Prefer graph query tools over Grep for symbol navigation. Use Tool Search to find them:
 
-| Need | Search for |
-|------|-----------|
-| Does this symbol exist? | `codebase_search_symbol` |
-| What calls this function? | `codebase_find_callers` |
-| What does this file import? | `codebase_find_dependencies` |
-| Where is this env var defined? | `codebase_get_env_var` |
-| What are the entry points? | `codebase_get_entry_points` |
-| What routes are exposed? | `codebase_search_api_endpoints` |
+| Need | Tool |
+|------|------|
+| Does this symbol exist? | `search_graph` |
+| What calls this function? | `query_graph` (Cypher: `MATCH (x)-[:CALLS]->(f:Function {name:"X"}) RETURN x`) |
+| What does this file import? | `query_graph` (Cypher: `MATCH (f {file:"X"})-[:IMPORTS]->(d) RETURN d`) |
+| Where is this env var defined? | Read `.claude-init/enrichments.json` directly |
+| What are the entry points? | `get_architecture` |
+| What routes are exposed? | `search_graph` (filter: Route nodes) |
 
 Use Grep only when no graph is present or when you need to read actual implementation logic.
 

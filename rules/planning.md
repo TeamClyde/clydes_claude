@@ -23,9 +23,9 @@ Use the codebase graph for structural facts; reserve source reads for implementa
 
 | Question type | Tool |
 |---|---|
-| "Does X already exist? Where?" | `codebase_search_symbol` |
-| "What breaks if I change this?" | `codebase_find_callers` |
-| "What env vars does this consume?" | `codebase_get_env_var` |
+| "Does X already exist? Where?" | `search_graph` |
+| "What breaks if I change this?" | `query_graph` (CALLS) |
+| "What env vars does this consume?" | Read `.claude-init/enrichments.json` |
 | Live infrastructure value (ARN, SSM param, table name) | `researcher` agent |
 | Cross-repo integration question | `integration-engineer` agent |
 
