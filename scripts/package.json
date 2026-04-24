@@ -1,0 +1,7 @@
+{
+  "name": "claude-workflow-scripts",
+  "private": true,
+  "dependencies": {
+    "nodemailer": "^6.9.0"
+  }
+}

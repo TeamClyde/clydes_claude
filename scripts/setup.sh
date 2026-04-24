@@ -538,6 +538,22 @@ mkdir -p "$HOME/.claude/scripts"
 install_symlink "$REPO_ROOT/scripts/skill-log.js"   "$HOME/.claude/scripts/skill-log.js"   "scripts/skill-log.js"
 install_symlink "$REPO_ROOT/scripts/skill-audit.js" "$HOME/.claude/scripts/skill-audit.js" "scripts/skill-audit.js"
 
+# Install nodemailer (used by skill-audit.js --send)
+info "Installing nodemailer ..."
+if (cd "$REPO_ROOT/scripts" && npm install --silent 2>/dev/null); then
+  success "nodemailer installed"
+else
+  warn "npm install failed in scripts/ — run manually: cd $REPO_ROOT/scripts && npm install"
+fi
+
+# Warn if email config is missing (credentials are machine-specific, not in the repo)
+CONFIG_FILE="$HOME/.claude/skill-report-config.json"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  warn "Missing email config: $CONFIG_FILE"
+  echo '     Create it with: {"email":"you@gmail.com","gmail_app_password":"xxxx xxxx xxxx xxxx"}'
+  echo "     Generate an app password at: https://myaccount.google.com/apppasswords"
+fi
+
 # Build the hook command using a Windows-native path so cmd.exe can resolve it.
 if command -v cygpath > /dev/null 2>&1; then
   _SKILL_LOG_WIN=$(cygpath -w "$HOME/.claude/scripts/skill-log.js")
@@ -597,14 +613,9 @@ _setup_windows_schedule() {
   local audit_win
   audit_win=$(cygpath -w "$HOME/.claude/scripts/skill-audit.js")
 
-  # Write a tiny PowerShell launcher so quoting stays sane in schtasks
-  local ps_win
   local ps_path="$HOME/.claude/scripts/skill-report.ps1"
   cat > "$ps_path" <<PSEOF
-\$report = node '$audit_win' 2>\$null | Out-String
-\$machine = \$env:COMPUTERNAME
-\$prompt  = "Send the following skill usage report via Gmail MCP to jason@wooshair.com. Subject: 'Weekly Skill Report - \$machine'. Body: \$report"
-claude -p \$prompt 2>&1 | Out-Null
+node '$audit_win' --send
 PSEOF
 
   local ps_path_win
@@ -627,9 +638,7 @@ _setup_unix_schedule() {
   local sh_path="$HOME/.claude/scripts/skill-report.sh"
   cat > "$sh_path" <<SHEOF
 #!/usr/bin/env bash
-MACHINE=\$(hostname)
-REPORT=\$(node "$audit_path" 2>/dev/null)
-claude -p "Send the following skill usage report via Gmail MCP to jason@wooshair.com. Subject: 'Weekly Skill Report - \$MACHINE'. Body: \$REPORT" 2>&1 | tail -3
+node "$audit_path" --send
 SHEOF
   chmod +x "$sh_path"
 
