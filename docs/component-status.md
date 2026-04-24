@@ -142,8 +142,8 @@ Located in `templates/`. Copied on use — not symlinked.
 | Template | Status | Purpose |
 |----------|--------|---------|
 | `CODEBASE.md` | ✅ | 5-category codebase summary template |
-| `codebase-graph.schema.json` | ✅ | JSON Schema for the codebase graph format |
-| `codebase-mcp/` | ✅ | Local MCP server starter code for codebase graph |
+| `codebase-graph.schema.json` | 🗑️ Retired | Replaced by codebase-memory-mcp (global SQLite-backed server) |
+| `codebase-mcp/` | 🗑️ Retired | Replaced by codebase-memory-mcp (global SQLite-backed server) |
 | `branch-protection.json` | ✅ | Bitbucket API payload for branch protection rules |
 | `mcp-settings.json` | ✅ | MCP settings template |
 | `pr-description.md` | ✅ | PR description template |

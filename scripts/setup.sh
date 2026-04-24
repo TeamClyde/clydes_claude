@@ -433,12 +433,11 @@ install_npm_pkg() {
 install_npm_pkg "@aashari/mcp-server-atlassian-bitbucket"
 # git MCP server uses uvx (mcp-server-git) — no pre-install needed; uvx downloads on first use
 
-# /infra-init Python dependencies — graphify (structural extraction) + tree-sitter
-# parsers (env var scanner). Install unpinned (upstream churn accepted; translator
-# is drift-defensive). pip show guard avoids re-resolving on every setup.sh run.
+# /infra-init Python dependencies — tree-sitter parsers (env var scanner).
+# Install unpinned. pip show guard avoids re-resolving on every setup.sh run.
 echo ""
 info "Installing /infra-init Python dependencies using $INFRA_INIT_PY"
-for pkg in graphifyy tree-sitter-python tree-sitter-typescript pyyaml jsonschema; do
+for pkg in tree-sitter-python tree-sitter-typescript pyyaml jsonschema; do
   if "$INFRA_INIT_PY" -m pip show "$pkg" > /dev/null 2>&1; then
     skip "already installed: $pkg"
   else
@@ -527,7 +526,136 @@ PYEOF
 fi
 
 # ---------------------------------------------------------------------------
-# Step 10 — Summary
+# Step 10 — Skill usage tracking
+# ---------------------------------------------------------------------------
+# Installs a PostToolUse hook that logs every Skill invocation to
+# ~/.claude/skill-usage-<hostname>.jsonl, and schedules a weekly email report.
+
+echo ""
+echo "Step 10 — Setting up skill usage tracking"
+
+mkdir -p "$HOME/.claude/scripts"
+install_symlink "$REPO_ROOT/scripts/skill-log.js"   "$HOME/.claude/scripts/skill-log.js"   "scripts/skill-log.js"
+install_symlink "$REPO_ROOT/scripts/skill-audit.js" "$HOME/.claude/scripts/skill-audit.js" "scripts/skill-audit.js"
+
+# Build the hook command using a Windows-native path so cmd.exe can resolve it.
+if command -v cygpath > /dev/null 2>&1; then
+  _SKILL_LOG_WIN=$(cygpath -w "$HOME/.claude/scripts/skill-log.js")
+  _HOOK_CMD="node \"${_SKILL_LOG_WIN}\""
+else
+  _HOOK_CMD="node \"$HOME/.claude/scripts/skill-log.js\""
+fi
+
+# Merge the PostToolUse hook into ~/.claude/settings.json.
+# Skips if a Skill matcher is already present (respects --force to replace).
+PYTHONUTF8=1 \
+  _SETTINGS_FILE="$(command -v cygpath > /dev/null 2>&1 && cygpath -m "$SETTINGS_FILE" || echo "$SETTINGS_FILE")" \
+  _HOOK_CMD="$_HOOK_CMD" \
+  _FORCE="$FORCE" \
+  "$PYTHON_CMD" - <<'PYEOF'
+import json, os, sys
+
+settings_path = os.environ["_SETTINGS_FILE"]
+hook_cmd      = os.environ["_HOOK_CMD"]
+force         = os.environ["_FORCE"] == "true"
+
+try:
+    with open(settings_path) as f:
+        settings = json.load(f)
+except Exception as e:
+    print(f"  ✗ Could not read settings.json: {e}", file=sys.stderr)
+    sys.exit(1)
+
+hooks = settings.setdefault("hooks", {})
+post  = hooks.setdefault("PostToolUse", [])
+
+# Check whether a Skill matcher entry already exists
+existing = next((h for h in post if h.get("matcher") == "Skill"), None)
+if existing and not force:
+    print("  ↷ PostToolUse Skill hook already present")
+else:
+    if existing:
+        post.remove(existing)
+    post.append({
+        "matcher": "Skill",
+        "hooks": [{"type": "command", "command": hook_cmd}]
+    })
+    with open(settings_path, "w") as f:
+        json.dump(settings, f, indent=2)
+        f.write("\n")
+    print(f"  ✓ PostToolUse Skill hook added to settings.json")
+PYEOF
+
+# ---------------------------------------------------------------------------
+# Weekly email report — Windows Task Scheduler (MSYS/MinGW) or crontab (Unix)
+# ---------------------------------------------------------------------------
+
+MACHINE=$(hostname)
+REPORT_TASK_NAME="Claude Weekly Skill Report"
+
+_setup_windows_schedule() {
+  local audit_win
+  audit_win=$(cygpath -w "$HOME/.claude/scripts/skill-audit.js")
+
+  # Write a tiny PowerShell launcher so quoting stays sane in schtasks
+  local ps_win
+  local ps_path="$HOME/.claude/scripts/skill-report.ps1"
+  cat > "$ps_path" <<PSEOF
+\$report = node '$audit_win' 2>\$null | Out-String
+\$machine = \$env:COMPUTERNAME
+\$prompt  = "Send the following skill usage report via Gmail MCP to jason@wooshair.com. Subject: 'Weekly Skill Report - \$machine'. Body: \$report"
+claude -p \$prompt 2>&1 | Out-Null
+PSEOF
+
+  local ps_path_win
+  ps_path_win=$(cygpath -w "$ps_path")
+
+  if schtasks.exe /create \
+      /tn "$REPORT_TASK_NAME" \
+      /tr "powershell.exe -NonInteractive -File \"$ps_path_win\"" \
+      /sc WEEKLY /d MON /st 09:00 \
+      /f > /dev/null 2>&1; then
+    success "Windows Task Scheduler: '$REPORT_TASK_NAME' runs every Monday at 09:00"
+  else
+    warn "Could not create Task Scheduler entry — create it manually:"
+    echo "     schtasks /create /tn \"$REPORT_TASK_NAME\" /tr \"powershell.exe -NonInteractive -File \\\"$ps_path_win\\\"\" /sc WEEKLY /d MON /st 09:00 /f"
+  fi
+}
+
+_setup_unix_schedule() {
+  local audit_path="$HOME/.claude/scripts/skill-audit.js"
+  local sh_path="$HOME/.claude/scripts/skill-report.sh"
+  cat > "$sh_path" <<SHEOF
+#!/usr/bin/env bash
+MACHINE=\$(hostname)
+REPORT=\$(node "$audit_path" 2>/dev/null)
+claude -p "Send the following skill usage report via Gmail MCP to jason@wooshair.com. Subject: 'Weekly Skill Report - \$MACHINE'. Body: \$REPORT" 2>&1 | tail -3
+SHEOF
+  chmod +x "$sh_path"
+
+  local cron_line="0 9 * * 1 $sh_path"
+  if crontab -l 2>/dev/null | grep -qF "skill-report"; then
+    skip "crontab entry already present for skill-report"
+  else
+    (crontab -l 2>/dev/null; echo "$cron_line") | crontab -
+    success "crontab: skill report scheduled every Monday at 09:00"
+  fi
+}
+
+uname_out=$(uname -s 2>/dev/null || echo "unknown")
+if echo "$uname_out" | grep -qi "mingw\|cygwin\|msys"; then
+  _setup_windows_schedule
+else
+  _setup_unix_schedule
+fi
+
+echo ""
+info "Skill usage log: ~/.claude/skill-usage-${MACHINE}.jsonl"
+info "Email report: every Monday at 09:00 (covers the prior 7 days)"
+info "On-demand: node ~/.claude/scripts/skill-audit.js [days]"
+
+# ---------------------------------------------------------------------------
+# Step 11 — Summary
 # ---------------------------------------------------------------------------
 
 echo ""
