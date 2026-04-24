@@ -433,6 +433,19 @@ install_npm_pkg() {
 install_npm_pkg "@aashari/mcp-server-atlassian-bitbucket"
 # git MCP server uses uvx (mcp-server-git) — no pre-install needed; uvx downloads on first use
 
+# codebase-memory-mcp — single static binary, installed to ~/.local/bin
+CBM_BIN="$HOME/.local/bin/codebase-memory-mcp"
+if [[ -x "$CBM_BIN" ]] && ! $FORCE; then
+  skip "already installed: codebase-memory-mcp ($("$CBM_BIN" --version 2>/dev/null || echo 'unknown version'))"
+else
+  info "Installing codebase-memory-mcp ..."
+  if curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --skip-config > /dev/null 2>&1; then
+    success "installed: codebase-memory-mcp"
+  else
+    warn "codebase-memory-mcp install failed — install manually: curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash"
+  fi
+fi
+
 # /infra-init Python dependencies — tree-sitter parsers (env var scanner).
 # Install unpinned. pip show guard avoids re-resolving on every setup.sh run.
 echo ""
@@ -451,83 +464,58 @@ for pkg in tree-sitter-python tree-sitter-typescript pyyaml jsonschema; do
 done
 
 # ---------------------------------------------------------------------------
-# Step 9 — Merge MCP settings into ~/.claude/settings.json
+# Step 9 — Register MCP servers via claude mcp add
 # ---------------------------------------------------------------------------
+# ~/.claude.json is the authoritative MCP config (not ~/.claude/settings.json).
+# Use `claude mcp add -s user` so servers are available across all projects.
 
 echo ""
-echo "Step 9 — Merging MCP settings into ~/.claude/settings.json"
+echo "Step 9 — Registering MCP servers"
 
-SETTINGS_FILE="$HOME/.claude/settings.json"
-MCP_TEMPLATE="$REPO_ROOT/templates/mcp-settings.json"
+# register_mcp_stdio <name> <command> [args...]
+# Idempotent: skips if the server name already appears in `claude mcp list`.
+register_mcp_stdio() {
+  local name="$1"; shift
+  if claude mcp list 2>/dev/null | grep -q "^${name}:"; then
+    if ! $FORCE; then
+      skip "already registered: $name"
+      (( SKIPPED++ )) || true
+      return 0
+    fi
+    claude mcp remove "$name" 2>/dev/null || true
+  fi
+  if claude mcp add -s user "$name" "$@" 2>/dev/null; then
+    success "registered MCP: $name"
+    (( LINKED++ )) || true
+  else
+    warn "failed to register MCP: $name — run manually: claude mcp add -s user $name $*"
+    (( FAILED++ )) || true
+  fi
+}
 
-# Convert to native OS paths for Python — on Windows/MinGW, $HOME expands to
-# a MSYS path (/c/Users/...) that Windows Python cannot open.
-if command -v cygpath > /dev/null 2>&1; then
-  # -m produces C:/Users/... (forward-slash Windows paths) — safe in Python strings
-  SETTINGS_FILE_PY=$(cygpath -m "$SETTINGS_FILE")
-  MCP_TEMPLATE_PY=$(cygpath -m "$MCP_TEMPLATE")
+# git — local repo history/blame/diff (uvx downloads on first use)
+register_mcp_stdio "git" uvx -- mcp-server-git --repository .
+
+# codebase-memory-mcp — symbol graph for /infra-init
+if [[ -x "$CBM_BIN" ]]; then
+  register_mcp_stdio "codebase-memory-mcp" "$CBM_BIN"
 else
-  SETTINGS_FILE_PY="$SETTINGS_FILE"
-  MCP_TEMPLATE_PY="$MCP_TEMPLATE"
+  warn "skipping codebase-memory-mcp registration — binary not found at $CBM_BIN"
 fi
 
-if [[ ! -f "$MCP_TEMPLATE" ]]; then
-  warn "MCP template not found at $MCP_TEMPLATE — skipping settings merge"
-else
-  PYTHONUTF8=1 _MCP_TEMPLATE="$MCP_TEMPLATE_PY" _SETTINGS_FILE="$SETTINGS_FILE_PY" _FORCE="$FORCE" "$PYTHON_CMD" - <<PYEOF
-import json
-import os
-import sys
-
-template_path = os.environ["_MCP_TEMPLATE"]
-settings_path = os.environ["_SETTINGS_FILE"]
-force = os.environ["_FORCE"] == "true"
-
-try:
-    with open(template_path, "r") as f:
-        template = json.load(f)
-except Exception as e:
-    print(f"  ✗ Could not read MCP template: {e}", file=sys.stderr)
-    sys.exit(1)
-
-if os.path.exists(settings_path):
-    try:
-        with open(settings_path, "r") as f:
-            settings = json.load(f)
-    except Exception as e:
-        print(f"  ✗ Could not read settings.json: {e}", file=sys.stderr)
-        sys.exit(1)
-else:
-    settings = {}
-
-if "mcpServers" not in settings:
-    settings["mcpServers"] = {}
-
-template_servers = template.get("mcpServers", {})
-for key, value in template_servers.items():
-    if key.startswith("_comment"):
-        continue
-    if key in settings["mcpServers"] and not force:
-        print(f"  ↷ already present: mcpServers.{key}")
-    else:
-        settings["mcpServers"][key] = value
-        print(f"  ✓ merged: mcpServers.{key}")
-
-with open(settings_path, "w") as f:
-    json.dump(settings, f, indent=2)
-    f.write("\n")
-
-print(f"  ✓ settings.json written: {settings_path}")
-PYEOF
-  echo ""
-  echo "  ℹ  Add Bitbucket credentials manually to ~/.claude/settings.json:"
-  echo "       mcpServers.bitbucket.env.BITBUCKET_USERNAME"
-  echo "       mcpServers.bitbucket.env.BITBUCKET_APP_PASSWORD"
-fi
+echo ""
+echo "  ℹ  Bitbucket MCP requires credentials — register manually if not already done:"
+echo "       claude mcp add -s user bitbucket npx -- -y @aashari/mcp-server-atlassian-bitbucket \\"
+echo "         -e BITBUCKET_USERNAME=you@example.com -e BITBUCKET_APP_PASSWORD=yourtoken"
 
 # ---------------------------------------------------------------------------
 # Step 10 — Skill usage tracking
 # ---------------------------------------------------------------------------
+# ~/.claude/settings.json is used for hooks and permissions (not MCP servers).
+SETTINGS_FILE="$HOME/.claude/settings.json"
+if command -v cygpath > /dev/null 2>&1; then
+  SETTINGS_FILE="$(cygpath -m "$SETTINGS_FILE")"
+fi
 # Installs a PostToolUse hook that logs every Skill invocation to
 # ~/.claude/skill-usage-<hostname>.jsonl, and schedules a weekly email report.
 
