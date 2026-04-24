@@ -4,13 +4,11 @@ Detects (per plan):
     Python : os.environ["X"], os.environ.get("X"[, default]), os.getenv("X"[, default])
     TS/JS  : process.env.X, process.env["X"], const {X, Y: local} = process.env
 
-Emits env_var nodes and reads_env edges in our schema shape. Caller node id
-matches what graphify_translate.py produced (source_file::Class.method or
-source_file::function). If a read happens at module scope, a synthetic
-function node `<file>::<module>` is emitted.
+Writes enrichments.json with schema:
+    {"env_vars": [{"name": str, "reads": ["file:line", ...], "default": null, "defined_in": null}],
+     "entry_points": []}
 
-If the repo has no .py/.ts/.js/.tsx/.jsx files, returns zero nodes and zero
-edges without error — documented non-Python/TS behavior.
+If the repo has no .py/.ts/.js/.tsx/.jsx files, returns zero env_vars without error.
 """
 
 from __future__ import annotations
@@ -130,7 +128,6 @@ TS_QUERY = r"""
 @dataclass
 class EnvRead:
     var_name: str
-    caller_id: str
     file: str
     line: int
 
@@ -140,68 +137,6 @@ def _strip_string(text: str) -> str:
     if len(text) >= 2 and text[0] in "\"'`" and text[-1] == text[0]:
         return text[1:-1]
     return text
-
-
-def _find_enclosing_symbol_py(node) -> tuple[str | None, str | None]:
-    """Walk up to the innermost function_definition / method of a class.
-
-    Returns (enclosing_class_name or None, symbol_name or None).
-    """
-    class_name = None
-    symbol = None
-    cur = node.parent
-    while cur is not None:
-        if cur.type in ("function_definition",):
-            name_node = cur.child_by_field_name("name")
-            if symbol is None and name_node is not None:
-                symbol = name_node.text.decode("utf-8", errors="replace")
-        elif cur.type == "class_definition":
-            name_node = cur.child_by_field_name("name")
-            if name_node is not None:
-                class_name = name_node.text.decode("utf-8", errors="replace")
-                break
-        cur = cur.parent
-    return class_name, symbol
-
-
-def _find_enclosing_symbol_ts(node) -> tuple[str | None, str | None]:
-    class_name = None
-    symbol = None
-    cur = node.parent
-    while cur is not None:
-        if cur.type in (
-            "function_declaration",
-            "function_expression",
-            "generator_function",
-            "generator_function_declaration",
-            "method_definition",
-            "arrow_function",
-        ):
-            if symbol is None:
-                name_node = cur.child_by_field_name("name")
-                if name_node is not None:
-                    symbol = name_node.text.decode("utf-8", errors="replace")
-                elif cur.type == "arrow_function":
-                    parent = cur.parent
-                    if parent is not None and parent.type == "variable_declarator":
-                        nm = parent.child_by_field_name("name")
-                        if nm is not None:
-                            symbol = nm.text.decode("utf-8", errors="replace")
-        elif cur.type == "class_declaration":
-            name_node = cur.child_by_field_name("name")
-            if name_node is not None:
-                class_name = name_node.text.decode("utf-8", errors="replace")
-                break
-        cur = cur.parent
-    return class_name, symbol
-
-
-def _caller_id(rel_file: str, class_name: str | None, symbol: str | None) -> str:
-    if class_name and symbol:
-        return f"{rel_file}::{class_name}.{symbol}"
-    if symbol:
-        return f"{rel_file}::{symbol}"
-    return f"{rel_file}::<module>"
 
 
 def _iter_dest_names(pattern_node, src: bytes) -> Iterable[tuple[str, int]]:
@@ -237,11 +172,9 @@ def scan_python_file(path: Path, rel: str, lang) -> list[EnvRead]:
         name = _strip_string(raw)
         if not name:
             continue
-        class_name, symbol = _find_enclosing_symbol_py(var_node)
         reads.append(
             EnvRead(
                 var_name=name,
-                caller_id=_caller_id(rel, class_name, symbol),
                 file=rel,
                 line=var_node.start_point[0] + 1,
             )
@@ -261,15 +194,7 @@ def scan_ts_file(path: Path, rel: str, lang) -> list[EnvRead]:
         if "pattern" in captures:
             pattern_node = captures["pattern"][0]
             for name, line in _iter_dest_names(pattern_node, src):
-                class_name, symbol = _find_enclosing_symbol_ts(pattern_node)
-                reads.append(
-                    EnvRead(
-                        var_name=name,
-                        caller_id=_caller_id(rel, class_name, symbol),
-                        file=rel,
-                        line=line,
-                    )
-                )
+                reads.append(EnvRead(var_name=name, file=rel, line=line))
             continue
 
         var_node = None
@@ -283,11 +208,9 @@ def scan_ts_file(path: Path, rel: str, lang) -> list[EnvRead]:
         name = _strip_string(raw)
         if not name:
             continue
-        class_name, symbol = _find_enclosing_symbol_ts(var_node)
         reads.append(
             EnvRead(
                 var_name=name,
-                caller_id=_caller_id(rel, class_name, symbol),
                 file=rel,
                 line=var_node.start_point[0] + 1,
             )
@@ -344,63 +267,18 @@ def scan(root: Path) -> dict:
             except Exception as e:
                 log.warning("TSX scan failed for %s: %s", rel, e)
 
-    env_var_nodes: list[dict] = []
-    seen_vars: set[str] = set()
+    by_var: dict[str, list[str]] = {}
     for r in reads:
-        if r.var_name in seen_vars:
-            continue
-        seen_vars.add(r.var_name)
-        env_var_nodes.append(
-            {
-                "id": f"env::{r.var_name}",
-                "type": "env_var",
-                "name": r.var_name,
-                "file": "",
-                "line_start": 1,
-            }
-        )
+        by_var.setdefault(r.var_name, []).append(f"{r.file}:{r.line}")
 
-    reads_env_edges: list[dict] = [
-        {
-            "type": "reads_env",
-            "from": r.caller_id,
-            "to": f"env::{r.var_name}",
-            "file": r.file,
-            "line": r.line,
-        }
-        for r in reads
-    ]
-
-    synthetic_module_nodes: list[dict] = []
-    synthetic_seen: set[str] = set()
-    for r in reads:
-        if not r.caller_id.endswith("::<module>"):
-            continue
-        if r.caller_id in synthetic_seen:
-            continue
-        synthetic_seen.add(r.caller_id)
-        file_path = r.caller_id.split("::", 1)[0]
-        synthetic_module_nodes.append(
-            {
-                "id": r.caller_id,
-                "type": "function",
-                "name": "<module>",
-                "file": file_path,
-                "line_start": 1,
-            }
-        )
-
-    log.info(
-        "env_var_scan: %d reads, %d unique vars, %d synthetic module nodes",
-        len(reads),
-        len(env_var_nodes),
-        len(synthetic_module_nodes),
-    )
+    log.info("env_var_scan: %d reads, %d unique vars", len(reads), len(by_var))
 
     return {
-        "env_var_nodes": env_var_nodes,
-        "reads_env_edges": reads_env_edges,
-        "synthetic_module_nodes": synthetic_module_nodes,
+        "env_vars": [
+            {"name": name, "reads": refs, "default": None, "defined_in": None}
+            for name, refs in sorted(by_var.items())
+        ],
+        "entry_points": [],
     }
 
 
