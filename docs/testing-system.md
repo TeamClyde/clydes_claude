@@ -397,7 +397,7 @@ The test-builder works from the Testing section spec and the testing plan. It do
 
 **Optional inputs:**
 - Existing test files — only if the Testing section does not already include conventions; used solely to understand naming, structure, and assertion style
-- `codebase-graph.json` — if it exists, may be consulted for function signatures: symbol names, parameter types, and return types. This is sufficient context to construct correct test inputs and verify expected outputs. The graph contains no implementation logic — only public interface shape.
+- codebase-memory-mcp (`search_graph`, `get_code_snippet`) — if the project is indexed, may be consulted for function signatures: symbol names, parameter types, and return types. This is sufficient context to construct correct test inputs and verify expected outputs. The graph contains no implementation logic — only public interface shape.
 
 This isolation is intentional. Tests written independently of the implementation are more likely to verify observable behavior rather than implementation internals.
 
@@ -421,7 +421,7 @@ The test-builder writes tests first — they fail because no implementation exis
 
 **Optionally (only if needed):**
 - **Existing test files** — for naming/structure/assertion conventions, only when the Testing section does not already supply them
-- **`codebase-graph.json`** — for function signatures (symbol names, parameter types, return types); sufficient to write correct test inputs and verify expected outputs; contains no implementation logic
+- **codebase-memory-mcp** (`search_graph`, `get_code_snippet`) — for function signatures (symbol names, parameter types, return types); sufficient to write correct test inputs and verify expected outputs; contains no implementation logic
 
 **Never reads:** implementation source files, design documents, or any non-test code.
 

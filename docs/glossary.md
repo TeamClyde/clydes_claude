@@ -47,7 +47,7 @@ A field in `testing-plan.md`. Integer — number of additional test-suite runs t
 A shell script wired to a Claude Code event. The `pre-commit` hook runs before every git commit. Lives in `hooks/` and is symlinked to `~/.claude/hooks/` by `setup.sh`.
 
 **infra-init**
-The skill that generates the codebase graph. Three phases: (1) structure detection and batch assignment, (2) parallel source file extraction, (3) graph synthesis. Output: `.claude-init/codebase-graph.json` and `.claude-init/CODEBASE.md`.
+The skill that indexes the codebase and generates the human-readable summary. Three phases: (1) structure detection and batch assignment, (2) parallel source file extraction and indexing via codebase-memory-mcp, (3) CODEBASE.md generation. Outputs: `.claude-init/enrichments.json` (env vars and serverless triggers) and `.claude-init/CODEBASE.md`. The graph itself is managed globally by the codebase-memory-mcp binary — no per-repo JSON file.
 
 **orchestrator**
 The main context or the `subagent-driven-development` skill when it is coordinating per-task subagents. The orchestrator is the only context that should invoke `test-runner` — never a leaf implementer subagent.

@@ -19,7 +19,7 @@ Your specification is the Testing section of the plan doc. You write exactly wha
 - `plan_doc` — path to the plan doc; read the Testing section only (required)
 - `testing_plan` — path to `.claude/testing-plan.md` (required)
 - `test_dir` — path to the repo's test directory (optional; only needed when the Testing section does not already supply conventions)
-- `codegraph` — path to `codebase-graph.json` (optional)
+- `codegraph` — omit; symbol lookups now go through codebase-memory-mcp (`search_graph`, `get_code_snippet`) rather than a local JSON file
 
 ---
 
@@ -44,8 +44,8 @@ the test code (e.g. router reset in setUp, permission grant in setUpAll).
 **Existing test files** (via `test_dir`)
 Only when the Testing section does not already supply conventions. Read to extract: file naming pattern, import style, assertion library, test structure (describe/it blocks, class-based, flat functions). Read conventions only — do not read existing tests to understand feature behavior or derive expectations from them.
 
-**`codebase-graph.json`** (via `codegraph`)
-The codegraph is not optional when your test code references a specific symbol. Before asserting against any symbol name, verify it via graph query or targeted file Read. If neither confirms the symbol, flag the assertion as unverified in the status summary — do not guess. The graph contains no implementation logic — only public interface shape: symbol names, parameter types, and return types.
+**codebase-memory-mcp** (when available)
+The graph is not optional when your test code references a specific symbol. Before asserting against any symbol name, verify it via `search_graph` or `get_code_snippet`. If neither confirms the symbol, flag the assertion as unverified in the status summary — do not guess. The graph contains no implementation logic — only public interface shape: symbol names, parameter types, and return types.
 
 ### Never
 
@@ -139,7 +139,7 @@ The main context receives this summary and nothing else. It learns which scenari
 - Black-box only — specification is the Testing section checklist, not implementation internals
 - Follows the test-strategy's explicit directives on which tests to reuse, update, or create — does not override those directives based on its own reading of the codebase
 - Flags untestable scenarios as gaps rather than approximating coverage
-- Does not assert against any symbol name without first verifying it via graph query or targeted file Read — flags unverified symbols in the status summary rather than guessing
+- Does not assert against any symbol name without first verifying it via `search_graph` / `get_code_snippet` (codebase-memory-mcp) or targeted file Read — flags unverified symbols in the status summary rather than guessing
 - Does not read implementation source files under any circumstance
 - Does not make architectural decisions
 - Does not return test code to the main context — status summary only

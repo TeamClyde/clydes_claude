@@ -43,7 +43,7 @@ Invoked via the `Skill` tool with `skill: <name>`.
 | `executing-plans` | Step-by-step plan execution with task tracking |
 | `finishing-a-development-branch` | Pre-merge checklist: tests, review, PR creation |
 | `git-manager` | All git operations: commits, branching, push, PR creation |
-| `infra-init` | Codebase graph generation — produces `codebase-graph.json` and `CODEBASE.md` |
+| `infra-init` | Codebase indexing via codebase-memory-mcp — produces `.claude-init/CODEBASE.md` and `.claude-init/enrichments.json` |
 | `plan-gate` | Bridges planning to execution: architect review, test strategy, Jira tickets |
 | `plan-management` | TODO.md maintenance and plan doc status tracking |
 | `receiving-code-review` | Structured response to code review feedback |

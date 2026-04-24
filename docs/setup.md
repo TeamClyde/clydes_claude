@@ -175,7 +175,7 @@ After running `scripts/setup.sh`, verify each component:
 | Component | Verification |
 |-----------|-------------|
 | `git-manager` skill | Run `/git-manager commit files:[README.md] type:chore description:"test commit"` on a test repo — should stage and commit |
-| `/infra-init` skill | Run `/infra-init` on this repo (`claude-workflow-improvements`) — should produce `codebase-graph.json` and `CODEBASE.md` |
+| `/infra-init` skill | Run `/infra-init` on this repo (`claude-workflow-improvements`) — should produce `.claude-init/CODEBASE.md` and `.claude-init/enrichments.json` |
 | `jira-workflow-manager` agent | Create a test Jira ticket — agent should create it and return a key |
 | `/e2e-init` skill | Run `/e2e-init` on a sample repo — should produce `.claude/testing-plan.md` |
 | `architect` agent | Invoke with the path to any plan doc in `plans/` — should return BLOCKING / MINOR / APPROVED feedback |

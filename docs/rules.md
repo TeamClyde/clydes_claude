@@ -225,7 +225,7 @@ Complete table of all global agents and skills with invocation method and role:
 **New repo checklist (~15 lines)**
 Sequenced steps:
 1. Run `scripts/setup.sh` to symlink global agents, skills, and rules
-2. Run `/infra-init` on repos with 200+ source files → generates `codebase-graph.json` and `CODEBASE.md`; skip for small repos
+2. Run `/infra-init` on repos with 200+ source files → indexes via codebase-memory-mcp and generates `.claude-init/CODEBASE.md` and `.claude-init/enrichments.json`; skip for small repos
 3. Run `/e2e-init` → generates `testing-plan.md`, `e2e-plan.md`, and `scripts/run-tests.sh`
 4. Create project `CLAUDE.md` from template below
 5. Create initial `TODO.md`

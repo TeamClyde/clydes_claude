@@ -324,12 +324,13 @@ argument-hint: "commit files:[...] type:feat|fix|chore description:'...' jira-ke
 ---
 name: infra-init
 description: >
-  Generates the codebase knowledge graph for the current repo. Orchestrates a
-  3-phase indexing process: structure detection, parallel batch file extraction,
-  and graph synthesis. Produces .claude-init/codebase-graph.json and
-  .claude-init/CODEBASE.md. Run once per repo during initial setup
-  (step 2 of new-repo-setup checklist), then re-run when the codebase grows
-  significantly. Handles resume automatically if a prior run was interrupted.
+  Indexes the codebase into codebase-memory-mcp and generates a human-readable
+  summary. Orchestrates a 3-phase process: structure detection, parallel batch
+  indexing via codebase-memory-mcp, and CODEBASE.md generation. Produces
+  .claude-init/CODEBASE.md and .claude-init/enrichments.json. Run once per repo
+  during initial setup (step 2 of new-repo-setup checklist), then re-run when
+  the codebase grows significantly. Handles resume automatically if a prior run
+  was interrupted.
 ---
 ```
 
@@ -339,11 +340,12 @@ description: >
 
 | File | Location | Contents |
 |------|----------|---------|
-| `codebase-graph.json` | `.claude-init/` | Symbol graph: functions, callers, env vars, endpoints — primary artifact for Claude agent navigation |
 | `CODEBASE.md` | `.claude-init/` | 5-category structured index (Entry Points, Domain Handlers, External Services, Use Cases, Repositories — names vary by repo type) |
+| `enrichments.json` | `.claude-init/` | Env var reads and serverless trigger metadata — queried by agents for domain-level context |
 | `structure.json` | `.claude-init/` | Repo metadata from Phase 1 — consumed by skill to build batch assignments |
 | `progress.json` | `.claude-init/` | Batch manifest — persists state for resume on interruption |
-| `results/batch_NN.json` | `.claude-init/results/` | Per-batch extraction output — consumed by graph-builder in Phase 3 |
+
+The symbol graph itself is managed globally by the codebase-memory-mcp binary (SQLite-backed). There is no per-repo `codebase-graph.json`.
 
 #### Phase 1 — Structure Detection
 
@@ -366,18 +368,18 @@ Orchestration loop:
 
 If an agent fails without writing a result: mark batch as `failed`, continue remaining batches, report failures after all other batches finish.
 
-#### Phase 3 — Graph Synthesis
+#### Phase 3 — CODEBASE.md Generation
 
-Spawn `infra-init-graph-builder` (Sonnet). Provide: path to `.claude-init/results/`.
+Spawn `infra-init-graph-builder` (Sonnet). Provide: paths to `.claude-init/progress.json`, `.claude-init/structure.json`, and `.claude-init/enrichments.json`.
 
-Returns `codebase-graph.json` and `CODEBASE.md`.
+Queries codebase-memory-mcp and writes `.claude-init/CODEBASE.md`.
 
 **Post-completion:**
 - Update `CLAUDE.md`: add/update the codebase graph section with artifact paths and generation date
 - Report: files indexed, repo type, any failed batches, artifact paths
 
 **Re-run behavior:**
-- If `codebase-graph.json` already exists: confirm with user before overwriting. Default is full refresh.
+- If `CODEBASE.md` already exists: confirm with user before overwriting. Default is full refresh.
 - If `progress.json` is incomplete: offer resume or restart.
 
 **What it does NOT do:**

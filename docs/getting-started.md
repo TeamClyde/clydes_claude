@@ -65,7 +65,7 @@ This wizard generates `project.json` and a project `CLAUDE.md` with Jira, testin
 ```
 /infra-init
 ```
-Generates `.claude-init/CODEBASE.md` and `.claude-init/codebase-graph.json`. Enables symbol-level navigation without grepping source files.
+Indexes the codebase via codebase-memory-mcp and generates `.claude-init/CODEBASE.md` and `.claude-init/enrichments.json`. Enables symbol-level navigation without grepping source files.
 
 **Step 3 — Testing backbone (required for TDD workflow)**
 ```

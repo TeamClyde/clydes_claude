@@ -62,13 +62,13 @@ Stop. Return to main context with a specific question stating exactly what infor
 
 For each repo located in Phase 1, find the files that contain the endpoints or API calls relevant to the `goal`. Take two paths depending on whether `/infra-init` has been run on the repo.
 
-**Path A — Graph exists** (`codebase-graph.json` is present in the repo):
-- Read `endpoints.exposed` for routes this repo serves
-- Read `endpoints.consumed` for external APIs this repo calls
-- Use the symbols and callers indexes to trace specific functions if a `focus` was provided
+**Path A — Project indexed in codebase-memory-mcp** (verify via `list_projects()` or `index_status()`):
+- Call `get_architecture(project=<project_name>)` for entry points, exposed routes, and service boundaries
+- Call `search_graph` or `query_graph` to find endpoint handlers and consumed API clients
+- Use `query_graph` Cypher traversals to trace callers when a `focus` is provided (e.g. `MATCH (x)-[:CALLS]->(f:Function {name:"X"}) RETURN x`)
 - The graph is a navigation aid — read the actual source file when the answer requires seeing exact parameter names, types, or validation logic
 
-**Path B — No graph** (no `codebase-graph.json`):
+**Path B — Project not indexed** (repo not present in codebase-memory-mcp):
 Do not flag the absence of a graph as a blocker. Search directly using patterns appropriate to the detected repo type.
 
 - Backend repos: search for route registration patterns such as `@app.route`, `router.get/post/put/delete`, `app.use`, `ApiGatewayEvent`, HTTP event definitions in `serverless.yml`. Use the repo type detected from manifest files to know which patterns apply.

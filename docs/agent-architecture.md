@@ -18,7 +18,7 @@ When a plan references a subagent, it is deferring the agent design here. This p
 | `researcher` | `~/.claude/agents/researcher.md` | Codebase lookups via local code MCP/graph + live infrastructure value lookups via AWS MCP — keeps lookup work out of the main context window |
 | `infra-init-structure` | (spawned by `/infra-init`, no persistent file) | Repo type detection and batch assignment during repo init |
 | `infra-init-batch-indexer` | (spawned by `/infra-init`, no persistent file) | Parallel source file extraction during repo init |
-| `infra-init-graph-builder` | (spawned by `/infra-init`, no persistent file) | Reduces batch output into codebase-graph.json and CODEBASE.md |
+| `infra-init-graph-builder` | (spawned by `/infra-init`, no persistent file) | Queries codebase-memory-mcp to build CODEBASE.md after indexing completes |
 | `integration-engineer` | `~/.claude/agents/integration-engineer.md` | Cross-repo contract mapping using local codebase MCPs from each repo |
 | `test-strategy` | `~/.claude/agents/test-strategy.md` | Per-plan validation criteria |
 | `test-builder` | `~/.claude/agents/test-builder.md` | Write test code from test strategy output, in parallel with implementation |
@@ -292,47 +292,39 @@ The orchestrator (the `/infra-init` skill) assigns batches before spawning agent
 
 ### 5. `infra-init-graph-builder` — Graph Builder
 
-**Purpose:** Phase 3 of `/infra-init`. Reduce phase — reads all batch output files and synthesizes them into the two final artifacts: `codebase-graph.json` (the queryable symbol graph) and `CODEBASE.md` (the short human-readable summary). Runs once, sequentially, after all batch indexers have completed. Does not read any source files.
+**Purpose:** Phase 3 of `/infra-init`. Query phase — after the codebase-memory-mcp binary has indexed the repo (Phase 2), this agent queries the MCP to produce a human-readable `CODEBASE.md` summary. Runs once, sequentially, after indexing completes. Does not read source files and does not write the graph — the graph is managed by the codebase-memory-mcp binary globally.
 
-**Model:** Sonnet (synthesis required — must build inverted indexes, correlate data across batches, and generate a coherent summary)
+**Model:** Sonnet (must reason about repo structure and produce a coherent categorized summary)
 
 **Inputs:**
-- Path to `.claude-init/results/` directory containing all `batch_NN.json` files
+- `.claude-init/progress.json` — provides `meta.repo_path` (the path used during indexing)
+- `.claude-init/structure.json` — provides `repo_type` for category naming
+- `.claude-init/enrichments.json` — env var reads and serverless trigger metadata
 
-**What it builds:**
+**What it queries:**
 
-| Index | Contents |
-|-------|----------|
-| Symbols index | All exported symbols keyed by name with `file:line` |
-| Callers index | Inverted call map — for each symbol, which files call it |
-| Env vars index | All env var reads with exact names, where defined (from serverless.yml / infra files), and which files read them |
-| Endpoints index | Exposed routes and consumed API clients |
+| Tool | Purpose |
+|------|---------|
+| `list_projects()` | Find the project identifier matching `meta.repo_path` |
+| `get_architecture(project=...)` | Entry points, modules, and service boundaries |
+| `search_graph(project=..., ...)` | Find files matching each category's directory patterns |
+| `query_graph(project=..., query=...)` | Cypher traversals for callers, feature modules, adapters |
 
-**Outputs:**
+**Output:**
 
-`codebase-graph.json` — the full queryable graph (schema defined in Plan 01):
-```json
-{
-  "meta": { "repo_type": "python-lambda", "generated": "...", "commit": "..." },
-  "symbols": { ... },
-  "callers": { ... },
-  "env_vars": { ... },
-  "endpoints": { "exposed": [], "consumed": { ... } }
-}
-```
-
-`CODEBASE.md` — short summary (entry points and key modules only). Intentionally brief — the graph handles deeper questions.
+`CODEBASE.md` — 5-category structured index (Entry Points, Domain Handlers, External Services, Use Cases, Repositories — names vary by repo type). Each entry lists the file and a one-line description of its role. The SQLite graph itself is managed globally by the codebase-memory-mcp binary and is not stored per-repo.
 
 **Behavior:**
-1. Read all `batch_NN.json` files from the results directory
-2. Merge symbol records across batches — deduplicate, resolve conflicts
-3. Build callers index by inverting all `calls` relationships
-4. Build env vars index by correlating `env_vars_read` records with definitions in serverless.yml / infra files
-5. Build endpoints index from `routes` and consumed API client records
-6. Write `codebase-graph.json`
-7. Generate `CODEBASE.md` — identify entry points (files where `entry_point: true`), key modules (most-called, most-imported), write short summary
+1. Read `progress.json` → extract `meta.repo_path`
+2. Call `list_projects()` → find matching project identifier
+3. Call `get_architecture()` → populate Category 1 (entry points) and Category 3 (external wrappers)
+4. Read `enrichments.json` → cross-reference serverless trigger annotations into Category 1
+5. Call `search_graph` / `query_graph` → populate Categories 2, 4, 5 from directory patterns
+6. Deduplicate — first category match wins
+7. Write `.claude-init/CODEBASE.md`
+8. Update `progress.json`: set `codebase_md.status` to `"complete"`
 
-**What it does NOT do:** Read source files, make implementation decisions, or modify any batch output files.
+**What it does NOT do:** Read source files, call `index_repository`, or write any file other than `CODEBASE.md` and the `progress.json` status update.
 
 ---
 
@@ -389,13 +381,13 @@ Parse the response to find candidate repos, then read their READMEs to select th
 
 For each repo, two paths depending on whether `/infra-init` has been run:
 
-**Path A — Graph exists** (`codebase-graph.json` is present):
-- Read `endpoints.exposed` for routes this repo serves
-- Read `endpoints.consumed` for external APIs this repo calls
-- Use the symbols and callers indexes to trace specific functions if needed
+**Path A — Project indexed in codebase-memory-mcp** (verify via `list_projects()` or `index_status()`):
+- Call `get_architecture(project=<project_name>)` for entry points, exposed routes, and service boundaries
+- Call `search_graph` or `query_graph` to find endpoint handlers and consumed API clients
+- Use `query_graph` Cypher traversals to trace callers when a `focus` is provided
 - The graph is the navigation aid — read the actual source file when the answer requires seeing exact parameter names, types, or validation logic
 
-**Path B — No graph** (repo does not have a codebase graph):
+**Path B — Project not indexed** (repo not present in codebase-memory-mcp):
 - Do not flag this as a blocker and stop. Search directly.
 - Backend repos: grep for route registration patterns (`@app.route`, `router.get/post/put/delete`, `app.use`, `ApiGatewayEvent`, `serverless.yml` HTTP events). These patterns are language-specific — use the repo type (detected from manifest files) to know which patterns to look for.
 - Mobile repos: grep for base URL constants, API client classes, request builder calls. Look for `URLSession`, `Retrofit`, `Dio`, `fetch`, `axios` — whatever matches the detected platform.
@@ -574,7 +566,7 @@ Plan approved, execution begins — invoked in parallel with the main implementa
 - `plan_doc` — path to the plan doc; agent reads only the Testing section (including Test Conventions if test-strategy populated them)
 - `testing_plan` — path to `.claude/testing-plan.md`
 - `test_dir` *(optional)* — path to the repo's test directory; only needed if the Testing section does not already supply conventions
-- `codegraph` *(optional)* — path to `codebase-graph.json` if it exists
+- `codegraph` *(omit)* — symbol lookups now go through codebase-memory-mcp (`search_graph`, `get_code_snippet`) rather than a local JSON file
 
 **What it reads:**
 
@@ -584,7 +576,7 @@ Plan approved, execution begins — invoked in parallel with the main implementa
 
 *Optionally (only if needed):*
 - Existing test files — for naming/structure/assertion conventions, only when the Testing section does not already supply them
-- `codebase-graph.json` — for function signatures: symbol names, parameter types, and return types; sufficient context to construct correct test inputs and verify expected outputs; contains no implementation logic — only public interface shape
+- codebase-memory-mcp (`search_graph`, `get_code_snippet`) — for function signatures: symbol names, parameter types, and return types; sufficient context to construct correct test inputs and verify expected outputs; contains no implementation logic — only public interface shape
 
 **Never reads:** implementation source files, design documents, or any non-test code.
 
