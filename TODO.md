@@ -4,6 +4,13 @@
 
 ## Up Next
 
+- [ ] Workflow doc process rework — bundles GitHub issues #13 (no session log) + #15 (design rationale lost) + #18 (cumulative footprint). Four-file structure per plan tree (design + plan + journal + handoff), skill-internal forcing functions, sub-plan rollup, one cross-platform SessionStart hook, bash pre-commit extension — [plan doc](plans/workflow-doc-process-rework/workflow-doc-process-rework-plan.md)
+  - [ ] Rules (4): plan-docs, planning, workflow-phases, filesystem/efficiency
+  - [ ] Skills (8 modified): plan-management (3 new modes), using-superpowers, writing-plans, executing-plans, subagent-driven-development, systematic-debugging, git-manager, plan-gate
+  - [ ] Hooks: 1 new SessionStart Node hook + 1 line addition to bash hooks/pre-commit
+  - [ ] Docs cleanup: 5 files (workflow-map, plan-management, rules, testing-system, glossary)
+  - [ ] Verification: /adherence-audit + pulser on 8 skills + smoke test
+
 ## Backlog
 
 - Mobile app workflow observations — real-world testing of memory capture, skill triggering, and CSO effectiveness in a new repo. Mobile app repo on separate machine will be used to observe whether memory is actually being written/read, which skills auto-trigger vs. get skipped, and what friction surfaces. Signal feeds back into memory system and CSO improvements. [scope]
