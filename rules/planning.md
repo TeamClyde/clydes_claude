@@ -62,17 +62,21 @@ When in doubt, size up.
 |---|---|
 | Design doc (from brainstorming) | `plans/<slug>/<slug>-design.md` |
 | L — implementation plan | `plans/<slug>/<slug>-plan.md` |
+| L — append-only history | `plans/<slug>/<slug>-journal.md` |
+| L — live session entry-point | `plans/<slug>/<slug>-handoff.md` |
 | S/M — session scratch | `~/.claude/plans/` only (session-scoped, not durable) |
-| Sub-plan (significant, standalone) | `plans/<parent-slug>/<child-slug>/<child-slug>-plan.md` |
+| Sub-plan (significant, standalone) | `plans/<parent-slug>/<child-slug>/<child-slug>-plan.md` (design + plan only — no journal or handoff; all journal/handoff content rolls up to the top-level files) |
 | Sub-plan (small addition to existing plan) | Appended section in the parent plan doc |
 
-Both the design doc and implementation plan live under the same `plans/<slug>/` directory. `~/.claude/plans/` files are ephemeral scratch pads. They are never the durable record — only `plans/<slug>/<slug>-plan.md` in the repo survives session boundaries.
+All four top-level artifacts (design, plan, journal, handoff) live under `plans/<slug>/`. `~/.claude/plans/` files are ephemeral scratch pads — never the durable record. Only `plans/<slug>/` files survive session boundaries.
 
 **`plans/` is gitignored.** Plan docs are session-scoped working artifacts — useful during a
 session, not committed deliverables. For committed reference documentation (workflow map, API
 docs, architecture guides), use `docs/`.
 
 ### Required Sections (L-sized plan docs)
+
+The plan doc is the **north star** for the work. The journal (`<slug>-journal.md`) and handoff (`<slug>-handoff.md`) are paired artifacts that the plan references — they are not sections inside the plan. Do not put journal entries or current-session state inside the plan doc.
 
 Every L-sized plan doc MUST contain:
 
@@ -87,7 +91,7 @@ Every L-sized plan doc MUST contain:
 - External resources with actual names (DynamoDB tables, SQS queues, SES templates, EventBridge rules)
 - Entry points and triggers involved
 
-**Epic/Task Reference table** — columns: #, Task, Size, Scope, Jira Key. **Jira Key column is intentionally blank during planning.** Keys are assigned during ticket creation (execution start). If a plan doc has blank Jira keys, this is correct behavior — not a gap. Rows marked ✅ as tasks complete.
+**Task Reference table** — **Authoritative durable progress record.** Columns: #, Task, Size, Scope, Jira Key. Jira Key column is intentionally blank during planning — keys are assigned at execution start. Rows marked ✅ as tasks complete. The mechanism that keeps this table current is `plan-management:divergence` — do not rely on "remember to update it."
 
 **Testing** — appended by `test-strategy` agent **after** architect review. This section does not exist at architect review time. This is correct — do not flag its absence during architect review.
 
@@ -101,7 +105,9 @@ A plan is ready when a model with an empty context window could receive it with 
 
 ### Plan Doc Refinements
 
-Editing or refining an existing plan doc is S-sized: no architect review, no new TODO.md entry, no new Jira ticket required.
+Editing or refining an existing plan doc before execution begins is S-sized: no architect review, no new TODO.md entry, no new Jira ticket required.
+
+During execution, divergences (architecture changes, scope shifts, discovered bugs, test-mechanics changes) are not "plan doc refinements" — they are handled by `plan-management:divergence`, which atomically writes a journal entry, edits the relevant plan section, and refreshes the handoff. Do not treat mid-execution updates as a separate S-sized editing task.
 
 ---
 
