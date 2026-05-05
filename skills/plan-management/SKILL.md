@@ -35,7 +35,7 @@ Single-line file at `.claude/active-plan` (relative to repo root). Holds the rel
 - **Deleted** (not just emptied) when the top-level plan completes — subsequent SessionStart hooks see no active-plan and exit silently.
 - Read by: the SessionStart hook, the `git-manager` plan-state validator, and constitutional gates inside `executing-plans`, `subagent-driven-development`, and `systematic-debugging`.
 
-**Walk-up algorithm** (used by `divergence` and `close-subplan` to resolve the top-level plan):
+**Walk-up algorithm** (used by `divergence`, `spawn-subplan`, and `close-subplan` to resolve the top-level plan):
 Starting from the active plan's directory, walk up one directory level. If that directory contains a `*-plan.md` file, the current plan is a sub-plan and the parent is that file. Keep walking up until reaching a directory with no `*-plan.md` — that is the top level. The top-level plan's peer files (`<top>-journal.md`, `<top>-handoff.md`) are the targets for all journal appends and handoff refreshes.
 
 ---
@@ -272,13 +272,14 @@ The caller must provide all three closeout fields before this mode proceeds:
 
 If any of the three fields is missing or empty: **refuse to close.** Surface the missing fields to the caller and wait. Do not proceed.
 
-#### Top-Level vs. Sub-Plan Detection (Walk-Up Algorithm)
+#### Top-Level vs. Sub-Plan Detection
 
-Before executing, determine whether the plan being closed is a sub-plan or the top-level plan:
+Before executing, determine whether the plan being closed is a sub-plan or the top-level plan using the **walk-up algorithm defined in the Active-Plan Marker section** above:
 
-1. Starting from the closing plan's directory, walk up one directory level.
-2. If that directory contains a `*-plan.md` file: this is a sub-plan. The parent plan is that file. Execute the **sub-plan close path** below.
-3. If walking up reaches the `plans/` directory or the repo root without finding a parent `*-plan.md`: this IS the top-level plan. Execute the **terminal-state path** below.
+- If the walk-up finds a parent `*-plan.md`: this is a sub-plan. Execute the **sub-plan close path** below with that file as the parent.
+- If the walk-up terminates without finding a parent `*-plan.md` (i.e., the closing plan IS the top-level): execute the **terminal-state path** below.
+
+Use the canonical algorithm — do not duplicate or restate the walk-up logic here.
 
 #### Sub-Plan Close Path
 
@@ -364,7 +365,7 @@ Triggered when `close-subplan` is invoked on the top-level plan (no parent `*-pl
 
 - Decide what work to do next
 - Create or transition Jira tickets — delegate to `jira-workflow-manager`
-- Call `jira-workflow-manager` except during `reconcile` when the caller explicitly requests a status read
+- Call `jira-workflow-manager` directly. (`reconcile` surfaces ticket keys to the caller; the caller is responsible for verifying status against Jira and reporting back. The skill itself never invokes Jira tools.)
 - Perform git operations — delegate to `git-manager`
 - Auto-resolve conflicts — surface them and wait for instruction
 - Write journal entries for every task completion — Task Reference rows are the completion record
