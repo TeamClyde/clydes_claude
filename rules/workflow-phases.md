@@ -22,7 +22,7 @@ Before writing any code:
 
 **Path B — A local plan doc exists (preferred for L-sized work)**
 
-A completed local plan doc (`plans/CLAUDE-N-description.md`) is the canonical kickoff artifact for L-sized work. It replaces codebase scanning entirely — the plan doc must already contain all file paths, function names, data structures, and implementation details needed. Do not scan the codebase when a plan doc covers the work.
+A completed local plan doc (`plans/<slug>/<slug>-plan.md`) is the canonical kickoff artifact for L-sized work. It replaces codebase scanning entirely — the plan doc must already contain all file paths, function names, data structures, and implementation details needed. Do not scan the codebase when a plan doc covers the work.
 
 A plan doc is complete when it has: context, an architecture blueprint, an Epic/Task Reference section, and a task checklist.
 
@@ -40,7 +40,7 @@ The plan doc is the handoff artifact. Receiving it does not bypass ticket creati
 
 ## Phase 2 — Execution & Status Transitions
 
-**All status transitions must be handled via the `jira-workflow-manager` agent. Do not call `transitionJiraIssue` directly.**
+**When Jira is enabled:** All status transitions must be handled via the `jira-workflow-manager` agent. Do not call `transitionJiraIssue` directly.
 
 | Trigger | Action |
 | ------- | ------ |
@@ -51,19 +51,20 @@ The plan doc is the handoff artifact. Receiving it does not bypass ticket creati
 
 Stop and wait for user confirmation before transitioning out of Testing. Do not move a ticket to Done based on your own judgment.
 
-### Three-source task sync
+**When Jira is disabled** (`project.json` has `jira.enabled: false`): skip all Jira transitions. The two-source model below is sufficient — no Jira-specific steps apply.
 
-Jira tickets, the plan doc Epic / Task Reference table, and TODO.md represent the same work at
-different levels of granularity. They must stay in sync:
+### Two-source task sync (plan + journal, handoff as live pointer)
 
-| Event | Action |
-| ----- | ------ |
-| Jira ticket transitions to Done | Prepend `✅` to the corresponding row in the plan doc's Epic/Task Reference table |
-| Jira ticket transitions to Done | Invoke `plan-management` skill with: ticket key, plan doc path, `status: completed`, 1-2 sentence summary. The skill determines if the linked TODO.md item is fully done or partially done and marks it accordingly. |
+The plan doc's Task Reference table is the **durable progress record**. The journal is the **append-only history** of divergences, decisions, and debugging cascades. The handoff reflects **current state** and is the session entry-point. TODO.md is the top-level navigation registry — it is updated by `plan-management` skill modes at the appropriate transitions, not manually maintained as a third sync target.
+
+| Event | Required action |
+| ----- | --------------- |
+| Task completes | Mark Task Reference row ✅; refresh handoff status table |
+| Plan deviation (architecture, scope, file path, signature) | Invoke `plan-management:divergence` — atomic three-write: journal append + plan section edit + handoff refresh |
+| Jira ticket transitions to Done (when Jira enabled) | Invoke `plan-management` with: ticket key, plan doc path, `status: completed`, 1–2 sentence summary. The skill marks the Task Reference row ✅ and updates TODO.md if the item is fully done. |
 | One TODO.md item maps to multiple Jira tickets | Invoke `plan-management` after every Done transition; it accumulates progress across partial completions. |
 
-A Jira ticket being Done means the plan doc row is done. They are equivalent records of the same
-work, not separate tracking systems.
+The plan doc Task Reference row being ✅ is the canonical completion signal. When Jira is enabled, a Jira ticket being Done and a ✅ row are equivalent — they are two records of the same fact, not separate tracking systems.
 
 ---
 
