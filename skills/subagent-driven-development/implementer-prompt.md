@@ -5,8 +5,11 @@ Use this template when dispatching an implementer subagent.
 ```
 Task tool (general-purpose):
   description: "Implement Task N: [task name]"
+  model: <claude-haiku-4-5-20251001 | claude-sonnet-4-6 | claude-opus-4-7>
   prompt: |
     You are implementing Task N: [task name]
+
+    **Model:** <chosen-model> — <one-line rationale, e.g. "mechanical: 1 file, clear spec">
 
     ## Task Description
 

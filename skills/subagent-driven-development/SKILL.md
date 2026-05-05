@@ -98,16 +98,15 @@ digraph process {
 
 Use the least powerful model that can handle each role to conserve cost and increase speed.
 
-**Mechanical implementation tasks** (isolated functions, clear specs, 1-2 files): use a fast, cheap model. Most implementation tasks are mechanical when the plan is well-specified.
+**Selecting the model:**
 
-**Integration and judgment tasks** (multi-file coordination, pattern matching, debugging): use a standard model.
+| Complexity | Examples | Model |
+|---|---|---|
+| Trivial (Haiku-eligible) | doc edit, jira transition, test-runner output parsing, single-file rename, config tweak | claude-haiku-4-5-20251001 |
+| Standard | feature implementation, multi-file change, debugging | claude-sonnet-4-6 |
+| Complex | architecture decisions, cross-cutting refactor, design judgment | claude-opus-4-7 |
 
-**Architecture, design, and review tasks**: use the most capable available model.
-
-**Task complexity signals:**
-- Touches 1-2 files with a complete spec → cheap model
-- Touches multiple files with integration concerns → standard model
-- Requires design judgment or broad codebase understanding → most capable model
+**Per-dispatch requirement:** Each implementer dispatch must explicitly set the `model:` parameter on the Task tool AND echo the choice as `**Model:** <name> — <rationale>` in the prompt body (see `./implementer-prompt.md`). Parent-context model selection must not silently propagate — every task gets a deliberate, visible choice.
 
 ## Handling Implementer Status
 

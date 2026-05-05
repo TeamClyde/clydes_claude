@@ -1,7 +1,7 @@
 ---
 name: systematic-debugging
 description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes — requires reproducing the issue, isolating root cause, and validating the fix rather than guessing.
-allowed-tools: Read, Bash, Grep, Glob
+allowed-tools: Read, Bash, Grep, Glob, WebSearch, WebFetch
 ---
 
 # Systematic Debugging
@@ -120,7 +120,14 @@ You MUST complete each phase before proceeding to the next.
    - Keep tracing up until you find the source
    - Fix at source, not at symptom
 
-6. **Enumerate All Candidate Hypotheses**
+6. **Search Online for Library Quirks**
+
+   If local code does not explain the error, web search the specific error message or
+   framework behavior. Third-party library quirks (YAML date roundtrip, TOML escape
+   sequences, regex backtracking, subprocess argument handling) are common root causes
+   documented online but absent from the codebase.
+
+7. **Enumerate All Candidate Hypotheses**
 
    **Before reading any implementation source files**, form a complete hypothesis table from
    the error output, stack traces, logs, and recent changes gathered above.
@@ -217,8 +224,8 @@ For each hypothesis:
    - STOP
    - Count: How many fixes have you tried?
    - If < 3: Return to Phase 1, re-analyze with new information
-   - **If ≥ 3: STOP and question the architecture (step 5 below)**
-   - DON'T attempt Fix #4 without architectural discussion
+   - **If ≥ 3: STOP. Surface root-cause hypothesis and remaining unknowns to the user. Do not attempt a fourth fix.** If the failure pattern fits step 5 below, frame the handoff as an architectural discussion.
+   - DON'T attempt Fix #4 without surfacing to the user first
 
 5. **If 3+ Fixes Failed: Question Architecture**
 
