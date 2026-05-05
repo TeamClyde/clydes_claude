@@ -18,13 +18,14 @@ This is not negotiable. This is not optional. You cannot rationalize your way ou
 
 ## Instruction Priority
 
-Superpowers skills override default system prompt behavior, but **user instructions always take precedence**:
+Rules and skills override default system prompt behavior, but **user instructions always take precedence**. The full hierarchy:
 
 1. **User's explicit instructions** (CLAUDE.md, GEMINI.md, AGENTS.md, direct requests) — highest priority
-2. **Superpowers skills** — override default system behavior where they conflict
-3. **Default system prompt** — lowest priority
+2. **Rules** (files in `~/.claude/rules/` and `rules/` in the project) — load with the system prompt and override skill triggers when they disagree
+3. **Skills** (Superpowers and plugin-provided) — override default system behavior where they conflict
+4. **Default system prompt** — lowest priority
 
-If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control.
+If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control. If a rule says "always route through git-manager" and a skill suggests calling git directly, follow the rule — rules outrank skill triggers.
 
 ## How to Access Skills
 
