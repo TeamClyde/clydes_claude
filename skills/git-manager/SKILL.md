@@ -86,9 +86,21 @@ Before first operation on any repo, run `git log --oneline -20` and `git branch 
 3. `git diff --staged` — verify staged content:
    - Stop if unexpected files, debug statements, secrets, or unrelated changes appear
 4. Validate commit message against the Commit Format section (Jira key per the conditional table)
-5. `git commit -m "<message>"`
-6. On hook rejection: surface full output, stop — never `--no-verify`
-7. Report commit hash on success
+5. **Plan-state validator** (scope-driven — runs after all pre-commit validations, before git commit):
+   1. Read `.claude/active-plan`. If absent → skip entirely, proceed to commit.
+   2. Read the active plan's `plan.md` Task Reference and active task's File Structure entries.
+   3. Compute intersection: staged file paths ∩ active task's File Structure paths.
+   4. **Intersection empty** → out-of-scope commit. Proceed to commit normally. (Covers parallel small fixes during plan execution.)
+   5. **Intersection non-empty** → in-scope commit. Check whether `<top>-plan.md` is in the staged set.
+      - Yes → proceed to commit.
+      - No → **refuse** unless commit message contains `[no-plan-update]`:
+        > "Active plan scope touched but `<top>-plan.md` not staged. Update plan via `plan-management:divergence` or include `[no-plan-update]` in commit message to override."
+   6. **Override token `[no-plan-update]`**: allows the commit to proceed. The validator does NOT write to the journal — that would bypass the three-edit atomic invariant owned by `plan-management:divergence`. If the caller wants the override recorded, they invoke `plan-management:divergence` separately. The journal is written only by `plan-management:divergence`, never by this skill.
+   - Path-level matching is the MVP. Symbol-level (DocSync-style) is deferred.
+   - This validator runs in addition to (not replacing) the existing bash `hooks/pre-commit`.
+6. `git commit -m "<message>"`
+7. On hook rejection: surface full output, stop — never `--no-verify`
+8. Report commit hash on success
 
 ---
 
