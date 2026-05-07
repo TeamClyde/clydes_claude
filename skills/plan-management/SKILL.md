@@ -45,7 +45,7 @@ Starting from the active plan's directory, walk up one directory level. If that 
 | Parameter | Required | Values |
 |-----------|----------|--------|
 | `status` | Always | `created` \| `in_progress` \| `completed` \| `backlog` \| `reconcile` \| `divergence` \| `spawn-subplan` \| `close-subplan` |
-| `ticket-key` | Required for `created`, `in_progress`, `completed`; optional for `backlog`; **not applicable** for `divergence`, `spawn-subplan`, `close-subplan` | e.g. `PROJ-42` |
+| `ticket-key` | Required for `created`, `in_progress`, `completed` **when `project.json` has `jira.enabled: true`** (omit entirely when `jira.enabled: false`); optional for `backlog`; **not applicable** for `divergence`, `spawn-subplan`, `close-subplan` | e.g. `PROJ-42` |
 | `plan-doc` | Required for `created`, `in_progress`, `completed`; required for `divergence`, `spawn-subplan`, `close-subplan` | e.g. `plans/slug/<slug>-plan.md` |
 | `summary` | Required for `completed`; required for `divergence` (description of the deviation); required for `close-subplan` (structured closeout — see below); optional for others | 1–2 sentences describing what was done |
 | `tag` | Required for `divergence` | One or more tags from the authoritative taxonomy (see `divergence` mode) |
@@ -56,7 +56,10 @@ Starting from the active plan's directory, walk up one directory level. If that 
 | `closeout-decisions` | Required for `close-subplan` | Key decisions made during sub-plan execution |
 | `closeout-gotchas` | Required for `close-subplan` | Gotchas and lessons worth preserving |
 
-**Jira-disabled note for new modes:** `divergence`, `spawn-subplan`, and `close-subplan` do not consume `ticket-key`. They operate on plan-doc state independently of Jira. When `project.json` has `jira.enabled: false`, these three modes work identically. Existing modes' Jira-key handling is unchanged.
+**Jira-disabled handling — all modes:**
+- **New modes:** `divergence`, `spawn-subplan`, and `close-subplan` do not consume `ticket-key` regardless of Jira state — they operate on plan-doc state independently of Jira.
+- **Status modes (`created`, `in_progress`, `completed`):** when `project.json` has `jira.enabled: false`, callers omit the `ticket-key` argument entirely (do not pass an empty string). The skill body proceeds without writing a Jira-key column to TODO.md and without any Jira-key validation. The Task Reference table's Jira Key column simply remains blank.
+- **Backlog mode:** `ticket-key` remains optional regardless of Jira state.
 
 ---
 

@@ -21,8 +21,10 @@ Bridge between planning and execution. Automatically invoked at the end of writi
 Before running the gate sequence, read `project.json` at the repo root if it exists:
 
 ```bash
-cat project.json 2>/dev/null
+cat "$(git rev-parse --show-toplevel)/project.json" 2>/dev/null
 ```
+
+The `git rev-parse` anchor ensures the read works regardless of the orchestrator's current working directory. If the command returns nothing (file absent or not in a git repo), all flags default to enabled.
 
 Apply these overrides:
 
@@ -62,7 +64,7 @@ Both must complete before proceeding to Step 2.
 The skill returns findings grouped by severity:
 
 - **BLOCKING** — must be resolved before proceeding. Either fix inline (if resolvable from context) or surface to the user and wait. Re-run adherence-audit after fixes. **Do not re-run architect** unless the fixes also touched content the architect reviewed.
-- **WARNING** — surface to the user for awareness. Do not block progression.
+- **WARNING** — surface to the user for awareness. Do not block progression. Surface them in the Step 2 checkpoint message (after the Testing Plan review prompt) rather than as a separate interruption between Step 1 and Step 2 — bundling them with the existing checkpoint avoids creating a new user-interaction loop.
 - **INFO** — note in the plan journal (via `plan-management:divergence` with tag `[decision]`). Do not block.
 
 If no findings: adherence-audit gate is clear.
@@ -84,6 +86,8 @@ The agent appends a `## Testing Plan` section to the plan doc. No output is need
 After Step 2 completes, surface the Testing Plan to the user:
 
 > "Test strategy is complete. Review the `## Testing Plan` section in `plans/<slug>/<slug>-plan.md` before I proceed with test builder, Jira ticket creation, and TODO.md registration. Reply 'proceed' to continue."
+>
+> **If adherence-audit returned WARNING items at Step 1**, append: "Adherence-audit also surfaced the following WARNING items for your awareness (not blocking): \[list each warning with its location and message]."
 
 **Wait for explicit user approval before proceeding to Step 3.** Do not proceed automatically.
 
