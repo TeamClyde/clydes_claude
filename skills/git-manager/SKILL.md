@@ -88,7 +88,7 @@ Before first operation on any repo, run `git log --oneline -20` and `git branch 
 4. Validate commit message against the Commit Format section (Jira key per the conditional table)
 5. **Plan-state validator** (scope-driven — runs after all pre-commit validations, before git commit):
    1. Read `.claude/active-plan`. If absent → skip entirely, proceed to commit.
-   2. Read the active plan's `plan.md` Task Reference and active task's File Structure entries.
+   2. Read the active plan's `plan.md` Task Reference and active task's File Structure entries. **Identify the active task** by reading `<top>-handoff.md` for the `Active task:` line, then locate that row in the Task Reference table. If the handoff is absent or the line is missing, treat the first non-✅ row in the Task Reference table as active.
    3. Compute intersection: staged file paths ∩ active task's File Structure paths.
    4. **Intersection empty** → out-of-scope commit. Proceed to commit normally. (Covers parallel small fixes during plan execution.)
    5. **Intersection non-empty** → in-scope commit. Check whether `<top>-plan.md` is in the staged set.
