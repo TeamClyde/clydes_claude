@@ -27,6 +27,20 @@ Load plan, review critically, execute all tasks, report when complete.
 **Before starting the first task:** Read `project.json` at repo root if it exists. Note whether `jira.enabled` is true. If absent, assume Jira is enabled (legacy fallback).
 
 For each task:
+
+#### Constitutional Entry Gate (assert before starting the task)
+
+Before doing any work on a task, assert all of the following. **If any check fails, stop and refuse to start the task until the condition is met.**
+
+- [ ] **E1 — Active plan confirmed:** `.claude/active-plan` exists and points to the correct plan doc for this work. If missing or pointing to the wrong plan, do not start — surface the discrepancy to the user.
+- [ ] **E2 — Previous task ✅:** The previous task's row in the plan's Task Reference table is marked ✅ (or this is Task 1 and no prior row exists). If the prior task row is not ✅, do not start the new task — mark the prior task complete first.
+- [ ] **E3 — Task prompt read:** The dispatch prompt (if dispatch-style) or the inline step list (if traditional) for this task has been read in full before any implementation begins.
+
+**Entry gate failure message format:**
+> ENTRY GATE FAILED — [E1 | E2 | E3]: [specific reason]. Cannot start Task N until this is resolved.
+
+---
+
 1. If Jira enabled: Transition corresponding Jira ticket to In Progress via jira-workflow-manager. If Jira disabled: skip.
 2. Mark task as in_progress in TodoWrite
 3. Follow each step exactly (plan has bite-sized steps)
@@ -48,6 +62,31 @@ For each task:
       test-runner for this repo if testing is not yet configured.
     - If `.claude/testing-plan.md` does not exist: skip this step silently.
 5. **If the task created one or more skills:** run `pulser --strict --skill <name> --no-anim` before marking done. Fix any warnings or errors before proceeding. This is a hard gate — do not skip even if pulser was not listed in the plan's testing section.
+
+#### Constitutional Exit Gate (assert before marking the task complete)
+
+Before marking a task ✅ or transitioning its Jira ticket, assert all of the following. **If any check fails, stop and refuse to advance until the condition is met.**
+
+- [ ] **X1 — Task Reference row ✅:** The task's row in the plan's Task Reference table has been marked ✅. This is mandatory even for trivial changes.
+- [ ] **X2 — Divergence journaled (if applicable):** If any divergence occurred during the task — architecture change, file path moved, signature changed, scope shift, discovered bug, test-debt finding — a journal entry has been appended via `plan-management:divergence`. See trivial-change exception below.
+- [ ] **X3 — Handoff refreshed:** The handoff's status table has been updated: Active task advanced to the next task, and any new gotchas relevant to the next session have been recorded.
+- [ ] **X4 — Test-mechanics divergence handled (if applicable):** If the task changed how tests run (new pytest flag, new fixture, new env var requirement, new skip group, changed test command, etc.), then:
+  - A journal entry tagged `[test-mechanics]` was written via `plan-management:divergence`, AND
+  - The relevant testing artifact (`.claude/testing-plan.md`, `scripts/run-tests.sh`, or repo equivalent) was updated **in the same `plan-management:divergence` call**.
+  Test-mechanics changes always count as divergence regardless of how small they appear.
+
+**Exit gate failure message format:**
+> EXIT GATE FAILED — [X1 | X2 | X3 | X4]: [specific reason]. Cannot mark Task N complete until this is resolved.
+
+**Trivial-change exception (X2 and X4 only):**
+The journal entry (X2) is optional — and X4 does not apply — when ALL of the following are true:
+- The change is a one-line typo fix, whitespace/formatting correction, or comment-only edit
+- No behavioral change of any kind was introduced
+- No test-running mechanics were changed
+X1 (Task Reference ✅) and X3 (handoff refresh) are still mandatory even for trivial changes — they are never skipped.
+
+---
+
 6. Mark task as completed
 7. If Jira enabled: Transition Jira ticket to Done (or Testing if human verification required) via jira-workflow-manager. If Jira disabled: skip.
 8. If Jira enabled: Invoke plan-management skill: path, jira-key, status: completed, 1-2 sentence summary. If Jira disabled: invoke plan-management skill with status: completed and summary only (omit jira-key).
