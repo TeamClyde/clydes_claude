@@ -145,6 +145,56 @@ If `.claude/testing-plan.md` does not exist: proceed directly to spec review.
 
 **Never** ignore an escalation or force the same model to retry without changes. If the implementer said it's stuck, something needs to change.
 
+## Per-Task Constitutional Gates
+
+**Gate ownership:** The orchestrator (this skill / this context) is responsible for running all gates. The implementer subagent does **not** have `Skill` tool access to `plan-management` and cannot invoke gates itself. The sequence is:
+
+1. Orchestrator runs **entry gate** before dispatching the implementer for a task
+2. Implementer reports DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED
+3. Orchestrator handles status (test-runner, spec review, code quality review per above)
+4. Orchestrator runs **exit gate** before marking the task complete in TodoWrite
+
+The two-stage review (spec compliance, then code quality) still happens between entry and exit gate runs — the gates wrap the entire per-task cycle.
+
+### Constitutional Entry Gate (assert before dispatching the implementer)
+
+Before dispatching the implementer for a task, assert all of the following. **If any check fails, stop and refuse to start the task until the condition is met.**
+
+- [ ] **E1 — Active plan confirmed:** `.claude/active-plan` exists and points to the correct plan doc for this work. If missing or pointing to the wrong plan, do not start — surface the discrepancy to the user.
+- [ ] **E2 — Previous task ✅:** The previous task's row in the plan's Task Reference table is marked ✅ (or this is Task 1 and no prior row exists). If the prior task row is not ✅, do not start the new task — mark the prior task complete first.
+- [ ] **E3 — Task prompt read:** The dispatch prompt for this task has been read in full before any implementation begins.
+
+**Entry gate failure message format:**
+> ENTRY GATE FAILED — [E1 | E2 | E3]: [specific reason]. Cannot start Task N until this is resolved.
+
+---
+
+### Constitutional Exit Gate (assert before marking the task complete in TodoWrite)
+
+Before marking a task complete in TodoWrite, assert all of the following. **If any check fails, stop and refuse to advance until the condition is met.**
+
+Before running this gate, **mark the task's row in the plan's Task Reference table ✅** — edit `<top>-plan.md` and add the ✅ marker to the row. This is the durable completion record the exit gate (X1) confirms. Doing this before the exit gate makes X1 a confirmation step rather than an orphaned precondition.
+
+- [ ] **X1 — Task Reference row ✅:** The task's row in the plan's Task Reference table has been marked ✅. This is mandatory even for trivial changes.
+- [ ] **X2 — Divergence journaled (if applicable):** If any divergence occurred during the task — architecture change, file path moved, signature changed, scope shift, discovered bug, test-debt finding — a journal entry has been appended via `plan-management:divergence`. See trivial-change exception below.
+- [ ] **X3 — Handoff refreshed:** The handoff's status table has been updated: Active task advanced to the next task, and any new gotchas relevant to the next session have been recorded.
+- [ ] **X4 — Test-mechanics divergence handled (if applicable):** If the task changed how tests run (new pytest flag, new fixture, new env var requirement, new skip group, changed test command, etc.), then:
+  - A journal entry tagged `[test-mechanics]` was written via `plan-management:divergence`, AND
+  - The relevant testing artifact (`.claude/testing-plan.md`, `scripts/run-tests.sh`, or repo equivalent) was updated **in the same `plan-management:divergence` call**.
+  Test-mechanics changes always count as divergence regardless of how small they appear.
+
+**Exit gate failure message format:**
+> EXIT GATE FAILED — [X1 | X2 | X3 | X4]: [specific reason]. Cannot mark Task N complete until this is resolved.
+
+**Trivial-change exception (X2 and X4 only):**
+The journal entry (X2) is optional — and X4 does not apply — when ALL of the following are true:
+- The change is a one-line typo fix, whitespace/formatting correction, comment-only edit, or documentation-only prose edit (e.g., rewording one paragraph in a markdown file with no logic, behavioral, or test-mechanics implications)
+- No behavioral change of any kind was introduced
+- No test-running mechanics were changed
+X1 (Task Reference ✅) and X3 (handoff refresh) are still mandatory even for trivial changes — they are never skipped.
+
+---
+
 ## Prompt Templates
 
 - `./implementer-prompt.md` - Dispatch implementer subagent
