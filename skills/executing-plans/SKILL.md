@@ -62,6 +62,7 @@ Before doing any work on a task, assert all of the following. **If any check fai
       test-runner for this repo if testing is not yet configured.
     - If `.claude/testing-plan.md` does not exist: skip this step silently.
 5. **If the task created one or more skills:** run `pulser --strict --skill <name> --no-anim` before marking done. Fix any warnings or errors before proceeding. This is a hard gate — do not skip even if pulser was not listed in the plan's testing section.
+5a. **Mark the task's row in the plan's Task Reference table ✅** — edit `<top>-plan.md` and add the ✅ marker to the row. This is the durable completion record the exit gate (X1) confirms. Doing this before the exit gate makes X1 a confirmation step rather than an orphaned precondition.
 
 #### Constitutional Exit Gate (assert before marking the task complete)
 
@@ -80,7 +81,7 @@ Before marking a task ✅ or transitioning its Jira ticket, assert all of the fo
 
 **Trivial-change exception (X2 and X4 only):**
 The journal entry (X2) is optional — and X4 does not apply — when ALL of the following are true:
-- The change is a one-line typo fix, whitespace/formatting correction, or comment-only edit
+- The change is a one-line typo fix, whitespace/formatting correction, comment-only edit, or documentation-only prose edit (e.g., rewording one paragraph in a markdown file with no logic, behavioral, or test-mechanics implications)
 - No behavioral change of any kind was introduced
 - No test-running mechanics were changed
 X1 (Task Reference ✅) and X3 (handoff refresh) are still mandatory even for trivial changes — they are never skipped.
