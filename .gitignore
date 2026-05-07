@@ -1,8 +1,10 @@
 # Local-only internal design artifacts (moved here during restructure)
 _archive/
 
-# Repo-specific Claude Code permissions (not part of the deliverable)
-.claude/
+# Repo-specific Claude Code state (not part of the deliverable — except hooks and settings)
+.claude/*
+!.claude/settings.json
+!.claude/hooks
 
 # Session artifacts — not committed; use docs/ for committed reference material
 plans/
