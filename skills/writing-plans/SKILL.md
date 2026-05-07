@@ -19,6 +19,98 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 **Save plans to:** `plans/<slug>/<slug>-plan.md`
 - (User preferences for plan location override this default)
 
+## Companion Files (Top-Level Plans)
+
+Every top-level plan produces **three files**, not one. After writing `<slug>-plan.md`, scaffold:
+
+### `<slug>-journal.md`
+
+```markdown
+# <Feature Name> — Journal
+
+This file is append-only. Never edit prior entries. Add new dated entries at the bottom.
+Journal-worthy events: plan deviations, root causes from debugging, test-mechanics changes,
+mid-execution decisions that override plan-time decisions, sub-plan spawn/close events.
+Skip: routine task completion, trivial formatting passes, in-session experimentation that changed nothing.
+
+---
+
+## YYYY-MM-DD — Plan created
+
+Plan doc: `plans/<slug>/<slug>-plan.md`
+Design doc: `plans/<slug>/<slug>-design.md`
+
+Initial scope: [one sentence from the plan Goal]
+```
+
+Replace `YYYY-MM-DD` with today's date.
+
+### `<slug>-handoff.md`
+
+```markdown
+# <Feature Name> — Handoff
+
+**Status:** In Progress
+**Active task:** Task 1 — [task name]
+**Branch:** [branch name]
+**Last updated:** YYYY-MM-DD
+
+---
+
+## Project Description
+
+[2–3 sentences: what this plan builds and why]
+
+## Status Snapshot
+
+| Task | Status |
+|------|--------|
+| 1. [Task name] | 🔄 In Progress |
+| 2. [Task name] | ⬜ Not started |
+
+## What's Configured
+
+[Environment, tools, or settings already in place that the next session needs to know]
+
+## How to Run
+
+[Commands to run tests, build, or verify the work in progress]
+
+## Open Gotchas
+
+[Known issues, edge cases, or surprises discovered so far — empty at plan creation]
+
+## Immediate Next Steps
+
+1. [First thing to do when picking this up]
+
+## Pointers
+
+- Plan: `plans/<slug>/<slug>-plan.md` — Task Reference table is the durable progress record
+- Journal: `plans/<slug>/<slug>-journal.md` — append-only history of divergences and decisions
+- Active task detail: see plan §Task N (line range, if known)
+```
+
+### `.claude/active-plan`
+
+Write the relative path to the new plan file:
+
+```
+plans/<slug>/<slug>-plan.md
+```
+
+Create the file if it doesn't exist. Overwrite if it does.
+
+---
+
+## Sub-Plan Exception (Form A)
+
+When scaffolding a **sub-plan** (separate subdirectory under a parent plan), create **only**:
+- `plans/<parent>/<child>/<child>-design.md`
+- `plans/<parent>/<child>/<child>-plan.md`
+
+Do **not** create a journal or handoff for sub-plans. The top-level journal and handoff continue to serve. Do **not** update `.claude/active-plan` — that is handled by `plan-management:spawn-subplan`.
+
 ## Scope Check
 
 If the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.
@@ -71,12 +163,23 @@ Circular reasoning past agent answers is a plan quality failure — it produces 
 
 ## Plan Document Header
 
-**Every plan MUST start with this header:**
+**Every plan MUST start with this header (including the constitutional gate preamble):**
 
 ```markdown
 # [Feature Name] Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Do NOT use the `superpowers:` prefix — invoke the local forked versions which have git-manager and plan-gate integration.
+
+## Phase -1 Gate — Tick before starting Task 1
+
+- [ ] Plan structure complete (header, Task Reference, File Structure, per-task sections)
+- [ ] Journal initialized with first entry (`<slug>-journal.md` exists)
+- [ ] Handoff scaffolded with current state (`<slug>-handoff.md` exists)
+- [ ] `.claude/active-plan` set to this plan
+- [ ] Architect review passed _(filled by plan-gate)_
+- [ ] `/adherence-audit` clean _(filled by plan-gate)_
+
+---
 
 **Goal:** [One sentence describing what this builds]
 
@@ -94,6 +197,10 @@ Circular reasoning past agent answers is a plan quality failure — it produces 
 ```
 
 ## Task Structure
+
+Two task styles are valid — pick the one that fits the task.
+
+### Inline-code style (direct code authoring)
 
 ````markdown
 ### Task N: [Component Name]
@@ -136,6 +243,30 @@ git commit -m "feat: add specific feature"
 ```
 ````
 
+### Dispatch-style (specialist-skill invocation)
+
+Use this style when a task's execution is delegating to a specialist skill rather than direct code authoring (e.g., `writing-skills`, `writing-rules`, `writing-agents`, `plugin-dev:hook-development`).
+
+````markdown
+### Task N: [Component Name]
+
+**Specialist:** `skill-name`
+
+**Dispatch prompt:**
+
+> [Exact prompt to pass to the specialist skill — self-contained, no pronouns requiring outer context]
+
+**Files affected:**
+- Create: `exact/path/to/file.md`
+- Modify: `exact/path/to/existing.md`
+
+**Verification:**
+- [ ] [Specific observable outcome to confirm the specialist's output is correct]
+- [ ] [Another outcome]
+````
+
+Both styles end with a commit step via `git-manager`. Inline-code tasks commit source files; dispatch-style tasks commit the files the specialist produced or modified.
+
 ## No Placeholders
 
 Every step must contain the actual content an engineer needs. These are **plan failures** — never write them:
@@ -168,7 +299,9 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 
 **REQUIRED NEXT STEP: invoke plan-gate immediately. Do not wait for user input.**
 
-plan-gate will: run architect review, generate your testing contract, pause for your review and approval of the test strategy, then write failing tests, create Jira tickets, and register the plan in TODO.md — then hand off to executing-plans.
+plan-gate runs **both** architect review and `/adherence-audit` in parallel. Both must pass before proceeding. plan-gate will: run architect review (design soundness, self-containment) and `/adherence-audit` (trigger gaps, broken references, convention conflicts) simultaneously, generate your testing contract, pause for your review and approval of the test strategy, then write failing tests, create Jira tickets, and register the plan in TODO.md — then hand off to executing-plans.
+
+The Phase -1 Gate checkboxes for "Architect review passed" and "/adherence-audit clean" are filled in by plan-gate after both checks complete.
 
 ## Gotchas
 
