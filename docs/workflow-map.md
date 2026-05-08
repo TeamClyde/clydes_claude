@@ -179,7 +179,7 @@ Rules are in `rules/` and `CLAUDE.md`.
 | `rules/workflow-phases.md` | Jira + git phase sequence; two-source task sync (plan doc + journal; handoff as live pointer) | All Jira via `jira-workflow-manager`; all git via `git-manager`; all TODO.md via `plan-management` |
 | `rules/planning.md` | Plan doc format, sizing thresholds, naming, architect gate sequence | L-sized → plan doc required; design docs at `plans/<slug>/<slug>-design.md` |
 | `rules/plan-docs.md` | When plan docs are created, location, skip conditions | S/M → no plan doc; `plans/` is gitignored (session artifacts); committed docs go in `docs/` |
-| `rules/filesystem/efficiency.md` | Search and read patterns | No unscoped globs; plan-doc-first during execution; prefer graph tools over Grep |
+| `rules/filesystem/efficiency.md` | Search and read patterns | No unscoped globs; plan-doc-first during execution; **graph tools are the default** for code navigation when graph is present (Grep is fallback for non-source files); project name lives in project's CLAUDE.md "Codebase Knowledge Graph" section |
 | `rules/mcp-governance.md` | MCP tool access | No direct Atlassian MCP calls; JQL must include `project=` filter |
 | `rules/plugin-lifecycle.md` | Plugin routing, conflict suppression | Integrated plugins route via `creating-tools`; do not invoke directly |
 | `rules/cspell.md` | Spellcheck false positives | Auto-add to `cspell.json` and `.vscode/settings.json` without asking |

@@ -33,20 +33,25 @@ Never call Glob with these patterns without a `path` parameter:
 
 Always scope with `path="src/function/"` or equivalent. A broad glob on a repo with 50+ files produces noise and consumes tokens with no gain over a targeted read.
 
-## Codebase Graph Tools (When Available)
+## Codebase Graph Tools — The Default for Code Navigation
 
-Prefer graph query tools over Grep for symbol navigation. Use Tool Search to find them:
+When a codebase graph is present (`.claude-init/CODEBASE.md` exists), graph tools are the **default** for symbol and code navigation. Grep is the **fallback** for non-source files (logs, generated output, configs) or when reading specific implementation logic the graph doesn't capture.
+
+Load the tools once per session via Tool Search: `ToolSearch("select:search_code,search_graph,query_graph,trace_path,get_architecture")`.
 
 | Need | Tool |
 |------|------|
-| Does this symbol exist? | `search_graph` |
+| Find a symbol or code by name/text | `search_code` (ranked, deduplicated) or `search_graph` |
 | What calls this function? | `query_graph` (Cypher: `MATCH (x)-[:CALLS]->(f:Function {name:"X"}) RETURN x`) |
 | What does this file import? | `query_graph` (Cypher: `MATCH (f {file:"X"})-[:IMPORTS]->(d) RETURN d`) |
 | Where is this env var defined? | Read `.claude-init/enrichments.json` directly |
 | What are the entry points? | `get_architecture` |
 | What routes are exposed? | `search_graph` (filter: Route nodes) |
+| Trace call chain between two symbols | `trace_path` |
 
-Use Grep only when no graph is present or when you need to read actual implementation logic.
+**Project name parameter.** Every graph tool requires a `project` argument. The canonical project name lives in the project's CLAUDE.md under "Codebase Knowledge Graph" — copy it from there. Do not derive it from the path; the slashes-to-hyphens conversion preserves internal underscores in unintuitive ways. If CLAUDE.md is missing the field, run `list_projects()` and use the entry whose `repo_path` matches the current working directory.
+
+Use Grep only when no graph is present, the file is non-source (logs, configs, generated output), or you need to read raw implementation logic that the graph doesn't capture.
 
 ## Plan-Doc-First Rule
 

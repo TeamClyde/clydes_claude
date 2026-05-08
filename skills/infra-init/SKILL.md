@@ -138,13 +138,16 @@ Wait for this agent to complete. It writes `.claude-init/CODEBASE.md` and sets `
 
 ## Post-Completion
 
-1. **Update the project's CLAUDE.md** — add or replace the codebase section:
+1. **Resolve the codebase-memory-mcp project name.** After indexing completes, call `list_projects()` and select the entry whose `repo_path` matches `meta.repo_path` from `progress.json`. Record its `name` field (the canonical project key — e.g. `Users-woosh-Documents-Repos-woosh_air_v4_claude`). Do not derive this client-side; the MCP server is the authority on its own key format.
+
+2. **Update the project's CLAUDE.md** — add or replace the codebase section:
 
    ```markdown
    ## Codebase Knowledge Graph
 
    Generated: <date>
 
+   - **Project name (codebase-memory-mcp):** `<project-name from list_projects>` — pass as the `project` parameter to `search_code`, `search_graph`, `query_graph`, `trace_path`, `get_architecture`.
    - Summary: `.claude-init/CODEBASE.md`
    - Env vars & serverless triggers: `.claude-init/enrichments.json`
    - `.claude-init/` is gitignored build output.
@@ -165,15 +168,16 @@ Wait for this agent to complete. It writes `.claude-init/CODEBASE.md` and sets `
    Read `.claude-init/enrichments.json` directly — not queryable via MCP tools.
    ```
 
-2. **Gitignore the build output.** Append to the target repo's `.gitignore` (create if absent, skip lines already present):
+3. **Gitignore the build output.** Append to the target repo's `.gitignore` (create if absent, skip lines already present):
 
    ```
    # /infra-init build output
    .claude-init/
    ```
 
-3. **Report to the user:**
+4. **Report to the user:**
    - Index status from `index_status()` result
+   - Project name from `list_projects()` (the value written into CLAUDE.md)
    - Paths to `CODEBASE.md` and `enrichments.json`
    - Any warnings logged by env var scan / serverless enrich
 
@@ -209,3 +213,4 @@ Wait for this agent to complete. It writes `.claude-init/CODEBASE.md` and sets `
 1. Requires python3.11 or python3.14 specifically — not generic python3.
 2. Call ToolSearch("select:index_repository") at Phase 2 start to verify codebase-memory-mcp is loaded.
 3. Phase 3 reads meta.repo_path from progress.json — verify it was written in Phase 2 before spawning the graph-builder agent.
+4. The codebase-memory-mcp project name is path-derived but the conversion (slashes→hyphens, internal underscores preserved) is non-obvious. Always pull it from `list_projects()` output — never construct it client-side.
