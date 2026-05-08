@@ -49,4 +49,44 @@ if command -v gitleaks >/dev/null 2>&1; then
   }
 fi
 
+# Step 5 — Plan-staleness check (Task 14 of workflow-doc-process-rework)
+# When an active plan is set and a staged file falls within the plan's scope
+# (i.e., a path mentioned in the plan.md), require the plan.md itself to
+# also be staged. Use `git commit --no-verify` to bypass this single check.
+ACTIVE_PLAN_FILE="$REPO_ROOT/.claude/active-plan"
+if [ -f "$ACTIVE_PLAN_FILE" ]; then
+  ACTIVE_PLAN_PATH=$(head -n1 "$ACTIVE_PLAN_FILE" | tr -d '[:space:]\r')
+  PLAN_MD="$REPO_ROOT/$ACTIVE_PLAN_PATH"
+  if [ -n "$ACTIVE_PLAN_PATH" ] && [ -f "$PLAN_MD" ]; then
+    # Extract backtick-quoted paths (must contain a slash), drop placeholders
+    PLAN_PATHS=$(grep -oE '`[a-zA-Z0-9_./-]+/[a-zA-Z0-9_.-]+`' "$PLAN_MD" 2>/dev/null \
+      | tr -d '`' \
+      | grep -vE '<|>' \
+      | sort -u || true)
+    STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null | sort -u || true)
+    INTERSECTION=""
+    if [ -n "$PLAN_PATHS" ] && [ -n "$STAGED_FILES" ]; then
+      while IFS= read -r path; do
+        [ -z "$path" ] && continue
+        if echo "$STAGED_FILES" | grep -qxF "$path"; then
+          INTERSECTION+="$path"$'\n'
+        fi
+      done <<< "$PLAN_PATHS"
+    fi
+    if [ -n "$INTERSECTION" ]; then
+      if ! echo "$STAGED_FILES" | grep -qxF "$ACTIVE_PLAN_PATH"; then
+        echo "Pre-commit: in-scope plan commit detected." >&2
+        echo "  Active plan: $ACTIVE_PLAN_PATH" >&2
+        echo "  In-scope staged files:" >&2
+        printf '%s' "$INTERSECTION" | sed 's/^/    /' >&2
+        echo "" >&2
+        echo "  Update the plan via plan-management:divergence and stage it" >&2
+        echo "  (use 'git add -f $ACTIVE_PLAN_PATH' if plans/ is gitignored)," >&2
+        echo "  or run 'git commit --no-verify' to bypass this single check." >&2
+        exit 1
+      fi
+    fi
+  fi
+fi
+
 exit 0
