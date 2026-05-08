@@ -123,11 +123,12 @@ Never push directly to the production repository. All changes go to the sandbox 
 
 > Populated by `/infra-init` when run. Leave blank until then.
 
+- **Project name (codebase-memory-mcp):** `[filled by /infra-init from list_projects()]` — pass as the `project` parameter to all graph tool calls.
 - **Summary:** `.claude-init/CODEBASE.md` — generated: [date]
 - **Enrichments:** `.claude-init/enrichments.json` — env vars and serverless triggers
-- **Query tools:** `search_graph`, `query_graph`, `get_architecture`, `search_code`
+- **Query tools:** `search_graph`, `query_graph`, `get_architecture`, `search_code`, `trace_path`
 
-**Read `.claude-init/CODEBASE.md` first when starting any new task.** It contains repo type, entry points, and key modules. Use query tools for symbol-level lookups. Only fall back to Grep or direct file reads when the graph is absent or you need implementation logic the graph doesn't capture.
+**Read `.claude-init/CODEBASE.md` first when starting any new task.** It contains repo type, entry points, and key modules. Use query tools for symbol-level lookups — they are the default for code navigation. Fall back to Grep only for non-source files (logs, generated output, configs) or when the graph is absent.
 
 ---
 
