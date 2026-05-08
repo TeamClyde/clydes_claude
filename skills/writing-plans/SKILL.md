@@ -177,7 +177,6 @@ Circular reasoning past agent answers is a plan quality failure — it produces 
 - [ ] Handoff scaffolded with current state (`<slug>-handoff.md` exists)
 - [ ] `.claude/active-plan` set to this plan
 - [ ] Architect review passed _(filled by plan-gate)_
-- [ ] `/adherence-audit` clean _(filled by plan-gate)_
 
 ---
 
@@ -299,9 +298,11 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 
 **REQUIRED NEXT STEP: invoke plan-gate immediately. Do not wait for user input.**
 
-plan-gate runs **both** architect review and `/adherence-audit` in parallel. Both must pass before proceeding. plan-gate will: run architect review (design soundness, self-containment) and `/adherence-audit` (trigger gaps, broken references, convention conflicts) simultaneously, generate your testing contract, pause for your review and approval of the test strategy, then write failing tests, create Jira tickets, and register the plan in TODO.md — then hand off to executing-plans.
+plan-gate will run architect review (design soundness, self-containment), generate your testing contract, pause for your review and approval of the test strategy, then write failing tests, create Jira tickets, and register the plan in TODO.md — then hand off to executing-plans.
 
-The Phase -1 Gate checkboxes for "Architect review passed" and "/adherence-audit clean" are filled in by plan-gate after both checks complete.
+**Sub-plan exception:** when this skill is invoked for a Form A sub-plan (separate `plans/<parent>/<child>/` subdirectory), do NOT invoke plan-gate. Sub-plans are tasks of the parent plan — they do not get independent TODO.md entries, separate test-strategy runs, or independent architect review. After scaffolding `<child>-design.md` and `<child>-plan.md`, return control to the orchestrator. The parent plan's existing plan-gate run already covered governance.
+
+The Phase -1 Gate checkbox for "Architect review passed" is filled in by plan-gate after architect review completes.
 
 ## Gotchas
 

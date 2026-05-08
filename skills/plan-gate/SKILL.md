@@ -40,36 +40,16 @@ Apply these overrides:
 
 ## Gate Sequence
 
-### Step 1 — Architect Review + Adherence Audit (parallel)
+### Step 1 — Architect Review
 
-Dispatch **both** of the following in a single message (parallel tool calls):
-
-**1a. Architect agent** — `subagent_type: architect`, `plan_doc_path` pointing to the plan doc.
-
-**1b. Adherence-audit skill** — `Skill { skill: "adherence-audit" }` against the same plan doc.
-
-Both must complete before proceeding to Step 2.
-
-#### Architect findings
+Dispatch the `architect` agent with `subagent_type: architect` and the plan doc path.
 
 **On NEEDS REVISION:**
 - BLOCKING items requiring user judgment → surface verbatim, wait, update plan doc, re-invoke architect
 - BLOCKING items resolvable from context → fix inline, re-invoke architect
 - Maximum 3 rounds. If BLOCKING items remain after round 3, surface to the user and stop.
 
-**On APPROVED** → architect gate is clear.
-
-#### Adherence-audit findings
-
-The skill returns findings grouped by severity:
-
-- **BLOCKING** — must be resolved before proceeding. Either fix inline (if resolvable from context) or surface to the user and wait. Re-run adherence-audit after fixes. **Do not re-run architect** unless the fixes also touched content the architect reviewed.
-- **WARNING** — surface to the user for awareness. Do not block progression. Surface them in the Step 2 checkpoint message (after the Testing Plan review prompt) rather than as a separate interruption between Step 1 and Step 2 — bundling them with the existing checkpoint avoids creating a new user-interaction loop.
-- **INFO** — note in the plan journal (via `plan-management:divergence` with tag `[decision]`). Do not block.
-
-If no findings: adherence-audit gate is clear.
-
-**Proceed to Step 2 only when both gates are clear.**
+**On APPROVED** → proceed to Step 2.
 
 ---
 
@@ -86,8 +66,6 @@ The agent appends a `## Testing Plan` section to the plan doc. No output is need
 After Step 2 completes, surface the Testing Plan to the user:
 
 > "Test strategy is complete. Review the `## Testing Plan` section in `plans/<slug>/<slug>-plan.md` before I proceed with test builder, Jira ticket creation, and TODO.md registration. Reply 'proceed' to continue."
->
-> **If adherence-audit returned WARNING items at Step 1**, append: "Adherence-audit also surfaced the following WARNING items for your awareness (not blocking): \[list each warning with its location and message]."
 
 **Wait for explicit user approval before proceeding to Step 3.** Do not proceed automatically.
 
@@ -142,9 +120,6 @@ After all 5 steps complete successfully:
 |---|---|
 | Architect returns NEEDS REVISION (rounds 1–2) | Fix/surface issues, re-invoke architect |
 | Architect returns NEEDS REVISION after round 3 | Surface to user, stop |
-| Adherence-audit returns BLOCKING | Fix inline or surface to user; re-run adherence-audit only |
-| Adherence-audit returns WARNING | Surface for awareness; do not block |
-| Adherence-audit returns INFO | Note in journal via `plan-management:divergence [decision]`; do not block |
 | Any agent fails or is unavailable | Surface the failure, stop — do not skip a gate step |
 | Plan doc missing required sections | Surface what is missing, stop |
 
@@ -158,8 +133,7 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 - `writing-plans` — automatically at end of skill
 
 **Calls:**
-- `architect` agent (subagent_type: architect) — Step 1a, parallel with adherence-audit
-- `adherence-audit` skill — Step 1b, parallel with architect
+- `architect` agent (subagent_type: architect) — Step 1
 - `test-strategy` agent (subagent_type: test-strategy) — Step 2
 - `test-builder` agent (subagent_type: test-builder) — Step 3 (skipped if tdd: false)
 - `jira-workflow-manager` agent (subagent_type: jira-workflow-manager) — Step 4 (skipped if jira.enabled: false)
@@ -173,7 +147,5 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 1. This skill fires automatically after `writing-plans` — do not invoke it manually in Case A.
 2. If architect returns NEEDS REVISION, update the plan doc and re-invoke architect — do not proceed to test-strategy until APPROVED.
 3. Maximum 3 architect iterations — surface remaining BLOCKING issues to the user after the third pass.
-4. Architect and adherence-audit run in parallel (Step 1) — dispatch both in a single message, wait for both to complete before acting on either.
-5. When re-running a gate after fixes, re-run ONLY the gate that found issues unless the fixes also touched the surface the other gate audited.
-6. `jira.enabled: false` and `workflow.tdd: false` are silent skips — no user-facing warning or confirmation prompt.
-7. On the Jira-disabled path, omit `jira-key` from the `plan-management:created` call entirely — do not pass an empty string.
+4. `jira.enabled: false` and `workflow.tdd: false` are silent skips — no user-facing warning or confirmation prompt.
+5. On the Jira-disabled path, omit `jira-key` from the `plan-management:created` call entirely — do not pass an empty string.

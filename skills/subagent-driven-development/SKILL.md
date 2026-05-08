@@ -69,7 +69,7 @@ digraph process {
     "Read plan, extract all tasks with full text, note context, create TodoWrite" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Dispatch final code reviewer subagent for entire implementation" [shape=box];
-    "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
+    "Use finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
     "Read plan, extract all tasks with full text, note context, create TodoWrite" -> "Assert entry gate (E1-E3)";
     "Assert entry gate (E1-E3)" -> "Dispatch implementer subagent (./implementer-prompt.md)";
@@ -96,7 +96,7 @@ digraph process {
     "Mark task complete in TodoWrite" -> "More tasks remain?";
     "More tasks remain?" -> "Assert entry gate (E1-E3)" [label="yes"];
     "More tasks remain?" -> "Dispatch final code reviewer subagent for entire implementation" [label="no"];
-    "Dispatch final code reviewer subagent for entire implementation" -> "Use superpowers:finishing-a-development-branch";
+    "Dispatch final code reviewer subagent for entire implementation" -> "Use finishing-a-development-branch";
 }
 ```
 
@@ -203,6 +203,18 @@ The journal entry (X2) is optional — and X4 does not apply — when ALL of the
 X1 (Task Reference ✅) and X3 (handoff refresh) are still mandatory even for trivial changes — they are never skipped.
 
 **Orchestrator owns the exception decision:** the orchestrator asserts this exception based on its own inspection of the implementer's diff or commit message — the implementer subagent's self-description ("I just fixed a typo") is not sufficient. If the diff disagrees with the implementer's framing, the exception does not apply and X2/X4 fire normally.
+
+---
+
+### Post-Exit-Gate — Promote Task in Tracking
+
+After the exit gate passes:
+
+1. **If Jira enabled:** transition the task's Jira ticket to **Done** (or **Testing** if AWS verification required) via `jira-workflow-manager`. **If Jira disabled:** skip.
+2. **Invoke `plan-management:completed`:** with the plan-doc path, status `completed`, and a 1–2 sentence summary. **If Jira enabled:** include `jira-key`. **If Jira disabled:** omit `jira-key` entirely. This promotes the TODO.md entry from In Progress to History.
+3. Mark the task complete in TodoWrite.
+
+Skipping step 2 leaves TODO.md In Progress entries stuck forever — the executor (this skill) is the only path that updates the TODO.md registry for the task.
 
 ---
 
@@ -364,16 +376,16 @@ Done!
 ## Integration
 
 **Required workflow skills:**
-- **superpowers:using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
-- **superpowers:writing-plans** - Creates the plan this skill executes
-- **superpowers:requesting-code-review** - Code review template for reviewer subagents
-- **superpowers:finishing-a-development-branch** - Complete development after all tasks
+- **using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
+- **writing-plans** - Creates the plan this skill executes
+- **requesting-code-review** - Code review template for reviewer subagents
+- **finishing-a-development-branch** - Complete development after all tasks
 
 **Subagents should use:**
-- **superpowers:test-driven-development** - Subagents follow TDD for each task
+- **test-driven-development** - Subagents follow TDD for each task
 
 **Alternative workflow:**
-- **superpowers:executing-plans** - Use for parallel session instead of same-session execution
+- **executing-plans** - Use for parallel session instead of same-session execution
 
 ## Gotchas
 

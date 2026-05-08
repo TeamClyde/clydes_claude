@@ -114,10 +114,11 @@ This structured closeout requirement is the forcing function that prevents sub-p
 ### Plan tree completion
 
 When all tasks in `<top>-plan.md` are ✅:
-1. Write a final journal entry summarizing the work.
-2. Update handoff to terminal status ("All tasks complete; awaiting closeout").
-3. Run `finishing-a-development-branch` flow.
-4. Clear `.claude/active-plan`.
+
+1. Invoke `plan-management:close-subplan` with `closeout-summary`, `closeout-decisions`, and `closeout-gotchas`. The skill writes the final journal entry, refreshes the handoff to terminal status, and clears `.claude/active-plan` atomically.
+2. Run the `finishing-a-development-branch` flow.
+
+Do not clear `.claude/active-plan` manually — `plan-management:close-subplan` is the only sanctioned path.
 
 ---
 

@@ -52,7 +52,7 @@ fi
 # Step 5 — Plan-staleness check (Task 14 of workflow-doc-process-rework)
 # When an active plan is set and a staged file falls within the plan's scope
 # (i.e., a path mentioned in the plan.md), require the plan.md itself to
-# also be staged. Use `git commit --no-verify` to bypass this single check.
+# also be staged. Use `git commit --no-verify` to bypass all pre-commit checks (including this one) — git-manager prohibits using --no-verify, but a human invoking git directly can use it.
 ACTIVE_PLAN_FILE="$REPO_ROOT/.claude/active-plan"
 if [ -f "$ACTIVE_PLAN_FILE" ]; then
   ACTIVE_PLAN_PATH=$(head -n1 "$ACTIVE_PLAN_FILE" | tr -d '[:space:]\r')
@@ -82,7 +82,7 @@ if [ -f "$ACTIVE_PLAN_FILE" ]; then
         echo "" >&2
         echo "  Update the plan via plan-management:divergence and stage it" >&2
         echo "  (use 'git add -f $ACTIVE_PLAN_PATH' if plans/ is gitignored)," >&2
-        echo "  or run 'git commit --no-verify' to bypass this single check." >&2
+        echo "  or run 'git commit --no-verify' to bypass all pre-commit checks (including this one) — git-manager prohibits using --no-verify, but a human invoking git directly can use it." >&2
         exit 1
       fi
     fi

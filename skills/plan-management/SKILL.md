@@ -344,7 +344,7 @@ Triggered when `close-subplan` is invoked on the top-level plan (no parent `*-pl
 
 ## Item Quality Rules
 
-- Every plan-backed item **must** link to both a Jira ticket key and a plan doc path. No orphaned entries.
+- Every plan-backed item **must** link to both a Jira ticket key and a plan doc path. No orphaned entries. **When `project.json` has `jira.enabled: false`:** the plan doc path alone is sufficient; the Jira key portion is omitted. The Task Reference table's Jira Key column remains blank. Do not generate placeholder keys (e.g. `[CLAUDE-N]`) for jira-disabled repos.
 - Descriptions must be **specific and actionable**: "add retry logic to S3 upload handler" not "improve error handling".
 - Backlog items **must** include a context note explaining why the item exists. A bare description with no context is not acceptable.
 - Items are temporary by design — they move through sections and get archived. TODO.md is not a graveyard.

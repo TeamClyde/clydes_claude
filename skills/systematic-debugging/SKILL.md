@@ -239,7 +239,9 @@ For each hypothesis:
 
    **This call is mandatory.** Do not declare debugging complete, mark any task ✅, or return to the orchestrator until the divergence call has been made.
 
-   **Only exception:** one-off environmental glitch with no learning to preserve (e.g., a flaky network blip that self-resolved, a CI restart that fixed a transient lock). If this exception applies, state it explicitly — do not skip silently.
+   **Exceptions (state explicitly when applying — never skip silently):**
+   1. **One-off environmental glitch** with no learning to preserve (e.g., a flaky network blip that self-resolved, a CI restart that fixed a transient lock).
+   2. **No active plan** (`.claude/active-plan` does not exist) — debugging is occurring outside a plan execution context. Record the root cause in the commit message body instead. State explicitly: "No active plan — recording root cause in commit message only."
 
    **Exit gate failure message:**
    > DEBUGGING EXIT GATE FAILED — plan-management:divergence not invoked. Cannot declare debugging complete until root cause and fix are journaled.

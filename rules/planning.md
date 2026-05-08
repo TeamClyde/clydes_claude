@@ -122,7 +122,7 @@ draft plan → architect → test-strategy → ExitPlanMode
 Architect runs first — it reviews the plan for design soundness and self-containment. Test-strategy runs after architect approval — it appends the Testing section.
 
 ```
-Task { subagent_type: "architect", prompt: "plan\n\nPlan doc: plans/<slug>/<slug>-plan.md" }
+Agent { subagent_type: "architect", prompt: "plan\n\nPlan doc: plans/<slug>/<slug>-plan.md" }
 ```
 
 **Iteration rules (max 3 rounds):**
