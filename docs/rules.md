@@ -183,7 +183,7 @@ The planning sequence from Plan 06:
 
 #### Plan doc requirements
 - Sizing table: S (1–3 files) → no plan doc; M (several files, cross-cutting) → no plan doc; L (many files, multi-session) → plan doc required, create before ExitPlanMode
-- Plan doc location: `plans/<slug>/PLAN.md` in the local repo; `~/.claude/plans/` files are session scratch pads only
+- Plan doc location: `plans/<slug>/<slug>-plan.md` in the local repo (four-file tree: design + plan + journal + handoff); `~/.claude/plans/` files are session scratch pads only
 - Required sections: Epic/Task Reference table (placeholder rows until execution), Context, Architecture blueprint (file paths, function signatures, enum values, external resource names)
 - Self-containment test: a plan is ready when it could be handed to an empty context with "execute this plan" and succeed without additional research
 - Plan doc refinements are S-sized — no architect review or new TODO.md entry required

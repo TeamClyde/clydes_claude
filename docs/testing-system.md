@@ -293,7 +293,7 @@ The sequence is: **draft plan → architect review → test strategy review → 
 
 **Invocation example:**
 ```
-Agent { subagent_type: "test-strategy", prompt: "Review this plan and produce a Testing section. Plan doc: plans/CLAUDE-N-description.md" }
+Agent { subagent_type: "test-strategy", prompt: "Review this plan and produce a Testing section. Plan doc: plans/<slug>/<slug>-plan.md" }
 ```
 
 The agent reads the plan's stated intent and the repo testing plan. If existing test files are present, it may optionally scan them to extract conventions (naming patterns, assertion style, file structure) and include a **Test Conventions** note in the Testing section — giving the test-builder a head start without requiring it to do its own discovery. The full agent prompt spec lives in `~/.claude/agents/test-strategy.md`.
