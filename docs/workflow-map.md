@@ -3,7 +3,7 @@
 Canonical reference for how skills, agents, rules, hooks, and plugins connect in the
 Claude workflow. Update this file whenever a component is added, removed, or rewired.
 
-Last updated: 2026-04-22
+Last updated: 2026-05-07
 
 ---
 
@@ -130,8 +130,9 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 
 | Skill | When it fires | Purpose |
 |-------|--------------|---------|
-| `git-manager` | Every commit, push, PR | All git operations — never use Bash git directly |
-| `plan-management` | After every Jira ticket creation or status transition | Keeps TODO.md current |
+| `git-manager` | Every commit, push, PR | All git operations — never use Bash git directly. Includes plan-state validator (Task 11): refuses commits on in-scope files if `.claude/active-plan` points to a plan doc that is not staged. |
+| `plan-management` | After every Jira ticket creation or status transition | Keeps TODO.md current. Modes: `divergence` (atomic three-write: journal append + plan edit + handoff refresh), `spawn-subplan` (scaffold child plan + journal entry + update active-plan), `close-subplan` (rollup closeout entry + revert active-plan). |
+| `plan-gate` | Auto after `writing-plans` | Adherence audit runs in parallel with architect review (Task 12). Jira ticket creation and test-builder steps are skipped when `jira.enabled=false` or `tdd=false` in `project.json`. |
 | `using-git-worktrees` | Feature work needing isolation | Creates worktrees; pairs with `finishing-a-development-branch` |
 | `dispatching-parallel-agents` | 2+ independent tasks | Coordinates parallel agent dispatch |
 | `verification-before-completion` | Before claiming work is done | Verifies tests pass, no regressions |
@@ -145,6 +146,28 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 
 ---
 
+## Plan Tree Structure
+
+Every top-level L-sized plan consists of four sibling files under `plans/<slug>/`:
+
+| File | Role | Mutability |
+|------|------|------------|
+| `<slug>-design.md` | Pre-execution rationale (output of `brainstorming`) | Frozen after `writing-plans` runs |
+| `<slug>-plan.md` | North star: goal, architecture, Task Reference table, per-task detail | Surgically mutable; Task Reference is the durable progress record |
+| `<slug>-journal.md` | Append-only history: divergences, decisions, debugging cascades, sub-plan events | Append-only — never edit prior entries |
+| `<slug>-handoff.md` | Live entry-point: current state, active task, open gotchas | Continuously refreshed (overwritten in place) |
+
+`.claude/active-plan` holds the relative path to the currently active `<slug>-plan.md`. Updated by `plan-management:spawn-subplan` and `plan-management:close-subplan`. SessionStart reads this file to surface the correct handoff.
+
+### Sub-plan structure
+
+| Form | When to use | Files created |
+|------|-------------|---------------|
+| Form A — significant standalone (L-sized) | Multi-task child with its own Epic | `plans/<parent>/<child>/<child>-design.md` + `<child>-plan.md` only. Journal and handoff always roll up to the top-level tree. |
+| Form B — small addition | S/M-sized addition or correction | Append new rows to the parent Task Reference table. No new files. |
+
+---
+
 ## Rule Governance
 
 Rules load with higher priority than skills. A rule that contradicts a skill wins silently.
@@ -153,7 +176,7 @@ Rules are in `rules/` and `CLAUDE.md`.
 | Source | Governs | Key constraints imposed |
 |--------|---------|------------------------|
 | `CLAUDE.md` | Global workflow sequence, delegation table, architect review gates | One task in progress at a time; architect required before execution; plan-management for TODO.md |
-| `rules/workflow-phases.md` | Jira + git phase sequence, three-source task sync | All Jira via `jira-workflow-manager`; all git via `git-manager`; all TODO.md via `plan-management` |
+| `rules/workflow-phases.md` | Jira + git phase sequence; two-source task sync (plan doc + journal; handoff as live pointer) | All Jira via `jira-workflow-manager`; all git via `git-manager`; all TODO.md via `plan-management` |
 | `rules/planning.md` | Plan doc format, sizing thresholds, naming, architect gate sequence | L-sized → plan doc required; design docs at `plans/<slug>/<slug>-design.md` |
 | `rules/plan-docs.md` | When plan docs are created, location, skip conditions | S/M → no plan doc; `plans/` is gitignored (session artifacts); committed docs go in `docs/` |
 | `rules/filesystem/efficiency.md` | Search and read patterns | No unscoped globs; plan-doc-first during execution; prefer graph tools over Grep |
@@ -167,9 +190,20 @@ Rules are in `rules/` and `CLAUDE.md`.
 
 Hooks live in `hooks/` and are symlinked to `~/.claude/hooks/` by setup.sh.
 
-| Hook | Trigger | What it does |
-|------|---------|--------------|
-| `pre-commit` | Before every git commit | Runs per-repo `scripts/run-tests.sh` if executable; runs ESLint and ruff if their config files are present; runs gitleaks secret scanning if installed. All checks skip gracefully if the tool is absent. |
+### Active hooks
+
+| Hook | Type | Trigger | What it does |
+|------|------|---------|--------------|
+| `pre-commit` | bash | Before every git commit | Runs per-repo `scripts/run-tests.sh` if executable; runs ESLint and ruff if their config files are present; runs gitleaks secret scanning if installed. Step 5 (Task 14): reads `.claude/active-plan` and refuses in-scope commits if the plan doc is not staged or `--no-verify` is passed. All checks skip gracefully if the tool is absent. |
+| `session-start.mjs` | Node.js | SessionStart | Reads `.claude/active-plan`; surfaces the active plan's handoff file to orient the session. Exits 0 on any error — never blocks a session start. |
+
+### Intentionally unused hooks
+
+| Hook event | Rationale (per design §8.1) |
+|------------|----------------------------|
+| `PostToolUse` (on commit) | Subagent commits bypass PostToolUse in the orchestrator context — hook would fire inconsistently or not at all. |
+| `SessionEnd` | Mixed human/agent context makes SessionEnd timing ambiguous; cleanup logic would be unreliable. |
+| `PreCompact` | Poor failure semantics — a PreCompact hook that errors can abort compaction mid-stream with no recovery path. |
 
 ---
 

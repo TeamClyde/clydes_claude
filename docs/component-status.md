@@ -115,7 +115,7 @@ Load priority: rules override skills. Highest priority: `CLAUDE.md`.
 | Rule file | Status | Governs |
 |-----------|--------|---------|
 | `CLAUDE.md` (global) | ✅ | Workflow sequence, delegation table, architect gate |
-| `rules/workflow-phases.md` | ✅ | Jira + git phase sequence; three-source task sync |
+| `rules/workflow-phases.md` | ✅ | Jira + git phase sequence; two-source plan+journal sync (handoff is live pointer) |
 | `rules/planning.md` | ✅ | Plan doc format, sizing, naming, architect gate sequence |
 | `rules/plan-docs.md` | ✅ | When plan docs are created, location, skip conditions |
 | `rules/filesystem/efficiency.md` | ✅ | Search/read patterns; plan-doc-first; graph tools over Grep |

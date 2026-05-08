@@ -75,17 +75,25 @@ Drafting begins when research has resolved the critical unknowns. The threshold:
 |------|---------------|---------|---------------|
 | S | ~1–5k | Small, targeted change. Minimal cross-cutting concern. | No local plan doc. Plan mode output only. |
 | M | ~5–15k | Moderate change. Some cross-cutting. Touches multiple systems or subsystems. | No local plan doc. Plan mode output only. |
-| L | ~15k+ | Large change. Many steps, significant refactor, new system, or major feature. | **Local plan doc required.** Write to `plans/<slug>/PLAN.md` before ExitPlanMode. |
+| L | ~15k+ | Large change. Many steps, significant refactor, new system, or major feature. | **Local plan doc required.** Write to `plans/<slug>/<slug>-plan.md` before ExitPlanMode. |
 
 The token estimates are rough — use them to calibrate scope, not to count precisely. When in doubt, size up.
 
 ### 1.4 — Required Sections of a Plan Doc
 
-Every L-sized plan doc must be self-contained: a model with an empty context window should be able to read it and execute. This requires:
+Every L-sized plan tree consists of four sibling files under `plans/<slug>/`:
+
+| File | Role |
+|------|------|
+| `<slug>-design.md` | Pre-execution rationale (output of `brainstorming`). Frozen after `writing-plans` runs. |
+| `<slug>-plan.md` | North star: goal, architecture, Task Reference table, per-task detail. Surgically mutable. |
+| `<slug>-journal.md` | Append-only history: divergences, decisions, debugging cascades. |
+| `<slug>-handoff.md` | Live entry-point: current state, active task, open gotchas. Continuously refreshed. |
+
+The `<slug>-plan.md` file must be self-contained: a model with an empty context window should be able to read it and execute. It requires:
 
 **Header block:**
 ```markdown
-**Parent Plan:** [link to parent if this is a sub-plan]
 **Status:** Planning | Designing | Executing | Complete
 **Priority:** N
 **Repo:** <git repo name and/or path>
@@ -141,7 +149,7 @@ Every file path, function name, line number, env var name, ARN, and resource nam
 ```markdown
 # Email Offline Notification — Plan
 
-**Parent Plan:** [plans/notifications/PLAN.md](../PLAN.md)
+**Parent Plan:** [plans/notifications/notifications-plan.md](../notifications-plan.md)
 **Status:** Designing
 **Repo:** my-backend-api
 **Jira Project:** CLAUDE
@@ -227,8 +235,8 @@ Follow Phase 1 Path B of `~/.claude/rules/workflow-phases.md` to create Jira tic
 | Plan type | Where it lives |
 |-----------|---------------|
 | S/M — session scratch | `~/.claude/plans/` only (auto-generated, not manually managed) |
-| L — architectural work | `plans/<slug>/PLAN.md` in the repo |
-| Sub-plan (significant, standalone) | `plans/<parent-slug>/<child-slug>/PLAN.md` |
+| L — architectural work | `plans/<slug>/<slug>-plan.md` in the repo (plus sibling journal, handoff, and design files) |
+| Sub-plan (significant, standalone) | `plans/<parent-slug>/<child-slug>/<child-slug>-plan.md` (plus sibling design file; journal/handoff roll up to top-level) |
 | Sub-plan (small addition or correction to existing plan) | Appended section in the parent plan doc |
 
 **Why repo-local:** Plans in `~/.claude/plans/` are session-scoped ephemera. Plans in the repo travel with the code, survive session boundaries, and can be read by any future session. They are also the source of truth for Jira ticket creation — they need to exist where the workflow that uses them runs.
@@ -240,7 +248,7 @@ Before drafting any new plan, check whether the work is a child of something alr
 1. Read `plans/` directory for related existing plans
 2. Check `TODO.md` Active Plans section
 3. If related: decide nesting vs. append:
-   - **New sub-plan file** (`plans/<parent>/<child>/PLAN.md`): when the child is a significant standalone effort — multi-task, its own Epic, or the parent plan is already large enough that appending would bury it
+   - **New sub-plan files** (`plans/<parent>/<child>/<child>-design.md` + `<child>-plan.md`): when the child is a significant standalone effort — multi-task, its own Epic, or the parent plan is already large enough that appending would bury it. Journal and handoff always roll up to the top-level plan tree.
    - **Append to parent**: when the work is a small addition, a correction to something that didn't work, or a scope tweak. In this case, add a clearly dated and titled section at the bottom of the parent plan.
 4. If genuinely independent: create a new top-level plan
 
@@ -295,7 +303,7 @@ A plan is complete when all Task Reference rows are ✅ and all Jira tickets are
 | 1 | Rewrite `plan-docs.md` | `~/.claude/rules/plan-docs.md` | Full rewrite incorporating Part 1 and Part 2 of this plan |
 | 2 | Rewrite `filesystem/efficiency.md` | `~/.claude/rules/filesystem/efficiency.md` | Rescoped to codebase graph as primary navigation; source reads as fallback |
 | 3 | Add cold-start / session handoff section to `workflow-phases.md` | `~/.claude/rules/workflow-phases.md` | §2.4 of this plan → rules |
-| 4 | Update `todo-manager` skill workflow | `~/.claude/skills/todo-manager/` (see Plan 08) | Pointer-entry management: register, update, archive TODO.md entries pointing to plan docs. Implementation details owned by Plan 05/08. |
+| 4 | `plan-management` skill handles TODO.md | `~/.claude/skills/plan-management/` | Pointer-entry management: register, update, archive TODO.md entries pointing to plan docs. Invoked after every ticket creation or status transition — never edit TODO.md manually. |
 
 ---
 

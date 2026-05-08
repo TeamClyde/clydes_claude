@@ -1,0 +1,83 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-start.mjs",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(grep -E '\\\\.\\(py|sh|yml|yaml|json|toml\\)$')",
+      "Bash(wc -l \"/c/Users/jason/repos/claude-workflow-improvements/plans\"/*.md)",
+      "WebSearch",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:awslabs.github.io)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:claudelog.com)",
+      "WebFetch(domain:claudefa.st)",
+      "WebFetch(domain:www.humanlayer.dev)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.builder.io)",
+      "Bash(mv 02-plan-management 02-plan-management-TEMP)",
+      "Bash(mv 03-jira-integration 02-jira-integration)",
+      "Bash(mv 04-testing-system 03-testing-system)",
+      "Bash(mv 05-git-workflow 04-git-workflow)",
+      "Bash(mv 06-agent-architecture 05-agent-architecture)",
+      "WebFetch(domain:danielmiessler.com)",
+      "WebFetch(domain:www.agilealliance.org)",
+      "WebFetch(domain:martinfowler.com)",
+      "WebFetch(domain:kirill-markin.com)",
+      "Bash(wc -l /c/Users/jason/.claude/CLAUDE.md /c/Users/jason/.claude/rules/*.md /c/Users/jason/.claude/rules/filesystem/*.md /c/Users/jason/.claude/agents/*.md /c/Users/jason/.claude/skills/git-manager/*.md /c/Users/jason/.claude/policies/jira-workflow-manager/*.md /c/Users/jason/.claude/policies/git-manager/*.md)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/jason/repos/claude-workflow-improvements/**)",
+      "Bash(done)",
+      "Bash(do basename:*)",
+      "Bash(for d:*)",
+      "Bash(find /c/Users/jason/repos/claude-workflow-improvements/output -type f -exec wc -l {} +)",
+      "Bash(chmod +x __TRACKED_VAR__/tmp/claude-test-scratch/setup.sh)",
+      "Bash(bash __TRACKED_VAR__/tmp/claude-test-scratch/setup.sh)",
+      "Bash(command -v pre-commit)",
+      "Bash(pip show:*)",
+      "Bash(pip3 show:*)",
+      "Bash(python -m pre_commit --version)",
+      "Bash(pre-commit --version)",
+      "Bash(bash \"c:/Users/jason/repos/claude-workflow-improvements/output/scripts/setup-test.sh\")",
+      "Bash(powershell -Command \"Get-Item 'C:\\\\Users\\\\jason\\\\tmp\\\\claude-test\\\\agents\\\\architect.md' | Select-Object -Property Name, LinkType, Target\")",
+      "Bash(powershell -Command \"Get-ItemProperty -Path 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\AppModelUnlock' -Name AllowDevelopmentWithoutDevLicense -ErrorAction SilentlyContinue | Select-Object AllowDevelopmentWithoutDevLicense\")",
+      "Bash(powershell -Command \"\\(Get-ItemProperty 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\AppModelUnlock' -ErrorAction SilentlyContinue\\).AllowDevelopmentWithoutDevLicense\")",
+      "Bash(powershell -Command \"\\(Get-ItemProperty 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\AppModelUnlock'\\).AllowDevelopmentWithoutDevLicense -eq 1\")",
+      "Bash(powershell -Command \"\\([System.IO.File]::GetAttributes\\('C:\\\\Users\\\\jason\\\\tmp\\\\claude-test\\\\agents\\\\architect.md'\\) -band [System.IO.FileAttributes]::ReparsePoint\\) -ne 0\")",
+      "Bash(sed -i 's|\\\\$HOME/\\\\.claude/|\\\\$HOME/tmp/claude-test/|g' __TRACKED_VAR__/tmp/claude-test-scratch/setup-test.sh)",
+      "Bash(sed -i 's|SOURCE_DIR=\"$REPO_ROOT/output\"|SOURCE_DIR=\"__TRACKED_VAR__\"|' __TRACKED_VAR__/tmp/claude-test-scratch/setup-test.sh)",
+      "Bash(bash __TRACKED_VAR__/tmp/claude-test-scratch/setup-test.sh)",
+      "Bash(npm install:*)",
+      "Bash(cygpath -m __TRACKED_VAR__/tmp/test-path)",
+      "Bash(rm -rf __TRACKED_VAR__/tmp/claude-test __TRACKED_VAR__/tmp/claude-test-scratch)",
+      "Bash(mkdir -p __TRACKED_VAR__/tmp/claude-test-scratch)",
+      "Bash(cp c:/Users/jason/repos/claude-workflow-improvements/output/scripts/setup.sh __TRACKED_VAR__/tmp/claude-test-scratch/setup-test.sh)",
+      "Bash(bash __TRACKED_VAR__/tmp/claude-test-scratch/setup-test.sh --force)",
+      "Bash(bash scripts/setup-test.sh)",
+      "Bash(bash scripts/setup-test.sh --force)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/jason/tmp/claude-test/settings.json'\\)\\); print\\(json.dumps\\(d['mcpServers'], indent=2\\)\\)\")",
+      "Bash(bash scripts/setup.sh --force)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/jason/.claude/settings.json'\\)\\); print\\(json.dumps\\(d.get\\('mcpServers', {}\\), indent=2\\)\\)\")",
+      "Bash(python3 -c \"import os; p='C:/Users/jason/.claude/agents/jira-workflow-manager.md'; print\\(os.path.islink\\(p\\)\\); print\\(os.readlink\\(p\\)\\); print\\(os.path.exists\\(p\\)\\)\")",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Read(//c/tmp/**)"
+    ],
+    "defaultMode": "bypassPermissions"
+  }
+}

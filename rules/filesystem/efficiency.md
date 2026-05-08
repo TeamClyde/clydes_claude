@@ -54,7 +54,7 @@ During task execution, the plan doc is the primary reference. Do not use Glob or
 
 ## Architecture Blueprint — New Epics
 
-When creating a new Epic, the plan doc (`plans/CLAUDE-N-description.md`) must include an architecture section covering:
+When creating a new Epic, the plan doc (`plans/<slug>/<slug>-plan.md`) must include an architecture section covering:
 - File paths and entry points for all affected code
 - Function/method signatures and their roles
 - Enum values, constants, and data structures in scope

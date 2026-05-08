@@ -220,14 +220,40 @@ For each hypothesis:
    - No other tests broken?
    - Issue actually resolved?
 
-4. **If Fix Doesn't Work**
+4. **Phase 4 Exit Gate — Record Root Cause (mandatory before declaring debugging complete)**
+
+   Once fix verification passes, invoke `plan-management:divergence` before closing out the debugging session:
+
+   ```
+   Skill {
+     skill: "plan-management",
+     args: "status: divergence plan-doc: <active-plan-path> summary: '<root cause confirmed + fix applied>' tag: [bug] plan-section: '<task or section where the bug was found>'"
+   }
+   ```
+
+   The journal entry must include:
+   - The confirmed root cause (from Phase 3's hypothesis table)
+   - The fix that was applied
+   - The commit hash(es) that contain the fix
+   - Tag: `[bug]` for a single defect, or `[debug-cascade]` for a sequence of related bugs uncovered in the same debugging session
+
+   **This call is mandatory.** Do not declare debugging complete, mark any task ✅, or return to the orchestrator until the divergence call has been made.
+
+   **Exceptions (state explicitly when applying — never skip silently):**
+   1. **One-off environmental glitch** with no learning to preserve (e.g., a flaky network blip that self-resolved, a CI restart that fixed a transient lock).
+   2. **No active plan** (`.claude/active-plan` does not exist) — debugging is occurring outside a plan execution context. Record the root cause in the commit message body instead. State explicitly: "No active plan — recording root cause in commit message only."
+
+   **Exit gate failure message:**
+   > DEBUGGING EXIT GATE FAILED — plan-management:divergence not invoked. Cannot declare debugging complete until root cause and fix are journaled.
+
+5. **If Fix Doesn't Work**
    - STOP
    - Count: How many fixes have you tried?
    - If < 3: Return to Phase 1, re-analyze with new information
-   - **If ≥ 3: STOP. Surface root-cause hypothesis and remaining unknowns to the user. Do not attempt a fourth fix.** If the failure pattern fits step 5 below, frame the handoff as an architectural discussion.
+   - **If ≥ 3: STOP. Surface root-cause hypothesis and remaining unknowns to the user. Do not attempt a fourth fix.** If the failure pattern fits step 6 below, frame the handoff as an architectural discussion.
    - DON'T attempt Fix #4 without surfacing to the user first
 
-5. **If 3+ Fixes Failed: Question Architecture**
+6. **If 3+ Fixes Failed: Question Architecture**
 
    **Pattern indicating architectural problem:**
    - Each fix reveals new shared state/coupling/problem in different place
@@ -262,7 +288,7 @@ If you catch yourself thinking:
 
 **ALL of these mean: STOP. Return to Phase 1.**
 
-**If 3+ fixes failed:** Question the architecture (see Phase 4.5)
+**If 3+ fixes failed:** Question the architecture (see Phase 4.6)
 
 ## your human partner's Signals You're Doing It Wrong
 
@@ -295,7 +321,7 @@ If you catch yourself thinking:
 | **1. Root Cause** | Read errors, reproduce, check changes, gather evidence, enumerate ALL hypotheses as table | Complete hypothesis table before reading implementation files |
 | **2. Pattern** | Find working examples, compare working vs broken | Identify differences that map to hypotheses |
 | **3. Validation** | Confirm/deny each hypothesis (3-file limit per hypothesis), parallel dispatch for 3+ | Every hypothesis marked CONFIRMED / DENIED / UNRESOLVED |
-| **4. Implementation** | Create test, fix ALL confirmed hypotheses in one pass, verify with single re-run | All confirmed root causes fixed, tests pass |
+| **4. Implementation** | Create test, fix ALL confirmed hypotheses in one pass, verify with single re-run, invoke `plan-management:divergence` at exit | All confirmed root causes fixed, tests pass, root cause journaled with `[bug]` or `[debug-cascade]` tag |
 
 ## When Process Reveals "No Root Cause"
 

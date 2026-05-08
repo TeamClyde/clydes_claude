@@ -46,6 +46,9 @@ A field in `testing-plan.md`. Integer — number of additional test-suite runs t
 **hook**
 A shell script wired to a Claude Code event. The `pre-commit` hook runs before every git commit. Lives in `hooks/` and is symlinked to `~/.claude/hooks/` by `setup.sh`.
 
+**integration-test-constraints.md**
+The repo-level file at `.claude/integration-test-constraints.md` that records runtime-discovered constraints (environment quirks, test isolation issues, SDK behavior surprises) that would recur in future test sessions without prior awareness. Governed by `rules/integration-test-constraints.md`, which defines the write-back protocol: confirm with user before appending; format `[YYYY-MM-DD] description — discovered via [BUILD FAILURE | TEST FAILURE | ENVIRONMENT FAILURE]`. This is a repo-scope artifact — not a per-plan file. Per-plan constraint discoveries are tagged `[constraint]` in the plan journal instead.
+
 **infra-init**
 The skill that indexes the codebase and generates the human-readable summary. Three phases: (1) structure detection and batch assignment, (2) parallel source file extraction and indexing via codebase-memory-mcp, (3) CODEBASE.md generation. Outputs: `.claude-init/enrichments.json` (env vars and serverless triggers) and `.claude-init/CODEBASE.md`. The graph itself is managed globally by the codebase-memory-mcp binary — no per-repo JSON file.
 
@@ -103,8 +106,8 @@ The repo-level testing configuration file at `.claude/testing-plan.md`. Generate
 **TODO.md**
 A pointer registry at the repo root. One entry per active plan: plan doc path + Epic Jira key. Never edit manually — always via `plan-management` skill. Does not duplicate task rows or status details from the plan doc.
 
-**three-source task sync**
-The requirement that Jira tickets, the plan doc Task Reference table, and TODO.md stay in sync. After each Done transition: mark ✅ in the plan doc table, invoke `plan-management` to update TODO.md.
+**three-source task sync** *(deprecated)*
+Replaced by the two-source model defined in `rules/workflow-phases.md`. The plan doc's Task Reference table is the durable progress record; the journal (`<slug>-journal.md`) is the append-only history of divergences and decisions; the handoff (`<slug>-handoff.md`) reflects current live state and is the session entry-point. TODO.md is a top-level navigation registry updated by `plan-management` — not a third sync target. See `rules/workflow-phases.md` §Two-source task sync for the full event table.
 
 **verification-before-completion**
 The pre-completion gate skill. Runs after test-runner returns PASS, before claiming a task is done. Verifies no regressions in other features.
