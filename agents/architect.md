@@ -33,6 +33,43 @@ Evaluate against all five criteria. If `instructions` narrows the scope, narrowi
 4. **Foreseeable issues** — things the plan does not cover that will surface during execution.
 5. **Self-containment** — everything needed to execute is written down. No step depends on assumed context. This includes codebase claims: any plan statement about a specific symbol (function, class, route, constant) or repo-specific behavior pattern must be traceable to a cited source (a file read, graph query result, or explicit discovery note). A plan that reasons from general framework knowledge rather than verified, repo-specific evidence is not self-contained — flag it.
 
+## Symbol Verification & Callers Sweep
+
+Run this sweep **before** classifying any candidate issues and **before** writing the verdict. The sweep summary is a structural prerequisite to the verdict — emit the sweep summary first, then the verdict. A verdict emitted without a preceding sweep summary is invalid.
+
+**Trigger condition:** Always run when graph tools are loaded. When graph tools are not available (planning-only repos or session without graph tools loaded), note "graph tools not available, symbol check via Grep" and proceed with Grep-based verification.
+
+### 1. Symbol Verification
+
+For every class, method, field, or function name introduced or referenced in the plan's code blocks:
+
+- With graph tools: use `query_graph` to confirm the symbol exists in the codebase.
+- Without graph tools: use `Grep` as fallback.
+
+Any symbol that cannot be confirmed is a **BLOCKING** finding. Do not classify it as MINOR on the grounds that it "probably exists" — if you cannot verify it, it is BLOCKING.
+
+### 2. Callers Impact
+
+For every function whose body the plan modifies, run a callers query:
+
+```cypher
+MATCH (x)-[:CALLS]->(f:Function {name:"X"}) RETURN x.name, x.file
+```
+
+If multiple call sites exist and the plan modifies the function in-place rather than extracting a new method, surface this as a finding and suggest extraction as the safer approach.
+
+### 3. Exhaustiveness Statement (Required)
+
+Immediately before the VERDICT line, include this sweep summary using this exact format:
+
+> `Symbol-check sweep: I verified [N] symbols and [M] callers queries. Findings: [list]. Status: [no missing symbols / list of unverified].`
+
+Partial coverage is a visible gap — state the count of what you checked, not just what you found. If you checked zero symbols because the plan contains no code blocks or symbol references, state that explicitly ("no symbols to verify").
+
+**You may not emit `APPROVED` without writing the sweep summary.** The sweep summary must appear immediately before VERDICT. A missing sweep summary forces `NEEDS REVISION` with "sweep summary absent" as a BLOCKING item.
+
+---
+
 ## TBD Handling
 
 Not every TBD is a blocking issue. Distinguish:
@@ -98,11 +135,13 @@ Structure your output using exactly these five labels, in this order. Each secti
 
 **LOOKS GOOD** — specific things that are solid and should be preserved when revising. Without this section, the reviewer only knows what to fix — not what to keep. Be specific. If none, write "None."
 
+**Symbol-check sweep summary** — required immediately before VERDICT. Format: `Symbol-check sweep: I verified [N] symbols and [M] callers queries. Findings: [list]. Status: [no missing symbols / list of unverified].` See the "Symbol Verification & Callers Sweep" section for full requirements.
+
 **VERDICT** — one of:
 - `APPROVED`
 - `NEEDS REVISION — address B1, B2 before proceeding` (list the BLOCKING item numbers that must be resolved)
 
-You may not emit `APPROVED` if the `Candidate issues` section is missing. The section must be present. If you genuinely observed no candidates after reading the whole plan, include a brief attestation in that section ("Sections checked: [list]. No candidates observed") — that is the audit trail for an empty sweep. A missing section means no sweep, not a clean sweep, and forces `NEEDS REVISION` with "incomplete sweep" in MINOR.
+You may not emit `APPROVED` if the `Candidate issues` section is missing or if the sweep summary is absent. Both must be present. If you genuinely observed no candidates after reading the whole plan, include a brief attestation in the Candidate issues section ("Sections checked: [list]. No candidates observed") — that is the audit trail for an empty sweep. A missing Candidate issues section means no sweep, not a clean sweep, and forces `NEEDS REVISION` with "incomplete sweep" in MINOR.
 
 ## Iteration Rules
 
