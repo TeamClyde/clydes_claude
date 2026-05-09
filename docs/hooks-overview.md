@@ -41,3 +41,14 @@ This repo defines several Claude Code hooks at `.claude/hooks/<event>/<intent>.m
 - Override: prefix pattern with `[grep-allowed]` marker; or `CLAUDE_DISABLE_WORKFLOW_HOOKS=1` env var
 **Log file:** `.claude/logs/grep-blocks.jsonl`
 **Owner issue:** #31 (drift aspect)
+
+### `userPromptSubmit/slash-command-enforcement.mjs`
+
+**Event:** `UserPromptSubmit`
+**Purpose:** When user types `/<skill-name>`, inject additionalContext directing immediate Skill invocation. Acknowledged limitation: prose-injection only — orchestrator can ignore. Mechanical enforcement blocked on Claude Code hook API capability.
+**Behavior:**
+- Pattern match on `(?:^|\s)/[a-z][a-z0-9-]+(?=\s|$)`
+- Validate against user-invocable skills list
+- Emit additionalContext per match
+**Override:** `CLAUDE_DISABLE_WORKFLOW_HOOKS=1`
+**Owner issue:** #14 (closes with limitation note)
