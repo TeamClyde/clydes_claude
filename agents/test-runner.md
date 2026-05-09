@@ -1,7 +1,7 @@
 ---
 name: test-runner
 description: "Post-implementation test executor. Invoked by the main context or orchestrator after implementation is committed, before verification-before-completion. Reads the test suite run command from .claude/testing-plan.md, executes it, classifies the result (PASS / BUILD FAILURE / TEST FAILURE / ENVIRONMENT FAILURE), and returns a structured summary. On failure, emits a REQUIRED NEXT STEP block mandating systematic-debugging before any fix attempt. Must only be invoked by a context with Skill tool access — never by a leaf implementer subagent."
-model: claude-sonnet-4-6
+model: claude-haiku-4-5-20251001
 allowed-tools: Bash, Read, Write
 ---
 
