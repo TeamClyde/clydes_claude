@@ -4,6 +4,11 @@
 
 ## Up Next
 
+- [ ] Orchestrator Routing v2 — mechanical enforcement of orchestrator routing decisions via Claude Code hooks + agent frontmatter pinning. Closes 8 GitHub workflow-friction issues (#14, #21, #28, #30, #31, #32, #33, #34). — [plan doc](plans/orchestrator-routing-v2/orchestrator-routing-v2-plan.md)
+  - [ ] Tier 1 — Mechanical routing core: agent discovery + Haiku frontmatter pinning, PreToolUse Agent dispatch hook, SessionStart graph-tools directive + PreToolUse Grep/Glob enforcement, architect prompt expansion (symbol verification + callers query)
+  - [ ] Tier 3 — Focused fixes: UserPromptSubmit slash-command directive, brainstorming two-stage research bookends, project-name PostToolUse self-heal + root-cause fix, plan-gate parallel dispatch with soft-gate adherence-audit, [gate-complete] tag + plan-gate end-of-success :divergence
+  - [ ] Tier 2 — Sub-plan spawn: subagent-driven-development frontier rewrite (B1 tier-aware dispatch, B2 re-anchoring, B3 cache-stable prompt prefix, B4 executable-verification preference) — runs in sub-plan after parent Task 10
+
 ## Backlog
 
 - Mobile app workflow observations — real-world testing of memory capture, skill triggering, and CSO effectiveness in a new repo. Mobile app repo on separate machine will be used to observe whether memory is actually being written/read, which skills auto-trigger vs. get skipped, and what friction surfaces. Signal feeds back into memory system and CSO improvements. [scope]
