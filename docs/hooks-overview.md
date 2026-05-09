@@ -19,3 +19,25 @@ This repo defines several Claude Code hooks at `.claude/hooks/<event>/<intent>.m
 - Never blocks. Exit 0 on all paths.
 **Log file:** `.claude/logs/agent-dispatches.jsonl`
 **Owner issue:** #30, #32 (and partial #31)
+
+### `sessionStart/graph-tools-directive.mjs`
+
+**Event:** `SessionStart`
+**Purpose:** When `.claude-init/CODEBASE.md` exists in CWD, inject additionalContext directing graph-tools loading as turn-1 action.
+**Behavior:**
+- No `CODEBASE.md`: silent pass
+- `CODEBASE.md` present: emit additionalContext with ToolSearch instruction
+**Owner issue:** #31 (loading aspect)
+
+### `preToolUse/graph-tools-enforcement.mjs`
+
+**Event:** `PreToolUse` on `Grep` and `Glob` tools
+**Purpose:** Block code-symbol Grep/Glob calls when graph tools are available; emit additionalContext with the equivalent graph-tool call.
+**Behavior:**
+- Pre-filter on `.claude-init/CODEBASE.md` existence
+- Pattern classifier (regex + file scope)
+- Block: returns `permissionDecision: deny` with helpful guidance in `permissionDecisionReason` field (per Claude Code PreToolUse hook API; `additionalContext` is for non-deny paths)
+- Allow: silent pass
+- Override: prefix pattern with `[grep-allowed]` marker; or `CLAUDE_DISABLE_WORKFLOW_HOOKS=1` env var
+**Log file:** `.claude/logs/grep-blocks.jsonl`
+**Owner issue:** #31 (drift aspect)
