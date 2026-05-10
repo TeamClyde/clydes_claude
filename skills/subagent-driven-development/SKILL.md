@@ -222,11 +222,23 @@ Skipping step 2 leaves TODO.md In Progress entries stuck forever — the executo
 
 ---
 
-## Prompt Templates
+## Prompt Templates and Auto-Prepended Prefixes
 
-- `./implementer-prompt.md` - Dispatch implementer subagent
-- `./spec-reviewer-prompt.md` - Dispatch spec compliance reviewer subagent
-- `./code-quality-reviewer-prompt.md` - Dispatch code quality reviewer subagent
+Each role has two artifacts:
+
+| Role | Prefix file (auto-prepended) | Variable-suffix template |
+|---|---|---|
+| Implementer | `./prefixes/implementer.md` | `./implementer-prompt.md` |
+| Spec reviewer | `./prefixes/spec-reviewer.md` | `./spec-reviewer-prompt.md` |
+| Code quality reviewer | `./prefixes/code-quality-reviewer.md` | `./code-quality-reviewer-prompt.md` |
+
+The `.claude/hooks/preToolUse/subagent-prefix-prepend.mjs` hook detects a `[role: <name>]` marker on the first non-empty line of the prompt parameter, reads the matching prefix file byte-for-byte, and prepends it (with a `---` separator) before the dispatch lands.
+
+**Why:** byte-identical prefix bytes across same-role dispatches yield automatic prompt-cache hits (cache-read = 0.1× input cost). Mid-session edits to a prefix file change its bytes; the next dispatch caches a new prefix. Visible — each prefix file carries a `version:` field in frontmatter; the hook logs `(role, prefix_version, suffix_first_60_chars)` per dispatch to `.claude/logs/subagent-prefix.jsonl` so cache invalidation is auditable.
+
+**Authoring discipline:** when constructing a dispatch prompt, write only the variable suffix following the role's prompt-template file. The first non-empty line must be the marker. The hook does the rest. Do NOT paste the methodological prefix manually — that would defeat the point of the hook (orchestrator drift was the original failure mode).
+
+**Rollback:** `CLAUDE_DISABLE_WORKFLOW_HOOKS=1` disables the hook (along with all other workflow hooks).
 
 ## Example Workflow
 

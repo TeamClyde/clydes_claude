@@ -32,6 +32,11 @@
             "type": "command",
             "command": "node .claude/hooks/preToolUse/agent-model-pinning.mjs",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/preToolUse/subagent-prefix-prepend.mjs",
+            "timeout": 5
           }
         ]
       },
