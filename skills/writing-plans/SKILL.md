@@ -190,9 +190,11 @@ Circular reasoning past agent answers is a plan quality failure — it produces 
 
 ## Task Reference
 
-| # | Task | Size | Scope | Jira Key |
-|---|------|------|-------|----------|
-| 1 | ... | S/M/L | files/components | _(assigned at plan-gate)_ |
+| # | Task | Size | Complexity | Scope | Jira Key |
+|---|------|------|------------|-------|----------|
+| 1 | ... | S/M/L | S/M/L | files/components | _(assigned at plan-gate)_ |
+
+Complexity is the input to tier-aware dispatch (see `subagent-driven-development` Model Selection): S → Haiku, M → Sonnet, L → Opus. Size is independent of complexity — a small but architecturally complex task may be `Size: S, Complexity: L`.
 ```
 
 ## Task Structure

@@ -91,7 +91,7 @@ Every L-sized plan doc MUST contain:
 - External resources with actual names (DynamoDB tables, SQS queues, SES templates, EventBridge rules)
 - Entry points and triggers involved
 
-**Task Reference table** — **Authoritative durable progress record.** Columns: #, Task, Size, Scope, Jira Key. Jira Key column is intentionally blank during planning — keys are assigned at execution start. Rows marked ✅ as tasks complete. The mechanism that keeps this table current is `plan-management:divergence` — do not rely on "remember to update it."
+**Task Reference table** — **Authoritative durable progress record.** Columns: #, Task, Size, Complexity, Scope, Jira Key. Complexity (S/M/L) drives tier-aware dispatch — see `subagent-driven-development` Model Selection. Size is independent of complexity (a small but architecturally complex task may be `Size: S, Complexity: L`). Jira Key column is intentionally blank during planning — keys are assigned at execution start. Rows marked ✅ as tasks complete. The mechanism that keeps this table current is `plan-management:divergence` — do not rely on "remember to update it."
 
 **Testing** — appended by `test-strategy` agent **after** architect review. This section does not exist at architect review time. This is correct — do not flag its absence during architect review.
 

@@ -108,9 +108,13 @@ Use the least powerful model that can handle each role to conserve cost and incr
 
 | Complexity | Examples | Model |
 |---|---|---|
-| Trivial (Haiku-eligible) | doc edit, jira transition, test-runner output parsing, single-file rename, config tweak | claude-haiku-4-5-20251001 |
-| Standard | feature implementation, multi-file change, debugging | claude-sonnet-4-6 |
-| Complex | architecture decisions, cross-cutting refactor, design judgment | claude-opus-4-7 |
+| S (Trivial — Haiku-eligible) | doc edit, jira transition, test-runner output parsing, single-file rename, config tweak | claude-haiku-4-5-20251001 |
+| M (Standard) | feature implementation, multi-file change, debugging | claude-sonnet-4-6 |
+| L (Complex) | architecture decisions, cross-cutting refactor, design judgment | claude-opus-4-7 |
+
+**Source of complexity:** The plan doc's Task Reference table includes a Complexity column with values S / M / L. The orchestrator reads this column at dispatch time and picks the model accordingly (S → Haiku, M → Sonnet, L → Opus). If the plan predates this convention and the column is absent, default to M (Sonnet) and log the fallback.
+
+**Frontmatter pinning wins.** Some agents are pinned to a specific tier in their frontmatter (e.g., `researcher` and `test-runner` pin to Haiku). The PreToolUse `agent-model-pinning.mjs` hook (Tier 1, A1) overrides the orchestrator's `model:` choice with the pinned value when present. The plan-time tier becomes a soft default in those cases — A1's hook is the source of truth.
 
 **Per-dispatch requirement:** Each implementer dispatch must explicitly set the `model:` parameter on the Task tool AND echo the choice as `**Model:** <name> — <rationale>` in the prompt body (see `./implementer-prompt.md`). Parent-context model selection must not silently propagate — every task gets a deliberate, visible choice.
 
