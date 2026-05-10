@@ -52,3 +52,17 @@ This repo defines several Claude Code hooks at `.claude/hooks/<event>/<intent>.m
 - Emit additionalContext per match
 **Override:** `CLAUDE_DISABLE_WORKFLOW_HOOKS=1`
 **Owner issue:** #14 (closes with limitation note)
+
+### `postToolUse/graph-tools-self-heal.mjs`
+
+**Event:** `PostToolUse` on `mcp__codebase-memory-mcp__*` tools
+**Purpose:** Catch "project not found" errors; resolve correct project from available indexed projects; update CLAUDE.md; emit additionalContext for retry.
+**Behavior:**
+- Re-entry guard prevents recursion (env var `CLAUDE_HOOK_GRAPH_TOOLS_HEAL_ACTIVE`)
+- Match condition: tool name starts with `mcp__codebase-memory-mcp__` AND output contains `"project not found"`
+- `available_projects` in the error response is an array of **name strings** (not objects) — this is the codebase-memory-mcp binary's actual format (verified 2026-05-09)
+- Single project in `available_projects`: update CLAUDE.md's Codebase Knowledge Graph section directly; emit retry instruction
+- Multiple projects in `available_projects`: emit additionalContext instructing Claude to call `list_projects()` to find CWD-matching entry (can't disambiguate from names alone)
+- No `available_projects` (no indexed projects): emit additionalContext directing `/infra-init` run
+- CLAUDE.md update targets the line: `- **Project name (codebase-memory-mcp):** \`{project-name}\` — pass as ...`
+**Owner issue:** #28 (closes via self-heal hook; no write-site root-cause fix needed — all write sites already use `list_projects()` correctly)
