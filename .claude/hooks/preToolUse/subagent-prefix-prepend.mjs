@@ -24,6 +24,26 @@
  *   permissionDecisionReason } } shape for its block-symbol-search path.
  *   The schema is verified against the harness by that hook's working behavior.
  *
+ * HOOK ORDERING — coexistence with agent-model-pinning.mjs:
+ *   Both hooks register on the "Agent" matcher in .claude/settings.json. Each
+ *   receives the original input independently and may emit its own updatedInput.
+ *   The harness's reconciliation when two hooks emit updatedInput in the same
+ *   matcher block is not formally documented in this codebase. In practice this
+ *   is benign because:
+ *     1. agent-model-pinning.mjs only emits updatedInput when model is unset
+ *        (its Case 2). The per-dispatch model requirement in
+ *        subagent-driven-development means model is usually set explicitly,
+ *        making Case 2 rare.
+ *     2. This hook only overrides the `prompt` field; agent-model-pinning's
+ *        model-injection path overrides the `model` field. The two writes touch
+ *        different fields, so even a naive merge or last-write-wins reconciler
+ *        produces a sensible result IF the harness's merge is field-level.
+ *   If the harness uses object-level last-write-wins (entire updatedInput
+ *   replaces the prior), this hook (running second per registration order)
+ *   would silently lose any model injection from agent-model-pinning.mjs.
+ *   Mitigation: keep model: parameter explicit in all dispatch sites
+ *   (already required by the per-dispatch rule).
+ *
  * Log file: .claude/logs/subagent-prefix.jsonl
  */
 
@@ -93,19 +113,20 @@ if (role === null) process.exit(0);
 
 // Read prefix file
 const prefixPath = join(PREFIX_DIR, `${role}.md`);
-if (!existsSync(prefixPath)) {
-  process.stderr.write(`[prefix-hook] missing prefix file: ${prefixPath}\n`);
+let prefixBytes;
+try {
+  prefixBytes = readFileSync(prefixPath, 'utf8');
+} catch (err) {
+  process.stderr.write(`[prefix-hook] cannot read prefix file ${prefixPath}: ${err.code || err.message}\n`);
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
-      permissionDecisionReason: `Subagent prefix file missing: ${prefixPath}. Cannot assemble prompt.`
+      permissionDecisionReason: `Subagent prefix file unreadable: ${prefixPath} (${err.code || 'unknown error'}). Cannot assemble prompt.`
     }
   }) + '\n');
   process.exit(0);
 }
-
-const prefixBytes = readFileSync(prefixPath, 'utf8');
 
 // Parse version from frontmatter (simple multiline search — works regardless of field order)
 const versionMatch = prefixBytes.match(/^version:\s*(\S+)/m);
