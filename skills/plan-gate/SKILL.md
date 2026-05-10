@@ -30,7 +30,7 @@ Apply these overrides:
 
 | Field | Value | Effect |
 |-------|-------|--------|
-| `workflow.architect-review` | `false` | Skip Step 1 (Architect Review) entirely — proceed directly to Step 2 |
+| `workflow.architect-review` | `false` | Skip Step 1 entirely (both architect AND adherence-audit) — proceed directly to Step 2 |
 | `workflow.plan-gate` | `false` | Skip the entire gate sequence — hand off directly to executing-plans |
 | `workflow.tdd` | `false` | Skip Step 3 (Test Builder) — proceed directly to Step 4 after checkpoint |
 | `jira.enabled` | `false` | Skip Step 4 (Jira Ticket Creation) — proceed directly to Step 5 |
@@ -40,16 +40,53 @@ Apply these overrides:
 
 ## Gate Sequence
 
-### Step 1 — Architect Review
+### Step 1 — Architect Review + Adherence Audit (parallel)
 
-Dispatch the `architect` agent with `subagent_type: architect` and the plan doc path.
+**If `workflow.architect-review: false`:** skip this entire step (both reviewers) and proceed directly to Step 2.
 
-**On NEEDS REVISION:**
-- BLOCKING items requiring user judgment → surface verbatim, wait, update plan doc, re-invoke architect
-- BLOCKING items resolvable from context → fix inline, re-invoke architect
-- Maximum 3 rounds. If BLOCKING items remain after round 3, surface to the user and stop.
+Dispatch both reviewers simultaneously and wait for both to complete before proceeding:
 
-**On APPROVED** → proceed to Step 2.
+- **Architect agent** — `subagent_type: architect`, pass the plan doc path (existing prompt).
+- **Adherence-audit skill** — pass the plan doc path as the `plan-doc` parameter. This runs the standard 7-check audit AND the plan-introduced drift check (Phase 9).
+
+Do not proceed to severity merge until both have returned results.
+
+#### Severity Merge
+
+Combine findings into a single unified list using this ordering and gate semantics:
+
+| Position | Source | Severity | Gate type |
+|----------|--------|----------|-----------|
+| 1st | Architect | BLOCKING | **Hard-gate** — plan must revise before proceeding |
+| 2nd | Adherence-audit | BLOCKING | **Soft-gate** — surface verbatim; user decides: (a) acknowledge and proceed, or (b) address findings first |
+| 3rd | Architect | MINOR / WARNING | Informational |
+| 4th | Adherence-audit | WARNING | Informational |
+| 5th | Either | INFO | Informational |
+
+**Hard-gate behavior (architect BLOCKING):** same as before — fix or surface, re-invoke architect, max 3 rounds.
+
+**Soft-gate behavior (adherence-audit BLOCKING):**
+
+Surface the findings verbatim to the user:
+
+> "The adherence audit found the following concerns about this plan (soft-gate — your call to proceed or address):
+> [findings]
+> Reply 'proceed' to continue past these findings, or address them and I'll re-run the audit."
+
+Wait for explicit user response. If the user replies 'proceed', continue to Step 2. If the user addresses findings, re-run adherence-audit (see Iteration below) before presenting again.
+
+**Adherence WARNING / INFO:** present in the unified output but require no user action — plan-gate continues.
+
+**Edge cases:**
+- Adherence-audit finds no plan-introduced drift (plan doesn't touch skills/agents/rules, or proposed changes are conventional): findings are empty or INFO-only → plan-gate proceeds without a soft-gate prompt.
+- Both reviewers must complete before severity merge runs — do not proceed on partial results.
+
+#### Iteration
+
+- **Architect:** re-dispatch on each architect-BLOCKING revision (existing behavior). 3-round cap. After round 3 with BLOCKING remaining, surface to user and stop.
+- **Adherence-audit:** re-run only when a revision changes components relevant to its prior findings (e.g., a proposed skill name, invocation pattern, or file path the audit flagged). If the revision only addresses architect findings that don't overlap with audit findings, do not re-run the audit.
+
+**On APPROVED (architect) + soft-gate resolved (user acknowledged or addressed)** → proceed to Step 2.
 
 ---
 
@@ -120,8 +157,10 @@ After all 5 steps complete successfully:
 |---|---|
 | Architect returns NEEDS REVISION (rounds 1–2) | Fix/surface issues, re-invoke architect |
 | Architect returns NEEDS REVISION after round 3 | Surface to user, stop |
-| Any agent fails or is unavailable | Surface the failure, stop — do not skip a gate step |
+| Adherence-audit returns BLOCKING (soft-gate) | Surface to user verbatim; wait for 'proceed' or revision |
+| Adherence-audit or architect fails / unavailable | Surface the failure, stop — do not skip a gate step |
 | Plan doc missing required sections | Surface what is missing, stop |
+| One reviewer returns before the other | Wait — do not run severity merge on partial results |
 
 Never skip a gate step (unless explicitly disabled via `project.json`). If an agent is unavailable, surface the blocker to the user.
 
@@ -133,7 +172,8 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 - `writing-plans` — automatically at end of skill
 
 **Calls:**
-- `architect` agent (subagent_type: architect) — Step 1
+- `architect` agent (subagent_type: architect) — Step 1, parallel with adherence-audit (skipped if architect-review: false)
+- `adherence-audit` skill — Step 1, parallel with architect, plan-doc path passed as `plan-doc` parameter (skipped if architect-review: false)
 - `test-strategy` agent (subagent_type: test-strategy) — Step 2
 - `test-builder` agent (subagent_type: test-builder) — Step 3 (skipped if tdd: false)
 - `jira-workflow-manager` agent (subagent_type: jira-workflow-manager) — Step 4 (skipped if jira.enabled: false)
@@ -149,3 +189,7 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 3. Maximum 3 architect iterations — surface remaining BLOCKING issues to the user after the third pass.
 4. `jira.enabled: false` and `workflow.tdd: false` are silent skips — no user-facing warning or confirmation prompt.
 5. On the Jira-disabled path, omit `jira-key` from the `plan-management:created` call entirely — do not pass an empty string.
+6. Adherence-audit BLOCKING is a soft-gate — it requires a user decision, not an automatic block. Do not treat it the same as architect BLOCKING.
+7. `workflow.architect-review: false` skips BOTH reviewers — adherence-audit is not run independently when architect review is disabled.
+8. Do not re-run adherence-audit on every architect revision — only re-run when the revision touches components that overlap with the audit's prior findings.
+9. Both reviewers must return before severity merge runs — do not proceed on partial results if one completes significantly before the other.

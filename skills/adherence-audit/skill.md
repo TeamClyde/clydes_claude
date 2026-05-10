@@ -60,6 +60,14 @@ For each file, extract:
 
 Build an inventory: `{ name, type, file, invokes: [], conventions: [], trigger, allowed_tools }`
 
+**Optional plan-doc extension:** If a `plan-doc` path was passed as input, also read that file and extract:
+- **Proposed new components** — files the plan intends to create (skill, agent, rule, hook files)
+- **Proposed modifications** — existing components the plan intends to edit (from "Files to modify", task-level edits, or implementation notes)
+- **Names and paths referenced** — any skill names, agent names, rule paths, or tool names mentioned in the plan
+- **Invocations described** — how the plan proposes to invoke new or modified components
+
+Store this as `plan_scope: { creates: [], modifies: [], references: [], proposed_invocations: [] }`. This data is used exclusively in Phase 9. Phases 2–8 run on the existing inventory only.
+
 ### Phase 2 — Check 1: Dead references
 
 For every name found in `invokes[]` across all components:
@@ -129,6 +137,29 @@ Also read `docs/workflow-map.md` if it exists — compare its agent registry and
 against the current inventory. Flag components in the map that no longer exist, and components
 that exist but aren't in the map.
 
+### Phase 9 — Plan-Introduced Drift (only runs when `plan-doc` is set)
+
+Using `plan_scope` from Phase 1, evaluate each proposed change for drift against the current inventory:
+
+**For each component the plan proposes to CREATE:**
+- Does the proposed name conflict with an existing component name? → **BLOCKING**
+- Does the proposed invocation pattern (tool, method, frontmatter name) match what the workflow expects? → mismatch is **WARNING**
+- Does the proposed component introduce a new convention (file path, status value, naming pattern) that conflicts with existing conventions? → **BLOCKING** (convention conflict) or **WARNING** (ambiguous)
+- Is the proposed component never referenced by any existing component and has no auto-trigger description? → **INFO** (potential orphan)
+
+**For each component the plan proposes to MODIFY:**
+- Would the modification break existing callers that depend on the current interface? (e.g., changing a frontmatter `name:`, removing a parameter, changing output format) → **BLOCKING**
+- Would the modification introduce a convention that disagrees with existing convention statements in other files? → **WARNING**
+- Would the modification cause a priority conflict (rule vs. skill disagree on same action)? → **WARNING**
+
+**For names and paths referenced in the plan:**
+- Do all referenced skill/agent names exist in the current inventory? Missing names are **BLOCKING** (dead reference the plan would introduce)
+- Do all referenced file paths follow existing conventions? Deviations are **WARNING**
+
+Report findings under the same headings as the standard audit output (BLOCKING / WARNING / INFO), prefixed with `[Plan-Introduced]` to distinguish from findings about existing components.
+
+If the plan does not propose creating or modifying any workflow components (skills, agents, rules, hooks), or if all proposed changes are purely conventional, output one INFO entry: "No plan-introduced drift detected."
+
 ---
 
 ## Output Format
@@ -181,3 +212,5 @@ If no findings: report "No adherence issues found."
 4. Do not fix issues during the audit — report only. Fixing during audit contaminates the
    inventory you built in Phase 1.
 5. Run Pulser separately for structural quality — this skill checks semantic consistency only.
+6. When `plan-doc` is set, Phase 9 findings are prefixed `[Plan-Introduced]` in the output — they describe drift the plan *would* introduce, not drift that already exists. Don't mix them with findings from Phases 2–8.
+7. If `plan-doc` is absent, the skill is identical to its pre-plan-doc behavior — no Phase 9 runs, no empty section is emitted.
