@@ -240,6 +240,30 @@ The `.claude/hooks/preToolUse/subagent-prefix-prepend.mjs` hook detects a `[role
 
 **Rollback:** `CLAUDE_DISABLE_WORKFLOW_HOOKS=1` disables the hook (along with all other workflow hooks).
 
+## Plan Anchor (re-anchoring block)
+
+Counters orchestrator and implementer drift across long sessions. The orchestrator authors a small (~60–80 token) anchor block and prepends it to the variable suffix of every implementer dispatch. Reviewers don't get one — they're short-lived and narrow-scoped.
+
+**Block format:**
+
+```
+## Plan Anchor
+Plan goal: <one sentence from plan doc Context section>
+This task's contribution: <one sentence on why this task exists>
+Recent completed tasks (last 3–5): <task IDs + one-line names, no summaries>
+```
+
+**Position:** First block of the variable suffix, immediately after the `[role: implementer]` marker line, before the `Task N:` line. The implementer reads "what's the goal" before "what's the task," matching how a human briefs a colleague.
+
+**Author:** Orchestrator (this skill / this context). Re-read the plan doc's Context section before each implementer dispatch — the re-read is itself part of B2 and counters orchestrator-level drift.
+
+**Sizing rule (anti-bloat):**
+- Recent completed tasks list: cap at the last 3–5 tasks; digest format only (IDs + one-line names, never per-task summaries).
+- Older completed tasks decay in salience and don't earn a slot.
+- Total anchor token budget: ~60 tokens typical, ~80–100 even on plans with 20+ completed tasks.
+
+**Scope:** Implementer dispatches only. Spec-reviewer and code-quality-reviewer dispatches do NOT get an anchor.
+
 ## Example Workflow
 
 ```

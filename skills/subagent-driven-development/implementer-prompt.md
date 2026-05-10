@@ -11,6 +11,11 @@ Task tool (general-purpose):
   prompt: |
     [role: implementer]
 
+    ## Plan Anchor
+    Plan goal: <one sentence from plan doc Context section>
+    This task's contribution: <one sentence on why this task exists>
+    Recent completed tasks (last 3–5): <task IDs + one-line names>
+
     Task N: [task name]
     **Model:** <chosen-model> — <one-line rationale, e.g. "mechanical: 1 file, clear spec">
     Work from: <directory>
@@ -37,5 +42,5 @@ Task tool (general-purpose):
 
 **Variable suffix authoring rules:**
 - First non-empty line MUST be the marker `[role: implementer]`. The hook strips it.
-- The Plan Anchor block (Task 3 / B2) sits immediately above `Task N:` once that task ships.
+- The Plan Anchor block sits immediately above `Task N:`. Cap at last 3–5 completed tasks; digest only (IDs + one-line names, never per-task summaries). Authored by the orchestrator from the plan doc's Context section.
 - Everything else is per-task variable content — never methodological.
