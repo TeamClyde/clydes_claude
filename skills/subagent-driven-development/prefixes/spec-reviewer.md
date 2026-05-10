@@ -28,4 +28,4 @@ Every spec requirement implemented. No extra features beyond spec. Implementer's
 
 - ✅ **Spec compliant** if every requirement is met and nothing extra was added.
 - ❌ **Issues found:** list specifically what's missing or extra, with `file:line` references. Separate "missing" from "extra" so the implementer knows what to add vs. remove.
-- 📌 **Out-of-lane flags** (optional): observations for the code-quality reviewer. These do NOT gate.
+- 📌 **Out-of-lane flags** (optional, advisory-only): observations for the code-quality reviewer. These do NOT gate, and the orchestrator may or may not forward them to the code-quality dispatch — surface them in your report regardless. If you're uncertain whether something is in your lane, emit a flag rather than fail to mention it.

@@ -135,6 +135,12 @@ test('case 5: marker present but prefix file missing, deny', () => {
 
 // case 6: log line written
 test('case 6: log line written', () => {
+  const prefixPath = resolve(REPO_ROOT, 'skills', 'subagent-driven-development', 'prefixes', 'implementer.md');
+  const prefixContent = readFileSync(prefixPath, 'utf8');
+  const versionMatch = prefixContent.match(/^version:\s*(\S+)/m);
+  const expectedVersion = versionMatch ? versionMatch[1] : null;
+  assert.ok(expectedVersion, 'implementer.md frontmatter should contain a version field');
+
   runHook({
     subagent_type: 'general-purpose',
     prompt: '[role: implementer]\n\nTask 1: foo\n## Task Description\nbar',
@@ -149,7 +155,7 @@ test('case 6: log line written', () => {
   const logEntry = JSON.parse(lastLine);
 
   assert.equal(logEntry.role, 'implementer', 'log entry should have role: implementer');
-  assert.equal(logEntry.prefix_version, '1', 'log entry should have prefix_version: 1');
+  assert.equal(logEntry.prefix_version, expectedVersion, `log entry should have prefix_version: ${expectedVersion}`);
   assert.ok(logEntry.suffix_first_60.length > 0, 'suffix_first_60 should be populated');
   assert.ok(logEntry.ts && /^\d{4}-\d{2}-\d{2}T/.test(logEntry.ts), 'ts should be an ISO string');
 });
