@@ -200,6 +200,7 @@ Every journal entry appended by `divergence` must include at least one tag from 
 | `[debug-cascade]` | A debugging cascade root cause and fix |
 | `[subplan-spawn]` | A sub-plan was spawned (written automatically by `spawn-subplan` mode) |
 | `[subplan-close]` | A sub-plan was closed (written automatically by `close-subplan` mode) |
+| `[gate-complete]` | Used by plan-gate at successful gate completion to record stage outcomes (architect APPROVED, adherence-audit APPROVED, test-strategy appended, test-builder ran). plan-gate invokes `:divergence` once at end of its successful path with this tag. |
 
 Multiple tags may apply. Example: a flaky test discovered mid-execution is `[bug] [test-debt]`.
 

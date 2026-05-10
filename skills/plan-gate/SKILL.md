@@ -143,9 +143,30 @@ Invoke the `plan-management` skill:
 
 ---
 
+### Step 6 — Gate-Complete Divergence Record
+
+After Step 5 completes, invoke `plan-management:divergence` to atomically tick the plan doc's gate-checkbox section, append a `[gate-complete]` journal entry, and refresh the handoff:
+
+```
+Skill {
+  skill: "plan-management",
+  args: "status: divergence plan-doc: plans/<slug>/<slug>-plan.md summary: 'Plan-gate complete: architect APPROVED (round N), adherence-audit APPROVED (round N), test-strategy appended, test-builder ran' tag: [gate-complete] plan-section: Phase -1 Gate"
+}
+```
+
+Fill in the actual round numbers from Step 1. If architect review was skipped (`workflow.architect-review: false`), write `architect skipped` in place of `architect APPROVED (round N)`. If TDD was skipped (`workflow.tdd: false`), write `test-builder skipped`.
+
+**Placement rationale:** This call fires after Step 5 (TODO.md registration) so it represents the true end of plan-gate's work. The gate checkboxes and journal entry are only written once everything else has succeeded.
+
+**Failure mode — mid-gate failure:** If plan-gate fails before reaching Step 6 (e.g., adherence-audit returns BLOCKING and the user does not issue 'proceed', or architect BLOCKING persists after 3 rounds), the `:divergence` call is not invoked. The plan doc gate-checkbox section and journal remain in their pre-gate state. Resuming or re-running plan-gate from the beginning is fully idempotent — when it eventually succeeds it fires `:divergence` once with the final stage outcomes.
+
+**Idempotency — re-running plan-gate after success:** The `:divergence` mode performs three independent idempotency checks before writing: (1) journal — skips append if a dated entry with matching summary already exists; (2) plan section — skips edit if the section already reflects the new state; (3) handoff — skips refresh if `Last Updated` is already today and the divergence is already reflected. Re-running plan-gate on an already-gated plan is therefore safe: all three writes are no-ops.
+
+---
+
 ## Handoff
 
-After all 5 steps complete successfully:
+After all steps complete successfully:
 
 > "Plan gated and ready. Invoke executing-plans with `plans/<slug>/<slug>-plan.md` to begin."
 
@@ -177,7 +198,8 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 - `test-strategy` agent (subagent_type: test-strategy) — Step 2
 - `test-builder` agent (subagent_type: test-builder) — Step 3 (skipped if tdd: false)
 - `jira-workflow-manager` agent (subagent_type: jira-workflow-manager) — Step 4 (skipped if jira.enabled: false)
-- `plan-management` skill — Step 5
+- `plan-management` skill — Step 5 (TODO.md registration)
+- `plan-management:divergence` skill — Step 6 (gate-complete record; fires once at end of successful path)
 
 **Followed by:**
 - `executing-plans` skill
@@ -193,3 +215,5 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 7. `workflow.architect-review: false` skips BOTH reviewers — adherence-audit is not run independently when architect review is disabled.
 8. Do not re-run adherence-audit on every architect revision — only re-run when the revision touches components that overlap with the audit's prior findings.
 9. Both reviewers must return before severity merge runs — do not proceed on partial results if one completes significantly before the other.
+10. Step 6 (`:divergence` call) fires exactly once at the end of the successful path — never per-stage. Mid-gate failures leave the plan doc in its pre-gate state; re-running plan-gate is idempotent.
+11. The `plan-section` value for the Step 6 `:divergence` call is always `Phase -1 Gate` — this is the gate-checkbox block at the top of the plan doc.
