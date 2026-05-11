@@ -1,5 +1,56 @@
 {
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__codebase-memory-mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/postToolUse/graph-tools-self-heal.mjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/userPromptSubmit/slash-command-enforcement.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/preToolUse/agent-model-pinning.mjs",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/preToolUse/subagent-prefix-prepend.mjs",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/preToolUse/graph-tools-enforcement.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "*",
@@ -8,6 +59,16 @@
             "type": "command",
             "command": "node .claude/hooks/session-start.mjs",
             "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/sessionStart/graph-tools-directive.mjs",
+            "timeout": 5
           }
         ]
       }

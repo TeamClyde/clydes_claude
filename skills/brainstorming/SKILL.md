@@ -24,13 +24,17 @@ You MUST create a task for each of these items and complete them in order:
 
 1. **Explore project context** — read project.json → read codebase-entry file if set → read plan doc if one exists → stop (see Orientation Protocol in using-superpowers)
 2. **Offer visual companion** (if topic will involve visual questions) — this is its own message, not combined with a clarifying question. See the Visual Companion section below.
-3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
-4. **Propose 2-3 approaches** — with trade-offs and your recommendation
-5. **Present design** — in sections scaled to their complexity, get user approval after each section
-6. **Write design doc** — save to `plans/<slug>/<slug>-design.md` and commit
-7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
-8. **User reviews written spec** — ask user to review the spec file before proceeding
-9. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+3. **Dispatch light-research subagent** — `subagent_type: general-purpose`, `model: haiku`; append result to Research appendix. Skip if `[skip-research]` in info dump. See Research Bookends section below.
+4. **User gate — review light research** — "Light research complete. Review before I ask questions?" Wait for user input before proceeding.
+5. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
+6. **Dispatch deep-research subagent** — `subagent_type: general-purpose`, `model: haiku`; append result to Research appendix. Skip if `[skip-research]` in info dump. See Research Bookends section below.
+7. **User gate — review deep research** — "Deep research complete. Review before I draft the design?" Wait for user input before proceeding.
+8. **Propose 2-3 approaches** — with trade-offs and your recommendation
+9. **Present design** — in sections scaled to their complexity, get user approval after each section
+10. **Write design doc** — save to `plans/<slug>/<slug>-design.md` and commit; merge Research appendix into the doc
+11. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
+12. **User reviews written spec** — ask user to review the spec file before proceeding
+13. **Transition to implementation** — invoke writing-plans skill to create implementation plan
 
 ## Process Flow
 
@@ -39,27 +43,38 @@ digraph brainstorming {
     "Orient to repo context" [shape=box];
     "Visual questions ahead?" [shape=diamond];
     "Offer Visual Companion\n(own message, no other content)" [shape=box];
+    "[skip-research] in info dump?" [shape=diamond];
+    "Dispatch light-research subagent\n(general-purpose, haiku)\nAppend to Research appendix" [shape=box];
+    "User reviews light research?\n'Light research complete.\nReview before I ask questions?'" [shape=diamond];
     "Ask clarifying questions" [shape=box];
+    "Dispatch deep-research subagent\n(general-purpose, haiku)\nAppend to Research appendix" [shape=box];
+    "User reviews deep research?\n'Deep research complete.\nReview before I draft the design?'" [shape=diamond];
     "Propose 2-3 approaches" [shape=box];
     "Present design sections" [shape=box];
     "User approves design?" [shape=diamond];
-    "Write design doc" [shape=box];
+    "Write design doc\n(merge Research appendix)" [shape=box];
     "Spec self-review\n(fix inline)" [shape=box];
     "User reviews spec?" [shape=diamond];
     "Invoke writing-plans skill" [shape=doublecircle];
 
     "Orient to repo context" -> "Visual questions ahead?";
     "Visual questions ahead?" -> "Offer Visual Companion\n(own message, no other content)" [label="yes"];
-    "Visual questions ahead?" -> "Ask clarifying questions" [label="no"];
-    "Offer Visual Companion\n(own message, no other content)" -> "Ask clarifying questions";
-    "Ask clarifying questions" -> "Propose 2-3 approaches";
+    "Visual questions ahead?" -> "[skip-research] in info dump?" [label="no"];
+    "Offer Visual Companion\n(own message, no other content)" -> "[skip-research] in info dump?";
+    "[skip-research] in info dump?" -> "Ask clarifying questions" [label="yes — skip both research stages"];
+    "[skip-research] in info dump?" -> "Dispatch light-research subagent\n(general-purpose, haiku)\nAppend to Research appendix" [label="no"];
+    "Dispatch light-research subagent\n(general-purpose, haiku)\nAppend to Research appendix" -> "User reviews light research?\n'Light research complete.\nReview before I ask questions?'";
+    "User reviews light research?\n'Light research complete.\nReview before I ask questions?'" -> "Ask clarifying questions" [label="user responds\n(may redirect questions)"];
+    "Ask clarifying questions" -> "Dispatch deep-research subagent\n(general-purpose, haiku)\nAppend to Research appendix";
+    "Dispatch deep-research subagent\n(general-purpose, haiku)\nAppend to Research appendix" -> "User reviews deep research?\n'Deep research complete.\nReview before I draft the design?'";
+    "User reviews deep research?\n'Deep research complete.\nReview before I draft the design?'" -> "Propose 2-3 approaches" [label="user responds"];
     "Propose 2-3 approaches" -> "Present design sections";
     "Present design sections" -> "User approves design?";
     "User approves design?" -> "Present design sections" [label="no, revise"];
-    "User approves design?" -> "Write design doc" [label="yes"];
-    "Write design doc" -> "Spec self-review\n(fix inline)";
+    "User approves design?" -> "Write design doc\n(merge Research appendix)" [label="yes"];
+    "Write design doc\n(merge Research appendix)" -> "Spec self-review\n(fix inline)";
     "Spec self-review\n(fix inline)" -> "User reviews spec?";
-    "User reviews spec?" -> "Write design doc" [label="changes requested"];
+    "User reviews spec?" -> "Write design doc\n(merge Research appendix)" [label="changes requested"];
     "User reviews spec?" -> "Invoke writing-plans skill" [label="approved"];
 }
 ```
@@ -106,6 +121,64 @@ digraph brainstorming {
 - Follow existing patterns. Where a file has grown unwieldy, include a targeted split in the design — do not unilaterally restructure.
 - Where existing code has problems that affect the work (e.g., a file that's grown too large, unclear boundaries, tangled responsibilities), include targeted improvements as part of the design - the way a good developer improves code they're working in.
 - Don't propose unrelated refactoring. Stay focused on what serves the current goal.
+
+## Research Bookends
+
+Two lightweight research dispatches bracket the questions stage. Both use `subagent_type: general-purpose` with `model: haiku`. No agent files are created — these are inline-prompt dispatches only. Do NOT create `agents/light-research.md` or `agents/deep-research.md`.
+
+### Skip opt-out
+
+If the user includes `[skip-research]` anywhere in their initial info dump, skip **both** research dispatches entirely and proceed directly to clarifying questions. No prompting, no confirmation — the marker is a silent power-user shortcut.
+
+### Idempotent recursion
+
+If brainstorming is invoked from a session that has already done research on this topic (e.g., a second session continuing earlier work, or a session where web research was run ad-hoc), the user may decline either dispatch by saying so. Acknowledge the opt-out and skip that stage without re-prompting. Skill respects any stated decline — do not argue or re-offer.
+
+### Step 3 — Light research dispatch
+
+After orientation (and Visual Companion offer if applicable), dispatch:
+
+```
+Agent {
+  subagent_type: "general-purpose",
+  model: "haiku",
+  prompt: "The user is brainstorming <topic>. Conduct light research aimed at adding value to the eventual plan — either by finding potential flaws in candidate approaches or by removing ambiguity from open decisions. Surface terminology, common patterns, and known pitfalls so the questions stage starts informed. Use WebSearch and WebFetch. Return a concise artifact (~300 words) with source URLs."
+}
+```
+
+Replace `<topic>` with a brief description extracted from the user's info dump.
+
+When the result returns, append it to a **Research appendix**. Before the design doc exists, hold the appendix as a titled block in your working context (e.g., `## Research Appendix\n\n### Light Research\n<result>`). It will be merged into the formal design doc at write time (Step 10). If the subagent returns nothing useful, note "Light research returned no actionable findings" in the appendix and proceed.
+
+After appending, say to the user:
+
+> "Light research complete. Review before I ask questions?"
+
+Wait for the user's response before continuing. The user may redirect which questions you ask based on what research surfaced.
+
+### Step 6 — Deep research dispatch
+
+After clarifying questions are complete, dispatch:
+
+```
+Agent {
+  subagent_type: "general-purpose",
+  model: "haiku",
+  prompt: "The user has scoped a brainstorming session on <topic> with concrete direction: <answers summary>. Conduct deeper research aimed at finding potential flaws in the chosen direction or removing remaining ambiguity from open decisions. Surface anything that would change the design. Use WebSearch and WebFetch. Return a structured artifact appended to an existing Research appendix."
+}
+```
+
+Replace `<topic>` and `<answers summary>` with the topic and a 2–3 sentence summary of the Q&A conclusions.
+
+Append the result to the Research appendix (under a `### Deep Research` heading). After appending, say to the user:
+
+> "Deep research complete. Review before I draft the design?"
+
+Wait for the user's response before proposing approaches.
+
+### Research appendix — timing and merge
+
+The design doc (`plans/<slug>/<slug>-design.md`) is written at Step 10, after both research stages have completed. Until then, the Research appendix lives as a titled block in working context. At write time, append the full appendix to the bottom of the design doc under `## Research Appendix`. If the design doc already exists from a prior session, append to (or update) the existing appendix section rather than creating a duplicate.
 
 ## After the Design
 

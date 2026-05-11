@@ -4,10 +4,16 @@
 
 ## Up Next
 
+- [ ] Orchestrator Routing v2 — mechanical enforcement of orchestrator routing decisions via Claude Code hooks + agent frontmatter pinning. Closes 8 GitHub workflow-friction issues (#14, #21, #28, #30, #31, #32, #33, #34). — [plan doc](plans/orchestrator-routing-v2/orchestrator-routing-v2-plan.md)
+  - [ ] Tier 1 — Mechanical routing core: agent discovery + Haiku frontmatter pinning, PreToolUse Agent dispatch hook, SessionStart graph-tools directive + PreToolUse Grep/Glob enforcement, architect prompt expansion (symbol verification + callers query)
+  - [ ] Tier 3 — Focused fixes: UserPromptSubmit slash-command directive, brainstorming two-stage research bookends, project-name PostToolUse self-heal + root-cause fix, plan-gate parallel dispatch with soft-gate adherence-audit, [gate-complete] tag + plan-gate end-of-success :divergence
+  - [ ] Tier 2 — Sub-plan spawn: subagent-driven-development frontier rewrite (B1 tier-aware dispatch, B2 re-anchoring, B3 cache-stable prompt prefix, B4 executable-verification preference) — runs in sub-plan after parent Task 10
+
 ## Backlog
 
 - Mobile app workflow observations — real-world testing of memory capture, skill triggering, and CSO effectiveness in a new repo. Mobile app repo on separate machine will be used to observe whether memory is actually being written/read, which skills auto-trigger vs. get skipped, and what friction surfaces. Signal feeds back into memory system and CSO improvements. [scope]
 - feature-dev plugin agent review — revisit feature-dev@claude-plugins-official agents (code-explorer, code-architect, code-reviewer) as potential upgrades to existing custom agents. Plugin was uninstalled 2026-04-20 due to its /feature-dev command bypassing the Jira/git/plan-doc workflow entirely, but the three agents themselves are well-designed and may offer patterns worth absorbing into architect, requesting-code-review, and the writing-plans exploration phase. [scope]
+- Progressive-disclosure split for the three plan-related skills — `skills/adherence-audit/SKILL.md` (216 lines), `skills/plan-gate/SKILL.md` (219 lines), `skills/plan-management/SKILL.md` (386 lines). Pulser flags at 200; Anthropic's official threshold is 500, so no real violation today. Pattern: extract deep-dive sections (mode workflows, severity merge prompt + soft-gate template, output format example) into `references/<topic>.md` files keeping SKILL.md as a navigational overview. One level deep, no cross-linking between references, no duplication between SKILL.md and references. Address when next substantive change touches one of them OR proactively as a workflow-hygiene pass. Deferred 2026-05-09 from orchestrator-routing-v2 epic. [debt]
 
 ## History
 

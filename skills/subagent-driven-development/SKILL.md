@@ -108,9 +108,13 @@ Use the least powerful model that can handle each role to conserve cost and incr
 
 | Complexity | Examples | Model |
 |---|---|---|
-| Trivial (Haiku-eligible) | doc edit, jira transition, test-runner output parsing, single-file rename, config tweak | claude-haiku-4-5-20251001 |
-| Standard | feature implementation, multi-file change, debugging | claude-sonnet-4-6 |
-| Complex | architecture decisions, cross-cutting refactor, design judgment | claude-opus-4-7 |
+| S (Trivial — Haiku-eligible) | doc edit, jira transition, test-runner output parsing, single-file rename, config tweak | claude-haiku-4-5-20251001 |
+| M (Standard) | feature implementation, multi-file change, debugging | claude-sonnet-4-6 |
+| L (Complex) | architecture decisions, cross-cutting refactor, design judgment | claude-opus-4-7 |
+
+**Source of complexity:** The plan doc's Task Reference table includes a Complexity column with values S / M / L. The orchestrator reads this column at dispatch time and picks the model accordingly (S → Haiku, M → Sonnet, L → Opus). If the plan predates this convention and the column is absent, default to M (Sonnet) and log the fallback.
+
+**Frontmatter pinning wins.** Some agents are pinned to a specific tier in their frontmatter (e.g., `researcher` and `test-runner` pin to Haiku). The PreToolUse `agent-model-pinning.mjs` hook (Tier 1, A1) overrides the orchestrator's `model:` choice with the pinned value when present. The plan-time tier becomes a soft default in those cases — A1's hook is the source of truth.
 
 **Per-dispatch requirement:** Each implementer dispatch must explicitly set the `model:` parameter on the Task tool AND echo the choice as `**Model:** <name> — <rationale>` in the prompt body (see `./implementer-prompt.md`). Parent-context model selection must not silently propagate — every task gets a deliberate, visible choice.
 
@@ -218,11 +222,47 @@ Skipping step 2 leaves TODO.md In Progress entries stuck forever — the executo
 
 ---
 
-## Prompt Templates
+## Prompt Templates and Auto-Prepended Prefixes
 
-- `./implementer-prompt.md` - Dispatch implementer subagent
-- `./spec-reviewer-prompt.md` - Dispatch spec compliance reviewer subagent
-- `./code-quality-reviewer-prompt.md` - Dispatch code quality reviewer subagent
+Each role has two artifacts:
+
+| Role | Prefix file (auto-prepended) | Variable-suffix template |
+|---|---|---|
+| Implementer | `./prefixes/implementer.md` | `./implementer-prompt.md` |
+| Spec reviewer | `./prefixes/spec-reviewer.md` | `./spec-reviewer-prompt.md` |
+| Code quality reviewer | `./prefixes/code-quality-reviewer.md` | `./code-quality-reviewer-prompt.md` |
+
+The `.claude/hooks/preToolUse/subagent-prefix-prepend.mjs` hook detects a `[role: <name>]` marker on the first non-empty line of the prompt parameter, reads the matching prefix file byte-for-byte, and prepends it (with a `---` separator) before the dispatch lands.
+
+**Why:** byte-identical prefix bytes across same-role dispatches yield automatic prompt-cache hits (cache-read = 0.1× input cost). Mid-session edits to a prefix file change its bytes; the next dispatch caches a new prefix. Visible — each prefix file carries a `version:` field in frontmatter; the hook logs `(role, prefix_version, suffix_first_60_chars)` per dispatch to `.claude/logs/subagent-prefix.jsonl` so cache invalidation is auditable.
+
+**Authoring discipline:** when constructing a dispatch prompt, write only the variable suffix following the role's prompt-template file. The first non-empty line must be the marker. The hook does the rest. Do NOT paste the methodological prefix manually — that would defeat the point of the hook (orchestrator drift was the original failure mode).
+
+**Rollback:** `CLAUDE_DISABLE_WORKFLOW_HOOKS=1` disables the hook (along with all other workflow hooks).
+
+## Plan Anchor (re-anchoring block)
+
+Counters orchestrator and implementer drift across long sessions. The orchestrator authors a small (~60–80 token) anchor block and prepends it to the variable suffix of every implementer dispatch. Reviewers don't get one — they're short-lived and narrow-scoped.
+
+**Block format:**
+
+```
+## Plan Anchor
+Plan goal: <one sentence from plan doc Context section>
+This task's contribution: <one sentence on why this task exists>
+Recent completed tasks (last 3–5): <task IDs + one-line names, no summaries>
+```
+
+**Position:** First block of the variable suffix, immediately after the `[role: implementer]` marker line, before the `Task N:` line. The implementer reads "what's the goal" before "what's the task," matching how a human briefs a colleague.
+
+**Author:** Orchestrator (this skill / this context). Re-read the plan doc's Context section before each implementer dispatch — the re-read is itself part of B2 and counters orchestrator-level drift.
+
+**Sizing rule (anti-bloat):**
+- Recent completed tasks list: cap at the last 3–5 tasks; digest format only (IDs + one-line names, never per-task summaries).
+- Older completed tasks decay in salience and don't earn a slot.
+- Total anchor token budget: ~60 tokens typical, ~80–100 even on plans with 20+ completed tasks.
+
+**Scope:** Implementer dispatches only. Spec-reviewer and code-quality-reviewer dispatches do NOT get an anchor.
 
 ## Example Workflow
 
