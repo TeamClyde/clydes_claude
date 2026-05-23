@@ -302,7 +302,7 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 
 plan-gate will run architect review (design soundness, self-containment), generate your testing contract, pause for your review and approval of the test strategy, then write failing tests, create Jira tickets, and register the plan in TODO.md — then hand off to executing-plans.
 
-**Sub-plan exception:** when this skill is invoked for a Form A sub-plan (separate `plans/<parent>/<child>/` subdirectory), do NOT invoke plan-gate. Sub-plans are tasks of the parent plan — they do not get independent TODO.md entries, separate test-strategy runs, or independent architect review. After scaffolding `<child>-design.md` and `<child>-plan.md`, return control to the orchestrator. The parent plan's existing plan-gate run already covered governance.
+**Sub-plan handling:** when this skill is invoked for a Form A sub-plan (separate `plans/<parent>/<child>/` subdirectory), still invoke plan-gate — it will detect the sub-plan path and run in **sub-plan mode**: architect review + adherence-audit run as normal, but Jira ticket creation, TODO.md registration, test-strategy, and test-builder are skipped (the parent plan's run already covered those). If the sub-plan is a trivial refinement and even adherence-audit is overkill, invoke plan-gate with `mode: minimal` to skip everything except architect. See `skills/plan-gate/skill.md` § Sub-Plan Mode.
 
 The Phase -1 Gate checkbox for "Architect review passed" is filled in by plan-gate after architect review completes.
 

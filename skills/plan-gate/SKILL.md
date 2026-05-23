@@ -12,9 +12,30 @@ Bridge between planning and execution. Automatically invoked at the end of writi
 
 **Trigger:** Automatically invoked after writing-plans saves a plan doc. Can also be invoked manually.
 
-**Input:** Path to a completed plan doc at `plans/<slug>/<slug>-plan.md`.
+**Input:** Path to a completed plan doc at `plans/<slug>/<slug>-plan.md` or `plans/<parent>/<child>/<child>-plan.md`. Optional `mode: minimal` argument for sub-plan invocations that want only architect review.
 
 **Announce at start:** "I'm using the plan-gate skill to gate this plan before execution."
+
+## Sub-Plan Mode
+
+**Detection.** If the plan doc path has 3+ segments under `plans/` (i.e. matches `plans/<parent>/<child>/<child>-plan.md`), this is a Form A sub-plan — enter sub-plan mode. Top-level plans (`plans/<slug>/<slug>-plan.md`, 2 segments under `plans/`) run in full mode.
+
+**Default (sub-plan, full):** the parent plan owns Jira tickets, TODO.md registration, and the testing contract — those are inherited. The sub-plan brings its own structural decisions (file paths, function signatures, task decomposition) that the parent's architect run never saw, so architect + adherence-audit must still run.
+
+| Step | Top-level | Sub-plan (default) | Sub-plan (`mode: minimal`) |
+|------|-----------|--------------------|----------------------------|
+| 1 — Architect | Run | Run | Run |
+| 1 — Adherence-audit | Run | Run | **Skip** |
+| 2 — Test strategy | Run | **Skip** (parent's section applies) | **Skip** |
+| Checkpoint | Run | **Skip** (no test strategy to approve) | **Skip** |
+| 3 — Test builder | Run | **Skip** (parent owns TDD baseline) | **Skip** |
+| 4 — Jira creation | Run | **Skip** (sub-plan inherits parent epic) | **Skip** |
+| 5 — TODO.md registration | Run | **Skip** (parent has the row) | **Skip** |
+| 6 — Divergence record | Run | Run (tag `[sub-plan-gate-complete]`, writes to **top-level** journal) | Run (same) |
+
+**Minimal mode.** Pass `mode: minimal` for trivial sub-plan refinements (e.g., a small structural correction that doesn't merit a full audit). Only architect runs. The Step 6 divergence record notes `mode: minimal` in the summary so the trail is preserved.
+
+**Project flags still apply.** `workflow.architect-review: false` skips Step 1 entirely even in sub-plan mode (rare — surfaces to user via the divergence record).
 
 ## Project Config Check
 
@@ -43,6 +64,8 @@ Apply these overrides:
 ### Step 1 — Architect Review + Adherence Audit (parallel)
 
 **If `workflow.architect-review: false`:** skip this entire step (both reviewers) and proceed directly to Step 2.
+
+**If sub-plan + `mode: minimal`:** skip adherence-audit; dispatch only architect.
 
 Dispatch both reviewers simultaneously and wait for both to complete before proceeding:
 
@@ -92,6 +115,8 @@ Wait for explicit user response. If the user replies 'proceed', continue to Step
 
 ### Step 2 — Test Strategy
 
+**Sub-plan mode (default or minimal):** skip — the parent plan's testing section applies to sub-plan tasks. Proceed directly to Step 3 (which will also skip in sub-plan mode).
+
 Dispatch the `test-strategy` agent with the plan doc path.
 
 The agent appends a `## Testing Plan` section to the plan doc. No output is needed back to the main context — the agent writes directly to the plan doc.
@@ -99,6 +124,8 @@ The agent appends a `## Testing Plan` section to the plan doc. No output is need
 ---
 
 ### Checkpoint — Human Approval Required
+
+**Sub-plan mode (default or minimal):** skip — there is no new test strategy to approve.
 
 After Step 2 completes, surface the Testing Plan to the user:
 
@@ -112,6 +139,8 @@ After Step 2 completes, surface the Testing Plan to the user:
 
 **TDD-disabled check:** if `project.json` has `workflow.tdd: false`, skip this step entirely and proceed directly to Step 4. No warning, no error.
 
+**Sub-plan mode (default or minimal):** skip — the parent plan owns the TDD baseline. Proceed directly to Step 4 (which will also skip in sub-plan mode).
+
 Otherwise: dispatch the `test-builder` agent with the plan doc path.
 
 The agent reads the `## Testing Plan` section and writes failing tests to disk. Tests exist on disk before any implementation begins.
@@ -124,6 +153,8 @@ Proceed to Step 4 when the agent completes.
 
 **Jira-disabled check:** if `project.json` has `jira.enabled: false` (or the file is absent), skip this step entirely and proceed directly to Step 5. No warning, no error. The Task Reference table's "Jira Key" column remains blank.
 
+**Sub-plan mode (default or minimal):** skip — sub-plan tasks live under the parent epic's Jira ticket(s). Proceed directly to Step 5 (which will also skip in sub-plan mode).
+
 Otherwise: invoke the `jira-workflow-manager` agent to create the Epic and Tasks from the Task Reference table in the plan doc.
 
 Pass the agent:
@@ -135,6 +166,8 @@ The agent assigns Jira keys and writes them back into the Task Reference table r
 ---
 
 ### Step 5 — TODO.md Registration
+
+**Sub-plan mode (default or minimal):** skip — the parent plan already has its TODO.md row; the sub-plan is tracked within the parent's Task Reference. Proceed directly to Step 6.
 
 Invoke the `plan-management` skill:
 - `plan-doc`: `plans/<slug>/<slug>-plan.md`
@@ -156,6 +189,10 @@ Skill {
 
 Fill in the actual round numbers from Step 1. If architect review was skipped (`workflow.architect-review: false`), write `architect skipped` in place of `architect APPROVED (round N)`. If TDD was skipped (`workflow.tdd: false`), write `test-builder skipped`.
 
+**Sub-plan mode (default):** tag `[sub-plan-gate-complete]`; summary `'Sub-plan-gate complete: architect APPROVED (round N), adherence-audit APPROVED (round N)'`; pass the **top-level** plan doc path as `plan-doc` so the divergence entry lands in the top-level journal (sub-plans don't have their own journals — see `rules/plan-docs.md`).
+
+**Sub-plan mode (`mode: minimal`):** tag `[sub-plan-gate-complete]`; summary `'Sub-plan-gate complete (minimal mode): architect APPROVED (round N), adherence-audit skipped'`; otherwise identical.
+
 **Placement rationale:** This call fires after Step 5 (TODO.md registration) so it represents the true end of plan-gate's work. The gate checkboxes and journal entry are only written once everything else has succeeded.
 
 **Failure mode — mid-gate failure:** If plan-gate fails before reaching Step 6 (e.g., adherence-audit returns BLOCKING and the user does not issue 'proceed', or architect BLOCKING persists after 3 rounds), the `:divergence` call is not invoked. The plan doc gate-checkbox section and journal remain in their pre-gate state. Resuming or re-running plan-gate from the beginning is fully idempotent — when it eventually succeeds it fires `:divergence` once with the final stage outcomes.
@@ -169,6 +206,8 @@ Fill in the actual round numbers from Step 1. If architect review was skipped (`
 After all steps complete successfully:
 
 > "Plan gated and ready. Invoke executing-plans with `plans/<slug>/<slug>-plan.md` to begin."
+
+**Sub-plan mode:** return control to the orchestrator without the executing-plans handoff — the parent plan's execution is already in flight, and the sub-plan's tasks fold back into the parent's Task Reference. Surface the architect verdict (and adherence-audit, when run) before returning.
 
 ---
 
@@ -217,3 +256,5 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 9. Both reviewers must return before severity merge runs — do not proceed on partial results if one completes significantly before the other.
 10. Step 6 (`:divergence` call) fires exactly once at the end of the successful path — never per-stage. Mid-gate failures leave the plan doc in its pre-gate state; re-running plan-gate is idempotent.
 11. The `plan-section` value for the Step 6 `:divergence` call is always `Phase -1 Gate` — this is the gate-checkbox block at the top of the plan doc.
+12. Sub-plan mode is detected by path shape (3+ segments under `plans/`), not by an explicit flag. The optional `mode: minimal` argument only modifies the sub-plan defaults — it does not change top-level plans.
+13. In sub-plan mode, the Step 6 `:divergence` call always passes the **top-level** plan doc path (not the sub-plan's) so the entry lands in the top-level journal. Sub-plans have no journal of their own.

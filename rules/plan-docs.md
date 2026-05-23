@@ -27,6 +27,8 @@ Sub-plans follow the two-form distinction from `rules/planning.md`:
 
 Never a journal or handoff — all journal-worthy and handoff-worthy content rolls up to the **top-level** journal/handoff. This rule applies at arbitrary depth: sub-sub-plans also get only design + plan.
 
+Form A sub-plans pass through `plan-gate` in **sub-plan mode**: architect + adherence-audit run as normal, but test-strategy, test-builder, Jira ticket creation, and TODO.md registration are skipped (the parent plan owns those). For trivial refinements, invoke plan-gate with `mode: minimal` to skip adherence-audit as well — architect-only. See `skills/plan-gate/skill.md` § Sub-Plan Mode.
+
 ### Form B — Small addition: appended section in parent plan
 
 Append new rows to the parent's Task Reference table. No new files. `plan-management:spawn-subplan` is not invoked. The parent journal and handoff continue to serve.

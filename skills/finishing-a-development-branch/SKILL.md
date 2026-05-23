@@ -89,20 +89,16 @@ Then: Cleanup worktree (Step 5)
 
 #### Option 2: Push and Create PR
 
-```bash
-# Push branch
-git push -u origin <feature-branch>
+Delegate to the `git-manager` skill's `finish` workflow — it handles push + PR creation with multi-backend dispatch (GitHub / Bitbucket / manual fallback) and the preflight check for backend tooling:
 
-# Create PR
-gh pr create --title "<title>" --body "$(cat <<'EOF'
-## Summary
-<2-3 bullets of what changed>
-
-## Test Plan
-- [ ] <verification steps>
-EOF
-)"
 ```
+Skill {
+  skill: "git-manager",
+  args: "finish jira-key: PROJ-N pr-body: '<override body if needed>'"
+}
+```
+
+Do **not** call `gh pr create` directly from this skill — that bypasses `git-manager`'s backend detection, breaks the abstraction, and skips the WIP/unrelated-change checks in the `publish` workflow.
 
 Then: Cleanup worktree (Step 5)
 
