@@ -101,7 +101,7 @@ If a scenario from the Testing section cannot be implemented as a runnable test 
 
 ## Output
 
-Write test files directly to disk. Stage them (add to git index).
+Write test files directly to disk. **Do not stage them** — all git operations belong to `git-manager`. The orchestrator's subsequent commit flow runs `git-manager` against the files this agent wrote; staging here would bypass `git-manager`'s pre-staged-invariant check (Step 2.5) and produce a phantom set of staged files outside the caller's `files:` parameter.
 
 Return a **status summary only** to the main context. The test code itself does not go back to the main context.
 

@@ -29,6 +29,23 @@ Never a journal or handoff — all journal-worthy and handoff-worthy content rol
 
 Form A sub-plans pass through `plan-gate` in **sub-plan mode**: architect + adherence-audit run as normal, but test-strategy, test-builder, Jira ticket creation, and TODO.md registration are skipped (the parent plan owns those). For trivial refinements, invoke plan-gate with `mode: minimal` to skip adherence-audit as well — architect-only. See `skills/plan-gate/skill.md` § Sub-Plan Mode.
 
+### Plan-type frontmatter
+
+Plans declare their type via frontmatter at the top of `<slug>-plan.md`:
+
+```yaml
+---
+plan-type: standard
+---
+```
+
+| Value | Plan-gate effect |
+|-------|------------------|
+| `standard` (default) | Full sequence runs |
+| `test-suite-addition` (alias `tests-only`) | Step 3 (test-builder) skips — the plan's deliverable IS the test suite, so writing failing tests against it is circular. All other steps run. Skip recorded with `[test-only-plan]` journal tag. |
+
+The declaration belongs to the plan author — path-heuristic detection was rejected because ecosystem-specific test conventions (Go's sibling `*_test.go`, Rust's mixed `tests/`/`#[cfg(test)]`, mixed-scope plans) make it unreliable. See `skills/writing-plans/skill.md` § Plan Frontmatter.
+
 ### Form B — Small addition: appended section in parent plan
 
 Append new rows to the parent's Task Reference table. No new files. `plan-management:spawn-subplan` is not invoked. The parent journal and handoff continue to serve.

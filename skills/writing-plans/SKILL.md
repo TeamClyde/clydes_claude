@@ -53,6 +53,7 @@ Replace `YYYY-MM-DD` with today's date.
 **Status:** In Progress
 **Active task:** Task 1 — [task name]
 **Branch:** [branch name]
+**Branched from:** [base branch name, e.g. `main` or `feature/gen2`] *(human-readable; the authoritative value lives in `.claude/worktrees/<wt-name>/base-branch` and is what `finishing-a-development-branch` reads)*
 **Last updated:** YYYY-MM-DD
 
 ---
@@ -161,11 +162,26 @@ Circular reasoning past agent answers is a plan quality failure — it produces 
 - "Run the tests and make sure they pass" - step
 - "Commit" - step
 
+## Plan Frontmatter
+
+Every plan begins with a frontmatter block between `---` markers. Plan-gate and other workflow components read these fields to alter gate behavior.
+
+| Field | Values | Effect |
+|-------|--------|--------|
+| `plan-type` | `standard` (default) | Full plan-gate sequence — architect, adherence-audit, test-strategy, test-builder, Jira, TODO.md |
+| `plan-type` | `test-suite-addition` (or `tests-only`) | plan-gate Step 3 (test-builder) **skips** — the plan's deliverable IS the test suite, so writing failing tests against it would be circular. All other steps run normally. A `[test-only-plan]` journal entry records the skip. |
+
+Set `plan-type: test-suite-addition` when the plan creates or expands a test suite as the primary deliverable (e.g., adding 25 new Patrol UI tests for a new device type, building out integration coverage for an existing module). When unsure, leave it as `standard` — the worst case is test-builder runs and produces a stub baseline you don't use; the worst case for an incorrectly-set `test-suite-addition` is that needed TDD baseline tests are silently skipped.
+
 ## Plan Document Header
 
 **Every plan MUST start with this header (including the constitutional gate preamble):**
 
 ```markdown
+---
+plan-type: standard
+---
+
 # [Feature Name] Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Do NOT use the `superpowers:` prefix — invoke the local forked versions which have git-manager and plan-gate integration.

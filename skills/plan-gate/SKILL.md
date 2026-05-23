@@ -141,6 +141,10 @@ After Step 2 completes, surface the Testing Plan to the user:
 
 **Sub-plan mode (default or minimal):** skip — the parent plan owns the TDD baseline. Proceed directly to Step 4 (which will also skip in sub-plan mode).
 
+**Test-only-plan check:** read the plan doc's frontmatter (lines between the opening and closing `---` at the top of `<slug>-plan.md`). If `plan-type: test-suite-addition` (or `tests-only`) is present, skip this step — the plan's deliverable IS the test suite, so writing failing tests against it is circular. Record a journal entry tagged `[test-only-plan]` via `plan-management:divergence` with summary "Plan-gate Step 3 skipped: plan-type declares tests-as-deliverable; no failing tests to write."
+
+Why a frontmatter flag rather than path-heuristic detection: ecosystem-specific test conventions (Go's sibling `*_test.go`, Rust's mixed `tests/` + `#[cfg(test)]`, mixed-scope plans that touch a single helper file alongside tests) make path-parsing unreliable. The plan author already knows whether the deliverable IS the test suite; trust the declaration.
+
 Otherwise: dispatch the `test-builder` agent with the plan doc path.
 
 The agent reads the `## Testing Plan` section and writes failing tests to disk. Tests exist on disk before any implementation begins.

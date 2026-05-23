@@ -41,11 +41,25 @@ Stop. Don't proceed to Step 2.
 ### Step 2: Determine Base Branch
 
 ```bash
-# Try common base branches
-git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null
+# Prefer the per-worktree sidecar written by using-git-worktrees at creation time.
+# This restores the actual branch the user was on, not a heuristic guess.
+wt_name=$(basename "$(git rev-parse --show-toplevel)")
+sidecar=".claude/worktrees/$wt_name/base-branch"
+
+if [ -f "$sidecar" ]; then
+  base_ref=$(cat "$sidecar")
+  # Values prefixed with `sha:` mean the worktree was created from detached HEAD.
+  # Cleanup will use `git checkout <sha>` (lands back in detached HEAD — expected).
+else
+  # Fallback: no sidecar (legacy worktree, or worktree created outside this flow).
+  base_ref=$(git merge-base HEAD main 2>/dev/null \
+          || git merge-base HEAD master 2>/dev/null)
+fi
 ```
 
-Or ask: "This branch split from main - is that correct?"
+If neither path produces a value, ask: "This branch split from main - is that correct?"
+
+For all subsequent steps in this workflow, `<base-branch>` resolves to `$base_ref` (strip the `sha:` prefix when present, and use `git checkout <sha>` instead of `git checkout <branch>`).
 
 ### Step 3: Present Options
 
@@ -141,10 +155,16 @@ git worktree list | grep $(git branch --show-current)
 
 If yes:
 ```bash
+wt_name=$(basename "$(git rev-parse --show-toplevel)")
 git worktree remove <worktree-path>
+
+# Remove the per-worktree base-branch sidecar created by using-git-worktrees.
+# Safe to attempt unconditionally — `rm -f` is a no-op if the file is absent
+# (e.g., legacy worktrees that predate the sidecar).
+rm -rf ".claude/worktrees/$wt_name"
 ```
 
-**For Option 3:** Keep worktree.
+**For Option 3:** Keep worktree (and its sidecar).
 
 ## Quick Reference
 
