@@ -201,6 +201,8 @@ Every journal entry appended by `divergence` must include at least one tag from 
 | `[subplan-spawn]` | A sub-plan was spawned (written automatically by `spawn-subplan` mode) |
 | `[subplan-close]` | A sub-plan was closed (written automatically by `close-subplan` mode) |
 | `[gate-complete]` | Used by plan-gate at successful gate completion to record stage outcomes (architect APPROVED, test-strategy appended, test-builder ran). plan-gate invokes `:divergence` once at end of its successful path with this tag. |
+| `[adr-candidate]` | A rationale-worthy moment during execution that may warrant promotion to a formal ADR at sub-plan close. Captured at brainstorming Step 10 (design doc) or mid-execution via `:divergence`. Scanned by `close-subplan` (both paths) to prompt ADR promotion. |
+| `[adr-declined]` | Written automatically by `close-subplan` when the user declines an ADR promotion for an `[adr-candidate]` entry. Preserves the trail of considered-and-skipped decisions. Do not write this tag manually — it's set by the ADR Promotion Scan step. |
 
 Multiple tags may apply. Example: a flaky test discovered mid-execution is `[bug] [test-debt]`.
 
@@ -315,6 +317,16 @@ Use the canonical algorithm — do not duplicate or restate the walk-up logic he
     - Bump `Last Updated:` to today's date.
 11. **Idempotency check — active-plan marker:** Read `.claude/active-plan`. If it already points at the parent plan, skip.
 12. If not reverted: write `.claude/active-plan` with the parent plan path.
+13. **ADR Promotion Scan.** Read `<top>-journal.md` from the start of this sub-plan's spawn entry to the just-written closeout entry. Scan for entries tagged `[adr-candidate]` that are not already tagged `[adr-declined]` and do not have a corresponding ADR file in `docs/explanation/adr/`. For each such entry:
+    - Show the journal entry summary to the user.
+    - Ask: "Promote to formal ADR? (yes/no/defer)"
+    - If **yes:** invoke the `architecture-decision-records` skill with the journal entry summary + tags + context as input → drafts `docs/explanation/adr/NNNN-<title>.md` with next-available ADR number (scan `docs/explanation/adr/` for the highest `NNNN-*.md` and increment).
+    - If **defer:** leave the entry as-is (user can run `/docs-refresh adr` later).
+    - If **no:** append the `[adr-declined]` tag to the existing journal line (preserves the trail of considered-and-skipped decisions).
+
+    If no `[adr-candidate]` entries are found for this sub-plan, skip this step silently.
+
+    **Idempotent:** re-running `close-subplan` after partial ADR promotion (user accepted some, deferred others) only re-prompts on the deferred entries — accepted ones already have ADR files; declined ones are tagged `[adr-declined]`; both are filtered out on re-scan.
 
 #### Terminal-State Path (Top-Level Plan Completion)
 
@@ -339,7 +351,16 @@ Triggered when `close-subplan` is invoked on the top-level plan (no parent `*-pl
 6. If not terminal: update `<top>-handoff.md` — set status line to "All tasks complete; awaiting closeout" and bump `Last Updated:`.
 7. **Idempotency check — active-plan marker:** Check whether `.claude/active-plan` still exists.
 8. If it exists: **delete** `.claude/active-plan` (do not empty — delete the file). Subsequent SessionStart hooks see no active-plan and exit silently.
-9. Report to the caller: plan tree is complete, active-plan marker cleared, `finishing-a-development-branch` flow should now be invoked.
+9. **ADR Promotion Scan.** Read the full `<top>-journal.md` from plan start to this final completion entry. Scan for entries tagged `[adr-candidate]` that are not already tagged `[adr-declined]` and do not have a corresponding ADR file in `docs/explanation/adr/`. For each such entry:
+    - Show the journal entry summary to the user.
+    - Ask: "Promote to formal ADR? (yes/no/defer)"
+    - If **yes:** invoke the `architecture-decision-records` skill → drafts `docs/explanation/adr/NNNN-<title>.md` with next-available ADR number.
+    - If **defer:** leave the entry as-is (user can run `/docs-refresh adr` later).
+    - If **no:** append the `[adr-declined]` tag to the existing journal line.
+
+    If no `[adr-candidate]` entries remain unprocessed, skip silently. Same idempotency guarantee as the Sub-Plan Close Path scan above.
+
+10. Report to the caller: plan tree is complete, active-plan marker cleared, `finishing-a-development-branch` flow should now be invoked. If any ADR drafts were created in Step 9, list their paths in the report.
 
 ---
 
