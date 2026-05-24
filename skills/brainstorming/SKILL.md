@@ -31,10 +31,14 @@ You MUST create a task for each of these items and complete them in order:
 7. **User gate — review deep research** — "Deep research complete. Review before I draft the design?" Wait for user input before proceeding.
 8. **Propose 2-3 approaches** — with trade-offs and your recommendation
 9. **Present design** — in sections scaled to their complexity, get user approval after each section
-10. **Write design doc** — save to `plans/<slug>/<slug>-design.md` and commit; merge Research appendix into the doc
-11. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
-12. **User reviews written spec** — ask user to review the spec file before proceeding
-13. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+10. **Ask the ADR-candidate question** — Before writing the design doc, ask the user: "Is this an ADR candidate? (yes/no — captured in plan journal for promotion at sub-plan close)"
+    - If yes: when writing the design doc in Step 11, include `[adr-candidate]` in the design doc's frontmatter or in a clearly-marked section so `writing-plans` can propagate the tag to the journal's initial entry.
+    - If no: continue normally; no tag added.
+    - The user's answer is one sentence — if they're unsure, default to "yes" (low cost; trivially declined later at plan-close).
+11. **Write design doc** — save to `plans/<slug>/<slug>-design.md` and commit; merge Research appendix into the doc
+12. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
+13. **User reviews written spec** — ask user to review the spec file before proceeding
+14. **Transition to implementation** — invoke writing-plans skill to create implementation plan
 
 ## Process Flow
 
@@ -148,7 +152,7 @@ Agent {
 
 Replace `<topic>` with a brief description extracted from the user's info dump.
 
-When the result returns, append it to a **Research appendix**. Before the design doc exists, hold the appendix as a titled block in your working context (e.g., `## Research Appendix\n\n### Light Research\n<result>`). It will be merged into the formal design doc at write time (Step 10). If the subagent returns nothing useful, note "Light research returned no actionable findings" in the appendix and proceed.
+When the result returns, append it to a **Research appendix**. Before the design doc exists, hold the appendix as a titled block in your working context (e.g., `## Research Appendix\n\n### Light Research\n<result>`). It will be merged into the formal design doc at write time (Step 11). If the subagent returns nothing useful, note "Light research returned no actionable findings" in the appendix and proceed.
 
 After appending, say to the user:
 
@@ -178,7 +182,7 @@ Wait for the user's response before proposing approaches.
 
 ### Research appendix — timing and merge
 
-The design doc (`plans/<slug>/<slug>-design.md`) is written at Step 10, after both research stages have completed. Until then, the Research appendix lives as a titled block in working context. At write time, append the full appendix to the bottom of the design doc under `## Research Appendix`. If the design doc already exists from a prior session, append to (or update) the existing appendix section rather than creating a duplicate.
+The design doc (`plans/<slug>/<slug>-design.md`) is written at Step 11, after both research stages have completed and the ADR-candidate question (Step 10) is answered. Until then, the Research appendix lives as a titled block in working context. At write time, append the full appendix to the bottom of the design doc under `## Research Appendix`. If the design doc already exists from a prior session, append to (or update) the existing appendix section rather than creating a duplicate.
 
 ## After the Design
 
