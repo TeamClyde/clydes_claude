@@ -47,6 +47,17 @@ git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null
 
 Or ask: "This branch split from main - is that correct?"
 
+### Step 2.5: Optional Docs Audit
+
+Before presenting branch-finish options, offer a soft `/docs-status` suggestion:
+
+> "Want to run `/docs-status` before opening this PR? (y/n)"
+
+- If `y`: invoke `/docs-status` inline; show the tiered output (ERRORS / WARNINGS / SUGGESTIONS); pause for user. User reviews and either acts on items or proceeds to Step 3.
+- If `n` (or no response): proceed silently to Step 3.
+
+**This step never blocks.** It is single-line, declinable, no enforcement. CHANGELOG bookkeeping is time-tolerant and `/docs-status` will catch staleness on demand — no separate CHANGELOG gate is needed.
+
 ### Step 3: Present Options
 
 Present exactly these 4 options:
