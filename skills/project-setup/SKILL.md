@@ -33,6 +33,40 @@ Run selected skills one at a time. Wait for each to complete before proceeding.
 
 ---
 
+## Phase 1.5 — Doc Scaffolding
+
+Runs after Phase 1, before Phase 2. All steps are idempotent — every action skips if the target already exists.
+
+1. **Read `project.json` `domain:` field.** If missing, fall through; Phase 2 Q10 will populate. Continue with Steps 2-6 regardless.
+
+2. **Create Diátaxis quadrant directories** (skip if already exist):
+   - `docs/tutorials/`
+   - `docs/how-to/`
+   - `docs/reference/`
+   - `docs/explanation/adr/`
+
+3. **Seed `docs/manifest.md`** from `templates/manifest/<domain>.md` based on `project.json` `domain:` field.
+   - **Fallback logic:** if `templates/manifest/<domain>.md` does not exist (custom or unknown domain), seed from `templates/manifest/_default.md` instead and report to user: "No seed template found for domain '<domain>' — seeded from generic baseline. Consider creating `templates/manifest/<domain>.md` in the workflow-improvements repo to teach the system about this domain."
+   - Skip the seed entirely if `docs/manifest.md` already exists.
+
+4. **Scaffold root-level docs** (each skip if target exists):
+   - `README.md` ← `templates/README.md`
+   - `CHANGELOG.md` ← `templates/CHANGELOG.md`
+   - `cliff.toml` ← `templates/cliff.toml`, with substitution:
+     - If `project.json` has `jira.enabled: true`: use sed (or Edit tool) to replace `{{JIRA_URL_BASE}}` with `https://<jira.workspace>` derived from project.json, then remove the `# JIRA_LINK_BLOCK_START` and `# JIRA_LINK_BLOCK_END` sentinel comment lines.
+     - If `jira.enabled: false` (or missing): use sed (or Edit tool) to delete every line between `# JIRA_LINK_BLOCK_START` and `# JIRA_LINK_BLOCK_END` inclusive (the entire `commit_preprocessors` block).
+
+5. **Scaffold ADR-zero into the Diátaxis path:**
+   - `docs/explanation/adr/README.md` ← `templates/adr/README.md`
+   - `docs/explanation/adr/template.md` ← `templates/adr/template.md`
+   - `docs/explanation/adr/0000-record-architecture-decisions.md` ← `templates/adr/0000-record-architecture-decisions.md`
+
+6. **Report to user:** list each file/dir created (skipped items get an INFO note, not a warning).
+
+**Edge case:** if the workflow-repo templates dir is unreachable (broken symlink, fresh setup), fail loud with: "Templates not found at `templates/manifest/<domain>.md` or `templates/manifest/_default.md`. Ensure setup.sh has been run on this machine."
+
+---
+
 ## Phase 2 — Interactive Questionnaire
 
 Ask these questions one at a time. Record answers for Phase 3.
@@ -54,6 +88,31 @@ Ask these questions one at a time. Record answers for Phase 3.
 7. **Testing** — What command runs the test suite? (e.g. `npm test`, `pytest`, `go test ./...`) — skip if not applicable, enter `none`
 
 8. **Orientation** — Is there a CODEBASE.md or equivalent orientation file? If yes, what is its path?
+
+9. **Confluence Push Configuration (optional)** — Does the user want to push selected doc artifacts to Confluence?
+   - If yes: Confluence base URL (e.g., `https://yourorg.atlassian.net/wiki`), default parent page or space key.
+   - Write to `project.json` `confluence:` block:
+     ```json
+     "confluence": {
+       "enabled": true,
+       "base_url": "https://yourorg.atlassian.net/wiki",
+       "parent_page": "Claude Docs"
+     }
+     ```
+   - If user declines, set `confluence.enabled: false` and skip the URL/parent prompts.
+
+10. **Repo Domain** — Which domain best describes this repo? Suggest these common values (the initial seed registry):
+    - `software-eng` — backend services, APIs, CLI tools
+    - `firmware` — embedded / hardware-adjacent
+    - `mobile` — iOS / Android app
+    - `python-utility` — standalone Python scripts or utility packages
+    - `ml` — machine learning training / inference code
+
+    **Accept any free-text value** (not restricted to the list above). Write the answer to `project.json` `domain:` field. If user already has a domain set from Phase 1.5, confirm rather than re-prompt.
+
+    The domain registry is **open by design** — new domains are added by creating `templates/manifest/<new-domain>.md` files, not by code changes. If the user provides a custom domain not in the initial seed list, Phase 1.5 will fall back to `templates/manifest/_default.md` and report that fallback (see Phase 1.5 step 3 fallback logic).
+
+    **Phase 1.5 re-run clause:** if Phase 1.5 ran without a domain (manifest not yet seeded because `domain:` was missing at the time), repeat Phase 1.5 steps 2 through 6 immediately after writing Q10's answer to `project.json` — these are idempotent; re-running only seeds `docs/manifest.md` (which was the only step skipped on the prior pass). Do not re-run step 1 since the domain is now populated.
 
 ---
 
