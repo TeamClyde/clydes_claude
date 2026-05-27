@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --font-japanese: Georgia, "Hiragino Mincho ProN", "Yu Mincho", serif;
+}
+
+html, body, #root {
+  min-height: 100vh;
+  margin: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 200ms ease-out;
+}
