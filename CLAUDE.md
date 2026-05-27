@@ -76,6 +76,8 @@ Invoke `architect` before:
 - Execution begins (via `plan-gate` after `writing-plans`, or manually before `ExitPlanMode`)
 - Any task transitions to Testing or Done
 
+**Form A sub-plans require architect review identically to top-level plans.** When `writing-plans` runs for a sub-plan, plan-gate enters sub-plan mode and still runs architect (+ adherence-audit by default; architect-only with `mode: minimal`). See `skills/plan-gate/skill.md` § Sub-Plan Mode.
+
 Skip for S-sized mechanical tasks (renaming, config-only, single-line fixes). Maximum 3 review iterations — surface BLOCKING issues to user after the third pass.
 
 ## Hard Prohibitions

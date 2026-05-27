@@ -120,6 +120,20 @@ You MUST complete each phase before proceeding to the next.
    - Keep tracing up until you find the source
    - Fix at source, not at symptom
 
+   **Tool selection.** When the repo has a codebase graph (`.claude-init/CODEBASE.md` present), graph tools answer the "where does this come from / what calls this" questions in a single MCP call. Default to them; Grep/Read is the fallback for non-source content (logs, fixtures, external tool output).
+
+   | Question | First-resort tool |
+   |----------|-------------------|
+   | What calls function X? | `query_graph` (Cypher: `MATCH (x)-[:CALLS]->(f:Function {name:"X"}) RETURN x.name, x.file`) |
+   | What does file Y import? | `query_graph` (Cypher: `MATCH (f {file:"Y"})-[:IMPORTS]->(d) RETURN d`) |
+   | Where is symbol X defined? | `search_graph` or `search_code` |
+   | What is the path from A to B? | `trace_path` |
+   | Find code by name or text | `search_code` (ranked, deduplicated) |
+
+   See `rules/filesystem/efficiency.md` § "Codebase Graph Tools" for the canonical decision table. Load tools once per session via `ToolSearch("select:search_code,search_graph,query_graph,trace_path,get_architecture")`.
+
+   No graph in the repo? Grep/Read is fine — proceed normally.
+
 6. **Search Online for Library Quirks**
 
    If local code does not explain the error, web search the specific error message or
@@ -179,13 +193,16 @@ You MUST complete each phase before proceeding to the next.
 
 For each hypothesis:
 
-1. **Identify the 1–2 implementation files most likely to confirm or deny it**
-   - Read them. Mark the hypothesis: **CONFIRMED / DENIED / UNRESOLVED**
+1. **Identify the smallest set of evidence that confirms or denies it**
+   - When graph tools are loaded, prefer a graph query for "what calls this", "what does this import", "where is this defined" — one call answers what a grep would partially answer across many files. Pair the graph result with a targeted Read (`offset` + `limit`) of any specific implementation logic the graph does not capture.
+   - When no graph is loaded, read the 1–2 implementation files most likely to confirm or deny.
+   - Mark the hypothesis: **CONFIRMED / DENIED / UNRESOLVED**
    - One variable at a time — test each hypothesis independently
 
-2. **3-file escalation rule**
-   - If a hypothesis is still UNRESOLVED after reading 3 implementation files, stop reading
-   - Do not add more files hoping to find confirmation
+2. **Evidence-budget escalation rule**
+   - With graph tools loaded: budget is 3 graph queries + 1 targeted source read per hypothesis. If still UNRESOLVED after that, stop.
+   - Without graph tools: budget is 3 implementation file reads per hypothesis. If still UNRESOLVED after that, stop.
+   - Do not add more evidence hoping to find confirmation
    - Mark it UNRESOLVED and escalate: state "I cannot confirm or deny this without more
      context" before proceeding
 

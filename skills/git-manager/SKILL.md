@@ -83,6 +83,10 @@ Before first operation on any repo, run `git log --oneline -20` and `git branch 
 
 1. `git status` and `git diff` — review current state
 2. Stage specified files only: `git add <file>` for each file
+2.5. **Pre-staged invariant check.** Run `git diff --cached --name-only` and compare to the `files:` parameter. If any path appears in the staged set but not in `files:`, **refuse** with:
+   > "Pre-staged files outside the `files:` parameter detected: [list of orphan paths]. The plan-state validator and pre-commit hooks inspect the staged set — committing now would gate on a different set than the one you listed. Either: (a) re-invoke with these files included in `files:`, or (b) unstage them via `git reset HEAD <file>` and re-invoke. Never bypass by passing `[no-plan-update]` — that token applies to the staged set, which is not the set you're committing."
+
+   This check protects the invariant **staged set = about-to-be-committed set**, which both the plan-state validator (Step 5) and `hooks/pre-commit` rely on. Proceed only when the staged set is exactly the `files:` set.
 3. `git diff --staged` — verify staged content:
    - Stop if unexpected files, debug statements, secrets, or unrelated changes appear
 4. Validate commit message against the Commit Format section (Jira key per the conditional table)
@@ -123,17 +127,51 @@ Before first operation on any repo, run `git log --oneline -20` and `git branch 
 
 ---
 
-### 5. `finish` — Open PR via Bitbucket MCP
+### 4b. `smoke-commit` — Disposable commit for validation tests
+
+Use when a caller (typically a smoke-test subagent) needs to actually create a commit in order to exercise downstream behavior (pre-commit hooks, plan-state validator, push pipeline) but must not leave the commit on the branch. Eliminates the "remember to clean up" contract — the workflow itself owns the revert.
+
+**Inputs:** same `files`, `type`, `description` as `commit`. Optionally `validation`: a description (string) of what the caller will inspect between commit and revert (e.g. "verify pre-commit hook output contains 'plan-state OK'").
+
+1. Record the current HEAD: `git rev-parse HEAD` → save as `<rollback-sha>`.
+2. Run the full `commit` workflow (including Step 2.5 pre-staged invariant check, Step 5 plan-state validator, Step 6 commit). If `commit` refuses or hook rejects, surface the failure — **do not auto-revert** (there's nothing to revert).
+3. Report the new commit SHA and the `<rollback-sha>` to the caller. The caller now does its inspection.
+4. **Revert unconditionally before returning control:** `git reset --soft <rollback-sha>` followed by `git reset HEAD` to also drop the staged set. The working tree is restored to whatever the caller's listed files looked like at smoke-commit invocation (unstaged), so the caller can re-test or discard freely.
+5. Verify: `git rev-parse HEAD` must equal `<rollback-sha>`. If it doesn't (e.g., the inspection step somehow advanced HEAD), refuse to return — surface to the user with the discrepancy.
+6. Report: "Smoke commit + revert complete. HEAD restored to `<rollback-sha>`. Files unstaged."
+
+**Push prohibition.** `smoke-commit` must never push. If the caller wants the commit to persist, use the regular `commit` workflow — `smoke-commit` is for validation only and is structurally incompatible with push.
+
+**Why this exists.** Smoke tests of git-manager itself (plan-state validator path, hook integration, etc.) need real commits to exercise. Without this workflow, the cleanup contract lives in the caller's instructions; any interrupted subagent leaves a polluted branch. With this workflow, revert is part of the call.
+
+---
+
+### 5. `finish` — Open PR (multi-backend dispatch)
 
 1. Run `publish` workflow first
 2. If WIP/debug commits flagged: surface to user, suggest squash rebase (only safe pre-PR)
-3. Fetch branch diff via Bitbucket MCP; flag unrelated changes before opening PR
-4. Open PR via `@aashari/mcp-server-atlassian-bitbucket` MCP:
-   - Title: `type: subject [PROJ-N]`
-   - Target: `main`, squash merge
-   - Body: from template below (or `pr-body` override)
-5. If Bitbucket MCP unavailable: output title + description for manual submission
-6. Report PR URL on success
+3. **Detect backend:**
+   1. If `project.json` has `git.backend` set, use that value (`github` | `bitbucket` | `manual`). This wins over auto-detection — use it for enterprise hosts (`github.mycompany.com`, Bitbucket Data Center) where the URL doesn't match the public host.
+   2. Otherwise, run `git remote get-url origin` and match:
+      - `github.com/...` or `git@github.com:...` → backend `github`
+      - `bitbucket.org/...` or `git@bitbucket.org:...` → backend `bitbucket`
+      - Anything else → backend `manual`
+4. **Preflight:**
+   - `github`: verify `gh` CLI is available (`command -v gh` on POSIX, `Get-Command gh` on PowerShell). If absent → fall back to `manual` and surface: "GitHub backend detected but `gh` CLI is not installed. Install via https://cli.github.com/ and re-run, or submit the PR manually using the title and body below."
+   - `bitbucket`: verify `@aashari/mcp-server-atlassian-bitbucket` MCP is loaded. If absent → fall back to `manual` with similar message.
+   - `manual`: no preflight needed.
+5. **Diff inspection:** fetch the branch diff (via the detected backend's API, or `git diff origin/main...HEAD` for `manual`); flag unrelated changes before opening the PR.
+6. **Open PR:**
+   - **`github`:**
+     ```
+     gh pr create --base main --title "type: subject [PROJ-N]" --body "$(<from template below or pr-body override>)"
+     ```
+     Squash-merge is set repo-side via branch protection (not per-PR), so no flag needed.
+   - **`bitbucket`:** open via `@aashari/mcp-server-atlassian-bitbucket` MCP. Title and body as above. Target `main`, squash merge.
+   - **`manual`:** output the title and body to the user; they submit via the host's web UI or their own CLI.
+7. Report PR URL on success (or "manual submission required" with the rendered title/body for the `manual` path).
+
+**Backend scope.** Currently supports `github` and `bitbucket` as first-class backends. GitLab, Gitea, Azure DevOps, and self-hosted variants require explicit additions to this workflow's step 6 — there is no plugin registry. Until added, those repos use the `manual` fallback (or override via `project.json` `git.backend: manual` to make it explicit).
 
 **PR description template:**
 
@@ -196,3 +234,5 @@ This skill does not: call Jira, read source code, decide which files to commit, 
 1. Never run git commands directly with Bash — this skill is the abstraction layer; use it from within.
 2. Commit message format is `type: description [PROJ-N]` — do not omit the Jira key unless the repo has `jira.enabled: false` in project.json.
 3. Do not push to main/master directly — always push a feature branch.
+4. The `files:` parameter must match the staged set exactly — Step 2.5 refuses if pre-staged files exist outside the listed set. The validator and pre-commit hooks inspect the staged set, so a mismatch would let them gate on a phantom set. To proceed: include the orphans in `files:`, or `git reset HEAD <orphan>` first. Never use `[no-plan-update]` to bypass this — that token only applies to plan-doc staleness, not pre-stage drift.
+5. Use `smoke-commit` (workflow 4b) when a caller needs a real commit purely to exercise downstream behavior (hooks, validator). Never instruct subagents to "commit then `git reset` afterward" — that pushes the cleanup contract onto the caller and breaks if the subagent is interrupted between the two steps. `smoke-commit` owns the revert.

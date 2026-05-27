@@ -33,6 +33,25 @@ Evaluate against all five criteria. If `instructions` narrows the scope, narrowi
 4. **Foreseeable issues** — things the plan does not cover that will surface during execution.
 5. **Self-containment** — everything needed to execute is written down. No step depends on assumed context. This includes codebase claims: any plan statement about a specific symbol (function, class, route, constant) or repo-specific behavior pattern must be traceable to a cited source (a file read, graph query result, or explicit discovery note). A plan that reasons from general framework knowledge rather than verified, repo-specific evidence is not self-contained — flag it.
 
+## Tool Selection — Code Navigation
+
+When graph tools are loaded (codebase-memory-mcp present, `.claude-init/CODEBASE.md` exists in the repo), **graph tools are the first resort for every code-navigation question** — not just the Symbol Verification sweep below. Default to graph queries; fall back to Grep/Read only for content the graph does not capture.
+
+| Question | First-resort tool |
+|----------|-------------------|
+| Does symbol X exist? Where is it defined? | `search_graph` or `query_graph` |
+| What calls function X? | `query_graph` (Cypher: `MATCH (x)-[:CALLS]->(f:Function {name:"X"}) RETURN x`) |
+| What does file Y import? | `query_graph` (Cypher: `MATCH (f {file:"Y"})-[:IMPORTS]->(d) RETURN d`) |
+| What is the call path A → B? | `trace_path` |
+| What are the entry points / routes / module structure? | `get_architecture` or `search_graph` |
+| Find code by name or text | `search_code` (ranked, deduplicated) |
+
+**Grep/Read remain correct for:** log file contents, JSON/XML output from external tools (e.g. `xcrun xcresulttool`), regex testing against fixture data, reading plan doc markdown, and any non-source content the graph does not index.
+
+If a question matches the table above and you reach for Grep, you are paying 2-3x the tokens and 2-3x the wall-clock for the same answer. Use Grep deliberately for the carve-outs, not by default.
+
+When graph tools are not loaded, note "graph tools not available" and use Grep/Read.
+
 ## Symbol Verification & Callers Sweep
 
 Run this sweep **before** classifying any candidate issues and **before** writing the verdict. The sweep summary is a structural prerequisite to the verdict — emit the sweep summary first, then the verdict. A verdict emitted without a preceding sweep summary is invalid.
