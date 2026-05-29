@@ -3,7 +3,7 @@
 Canonical reference for how skills, agents, rules, hooks, and plugins connect in the
 Claude workflow. Update this file whenever a component is added, removed, or rewired.
 
-Last updated: 2026-05-07
+Last updated: 2026-05-28
 
 ---
 
@@ -118,6 +118,8 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | `e2e-init` | New repo, test backbone needed | Generates testing-plan.md, run-tests.sh, integration-test-constraints.md (static section) |
 | `project-setup` | Onboarding new repo to Claude workflow | CLAUDE.md + project.json setup wizard |
 | `adherence-audit` | Periodic / when adding new tools | Semantic consistency check across all components |
+| `doc-author` | Invoked by `plan-management:close-subplan`, `/doc-backfill`, `/docs-refresh feature\|architecture` | Wrapper around `docs-architect` agent with merge-not-replace + 2-step (backlink → synthesis) constraints. Single entry point for all `docs/explanation/architecture.md` and `features/*.md` mutations. Args: target, mode (`create`/`update`/`backlink-only`), context-source (`codegraph`/`journal`), accepted-adrs, optional plan-doc. Does not auto-commit — caller owns review + commit. |
+| `doc-backfill` | User-invoked `/doc-backfill` (no args) | Whole-repo one-shot codegraph-driven backfill. Generates `docs/explanation/architecture.md` (C1+C2) + one `features/<slug>.md` per detected C3 component via `doc-author` mode=`create`. Preflight requires `/infra-init` to have been run. C1 actors written as TODO comments (codegraph cannot detect external systems). |
 
 ### Thinking tools
 
@@ -143,6 +145,19 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | `requesting-code-review` | Implementation complete | Opens PR with structured review request |
 | `receiving-code-review` | PR review feedback received | Processes and implements reviewer feedback |
 | `using-superpowers` | Start of any conversation | Orientation: finds available skills and how to use them |
+
+**Close-subplan execution order (post feature-doc-hierarchy rework):**
+
+1. Existing close steps (idempotency, journal closeout, parent task ✅).
+2. ADR Promotion Scan — populates each ADR's `## Related` heading section with `Parent: <path>` lines from design.md's Docs Affected. Hard-blocks orphan ADRs (4-option prompt: pick existing / declare new / defer / decline).
+3. Feature-Doc Synthesis Pass — dispatches `doc-author` skill serially per Docs Affected entry. Per-doc accept/edit/decline gate via `git-manager` commit.
+4. Existing terminal-state steps (handoff refresh, active-plan clear).
+
+ADR-first → doc-author-second is the canonical order. See `rules/doc-tools.md` "Close-Subplan Doc Order" for the convention.
+
+**`/docs-status` cross-link integrity check (added):**
+
+After the existing manifest audit and Linkinator pass, three regex sweeps verify ADR ↔ feature-doc cross-links: (1) ADR `## Related` heading section + `Parent: <path>` lines resolve; (2) parent doc's `## Decisions` section contains backlink to the ADR; (3) feature-doc's `## Decisions` section links resolve. Findings merge into existing ERRORS/WARNINGS tiers.
 
 ---
 
