@@ -21,15 +21,33 @@ This skill is a thin router. Specialists handle their own internal logic.
 | `tutorial` | `tutorial-engineer` agent | `docs/tutorials/<name>.md` (prompt user for name) |
 | `how-to` | `docs-architect` agent | `docs/how-to/<name>.md` (prompt user for name) |
 | `reference` | `reference-builder` agent | `docs/reference/<name>.md` (prompt user for name) |
-| `explanation` | `docs-architect` agent | `docs/explanation/<name>.md` (prompt user for name) |
+| `explanation` | `docs-architect` agent (for free-form non-feature explanation docs only) | `docs/explanation/<name>.md` (prompt user for name; excludes `features/`, `adr/`, and `architecture.md` — see refuse rule below) |
+| `feature` | `doc-author` skill | `docs/explanation/features/<slug>.md` (slug required; lists existing features if missing); mode=update; context-source resolved per "plan-doc resolution" below |
+| `architecture` | `doc-author` skill | `docs/explanation/architecture.md` (no args); mode=update; context-source resolved per "plan-doc resolution" below |
 | `adr` | `architecture-decision-records` skill | `docs/explanation/adr/NNNN-<title>.md` (auto-numbered) |
 | `changelog` | `changelog-automation` skill | `CHANGELOG.md` (overwrites/extends `[Unreleased]`) |
 | `openapi` | `openapi-spec-generation` skill | `openapi.yaml` |
 | `diagram` | `mermaid-expert` agent | inline in user-specified target file |
 
+**plan-doc resolution (load-bearing — `doc-author` refuses `context-source=journal` without `plan-doc` arg):**
+
+Both `feature` and `architecture` routes use this resolution sequence:
+
+1. **Try `.claude/active-plan`:** read the file at `.claude/active-plan` in the repo root. If it exists and contains a non-empty plan-doc path, use that as the `plan-doc` arg and dispatch `doc-author` with `context-source=journal`.
+
+2. **No active plan; prompt user for path:** if `.claude/active-plan` is missing or empty, prompt the user: `"No active plan detected. Provide plan-doc path (e.g., plans/<slug>/<slug>-plan.md), or type 'codegraph' to refresh from codebase graph instead."` — if user provides a path, dispatch `doc-author context-source=journal plan-doc=<provided path>`. If user types `codegraph`, dispatch `doc-author context-source=codegraph` (no `plan-doc` arg needed).
+
+3. **User cancels:** if user provides no input or cancels, abort the route with INFO message: `"Refresh canceled — no plan-doc or codegraph source provided."`
+
+For the `feature` route command form: `/docs-refresh feature <slug>` — slug arg required. If slug missing, list existing `docs/explanation/features/*.md` and ask user to pick.
+
+For the `architecture` route command form: `/docs-refresh architecture` — no args.
+
+**Route refuse:** If a user invokes `/docs-refresh explanation` with a target path matching `docs/explanation/features/*`, `docs/explanation/adr/*`, or `docs/explanation/architecture.md` — refuse and redirect to the correct dedicated route (`/docs-refresh feature <slug>`, `/docs-refresh adr`, or `/docs-refresh architecture` respectively). This keeps `doc-author`'s constraint surface canonical for feature-docs and architecture.md.
+
 ## Workflow
 
-1. **Validate `type` argument** matches one of the 8 values above. If invalid, list valid types and exit.
+1. **Validate `type` argument** matches one of the 10 values above. If invalid, list valid types and exit.
 
 2. **Resolve target path or name:**
    - For `tutorial` / `how-to` / `reference` / `explanation`: prompt user for a short kebab-case filename.
@@ -48,7 +66,7 @@ This skill is a thin router. Specialists handle their own internal logic.
 
 | Condition | Behavior |
 |---|---|
-| Invalid `<type>` argument | List the 8 valid types, exit |
+| Invalid `<type>` argument | List the 10 valid types, exit |
 | Target file already exists (non-versioned types: tutorial / how-to / reference / explanation) | Ask user: overwrite, append, or cancel |
 | Specialist agent or skill missing | Fail loud — these are installed at commit `67b1403`; this should never happen unless the workflow-improvements repo is in an unexpected state |
 
