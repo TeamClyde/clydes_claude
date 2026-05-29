@@ -63,6 +63,18 @@ Runs after Phase 1, before Phase 2. All steps are idempotent — every action sk
 
 6. **Report to user:** list each file/dir created (skipped items get an INFO note, not a warning).
 
+7. **Hybrid Explanation layout scaffold (added):**
+
+   1. Create directory `docs/explanation/features/` (empty; populated as work touches each feature). Skip if exists.
+
+   2. Copy `templates/architecture.md` → `docs/explanation/architecture.md`. Skip if `architecture.md` exists.
+      - The template's `<repo-name>` placeholder should be replaced with the value from `project.json` `project.name`.
+      - The `**Last updated:**` placeholder should be replaced with today's date.
+
+   3. Confirm `docs/explanation/adr/` exists (should already be created by the existing ADR-zero copy step in Phase 1.5 step 5). If missing for any reason, create it.
+
+   All new copies are skip-if-exists per the Phase 1.5 idempotency contract — `project-setup` is re-runnable safely.
+
 **Edge case:** if the workflow-repo templates dir is unreachable (broken symlink, fresh setup), fail loud with: "Templates not found at `templates/manifest/<domain>.md` or `templates/manifest/_default.md`. Ensure setup.sh has been run on this machine."
 
 ---
