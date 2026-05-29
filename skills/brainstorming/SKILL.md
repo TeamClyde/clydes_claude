@@ -32,13 +32,43 @@ You MUST create a task for each of these items and complete them in order:
 8. **Propose 2-3 approaches** — with trade-offs and your recommendation
 9. **Present design** — in sections scaled to their complexity, get user approval after each section
 10. **Ask the ADR-candidate question** — Before writing the design doc, ask the user: "Is this an ADR candidate? (yes/no — captured in plan journal for promotion at sub-plan close)"
-    - If yes: when writing the design doc in Step 11, include `[adr-candidate]` in the design doc's frontmatter or in a clearly-marked section so `writing-plans` can propagate the tag to the journal's initial entry.
+    - If yes: when writing the design doc in Step 12, include `[adr-candidate]` in the design doc's frontmatter or in a clearly-marked section so `writing-plans` can propagate the tag to the journal's initial entry.
     - If no: continue normally; no tag added.
     - The user's answer is one sentence — if they're unsure, default to "yes" (low cost; trivially declined later at plan-close).
-11. **Write design doc** — save to `plans/<slug>/<slug>-design.md` and commit; merge Research appendix into the doc
-12. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
-13. **User reviews written spec** — ask user to review the spec file before proceeding
-14. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+    - ADRs are orthogonal to C4 layer — any plan may produce zero or more ADRs regardless of which C4 layer it operates at. Answer this question independently of Step 10.5's layer classification.
+10.5. **Classify C4 layer(s) internally + draft Docs Affected** — INTERNAL STEP, no user prompt.
+
+    Based on the brainstorming context (the user's info dump, your clarifying questions, and the user's answers), classify which C4 abstraction layer(s) this plan operates at:
+
+    - **C1 System Context** — new external actor or upstream system mentioned
+    - **C2 Containers** — new service / binary / deployment unit mentioned
+    - **C3 Components** — new or modified module / feature / component mentioned
+    - **None** — refactor / cleanup / bug-fix only, no doc impact
+
+    Multi-layer plans are valid (e.g., C2 + C3 for a new service that also has internal components).
+
+    **Per classification, scan existing docs:**
+
+    - C1 or C2 detected → Read `docs/explanation/architecture.md` (if it exists).
+    - C3 detected → Scan `docs/explanation/features/*.md`. For each existing file, match by name/concept similarity to the work being planned. Mark matches as candidates for `UPDATE`.
+
+    **Draft the Docs Affected list:**
+
+    For each existing match: `- <path> — UPDATE — <one-line change-summary>`.
+    For each proposed new feature-doc: `- <path> — NEW — <one-line description>`.
+    For C1/C2 work touching architecture.md: `- docs/explanation/architecture.md — UPDATE — <one-line>`.
+
+    **Edge case — `[adr-candidate]` tagged in Step 10 AND classification = None:**
+
+    Insert an inline NOTE in the design draft asking the user to confirm or adjust:
+
+    > NOTE: This plan was tagged `[adr-candidate]` in Step 10 but classified as no-doc-impact in Step 10.5. ADRs hang off feature-docs or architecture.md. Reconsider Docs Affected before approving the design.
+
+    **Output:** The Docs Affected list is carried forward into Step 12 (write design doc) as a required section. No user prompt during this step — the user reviews the Docs Affected section when the design draft is presented.
+12. **Write design doc** — save to `plans/<slug>/<slug>-design.md` and commit; merge Research appendix into the doc. The design doc MUST include a `## Docs Affected` section — output of Step 10.5. Lists which feature-docs / architecture.md this plan affects, with C4 layer tagging and per-entry action (`UPDATE` or `NEW`). Drives close-subplan's doc-author serial pass.
+13. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
+14. **User reviews written spec** — ask user to review the spec file before proceeding
+15. **Transition to implementation** — invoke writing-plans skill to create implementation plan
 
 ## Process Flow
 
@@ -56,6 +86,7 @@ digraph brainstorming {
     "Propose 2-3 approaches" [shape=box];
     "Present design sections" [shape=box];
     "User approves design?" [shape=diamond];
+    "Step 10.5 — internal C4 classification\nDraft Docs Affected list" [shape=box];
     "Write design doc\n(merge Research appendix)" [shape=box];
     "Spec self-review\n(fix inline)" [shape=box];
     "User reviews spec?" [shape=diamond];
@@ -75,7 +106,8 @@ digraph brainstorming {
     "Propose 2-3 approaches" -> "Present design sections";
     "Present design sections" -> "User approves design?";
     "User approves design?" -> "Present design sections" [label="no, revise"];
-    "User approves design?" -> "Write design doc\n(merge Research appendix)" [label="yes"];
+    "User approves design?" -> "Step 10.5 — internal C4 classification\nDraft Docs Affected list" [label="yes"];
+    "Step 10.5 — internal C4 classification\nDraft Docs Affected list" -> "Write design doc\n(merge Research appendix)";
     "Write design doc\n(merge Research appendix)" -> "Spec self-review\n(fix inline)";
     "Spec self-review\n(fix inline)" -> "User reviews spec?";
     "User reviews spec?" -> "Write design doc\n(merge Research appendix)" [label="changes requested"];
@@ -152,7 +184,7 @@ Agent {
 
 Replace `<topic>` with a brief description extracted from the user's info dump.
 
-When the result returns, append it to a **Research appendix**. Before the design doc exists, hold the appendix as a titled block in your working context (e.g., `## Research Appendix\n\n### Light Research\n<result>`). It will be merged into the formal design doc at write time (Step 11). If the subagent returns nothing useful, note "Light research returned no actionable findings" in the appendix and proceed.
+When the result returns, append it to a **Research appendix**. Before the design doc exists, hold the appendix as a titled block in your working context (e.g., `## Research Appendix\n\n### Light Research\n<result>`). It will be merged into the formal design doc at write time (Step 12). If the subagent returns nothing useful, note "Light research returned no actionable findings" in the appendix and proceed.
 
 After appending, say to the user:
 
@@ -182,7 +214,7 @@ Wait for the user's response before proposing approaches.
 
 ### Research appendix — timing and merge
 
-The design doc (`plans/<slug>/<slug>-design.md`) is written at Step 11, after both research stages have completed and the ADR-candidate question (Step 10) is answered. Until then, the Research appendix lives as a titled block in working context. At write time, append the full appendix to the bottom of the design doc under `## Research Appendix`. If the design doc already exists from a prior session, append to (or update) the existing appendix section rather than creating a duplicate.
+The design doc (`plans/<slug>/<slug>-design.md`) is written at Step 12, after both research stages have completed and the ADR-candidate question (Step 10) is answered. Until then, the Research appendix lives as a titled block in working context. At write time, append the full appendix to the bottom of the design doc under `## Research Appendix`. If the design doc already exists from a prior session, append to (or update) the existing appendix section rather than creating a duplicate.
 
 ## After the Design
 
