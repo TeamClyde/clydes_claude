@@ -9,6 +9,27 @@
 
 Proposed
 
+## Related
+
+<!-- Required. The parent doc this decision belongs to. Format: `Parent: <path>`. -->
+<!-- Multi-parent ADRs (rare) use one Parent: line per parent.                   -->
+
+Parent: docs/explanation/features/<slug>.md
+
+## Supersedes
+
+<!-- Optional. ADRs this decision replaces. One link per line. -->
+<!-- Omit this entire section if no ADRs are superseded.        -->
+
+_(none)_
+
+## Superseded by
+
+<!-- Optional. Filled in if a later ADR supersedes THIS decision. -->
+<!-- Omit until that happens.                                      -->
+
+_(none)_
+
 ## Context
 
 <!-- 2-4 sentences. What problem were we facing? What constraints existed?    -->
