@@ -24,7 +24,8 @@
 - [ ] `docs/reference/datasheet-refs.md`
 
 ## Explanation
-<!-- Architecture explains how peripherals, RTOS tasks, and main loop fit together.
-     ADRs capture decisions like chip choice, RTOS selection, peripheral protocols. -->
-- [ ] `docs/explanation/architecture.md` — peripherals + task layout
+<!-- Hybrid C1+C2+C3 layout per rules/doc-tools.md.
+     Firmware repos seed Observability uncommented in feature-docs (hardware telemetry). -->
+- [ ] `docs/explanation/architecture.md` — repo-level system overview (C1 + C2)
+- [ ] `docs/explanation/features/<placeholder>.md` — per-feature explainer (C3); create one per major component
 - ADRs live under `docs/explanation/adr/`

@@ -25,5 +25,8 @@
 - [ ] `docs/reference/store-listing.md` — description, keywords, screenshots checklist
 
 ## Explanation
-- [ ] `docs/explanation/architecture.md` — navigation, state management, platform abstractions
+<!-- Hybrid C1+C2+C3 layout per rules/doc-tools.md.
+     Mobile repos seed Observability uncommented in feature-docs (crash reporting / analytics). -->
+- [ ] `docs/explanation/architecture.md` — repo-level system overview (C1 + C2)
+- [ ] `docs/explanation/features/<placeholder>.md` — per-feature explainer (C3); create one per major component
 - ADRs live under `docs/explanation/adr/`

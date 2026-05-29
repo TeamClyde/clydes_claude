@@ -22,6 +22,11 @@
 - [ ] `docs/reference/overview.md`
 
 ## Explanation
-<!-- Understanding-oriented. The "why we built it this way" content. -->
-- [ ] `docs/explanation/architecture.md`
+<!-- Hybrid C1+C2+C3 layout per rules/doc-tools.md. -->
+- [ ] `docs/explanation/architecture.md` — repo-level system overview (C1 + C2)
+- [ ] `docs/explanation/features/<placeholder>.md` — per-feature explainer (C3); create one per major component
 - ADRs live under `docs/explanation/adr/`
+
+<!-- Observability section in feature-docs is domain-dependent.
+     Default: HTML-commented (no production telemetry assumed).
+     Override per domain in templates/manifest/<domain>.md. -->

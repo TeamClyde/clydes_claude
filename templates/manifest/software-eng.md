@@ -23,6 +23,8 @@
 - [ ] `docs/reference/api-reference.md` — human-readable companion to OpenAPI
 
 ## Explanation
-<!-- Architecture overview anchors cross-team comprehension. ADRs capture decisions. -->
-- [ ] `docs/explanation/architecture.md` — system overview + key files
-- ADRs live under `docs/explanation/adr/` (see ADR-0000 for the convention)
+<!-- Hybrid C1+C2+C3 layout per rules/doc-tools.md.
+     Software-eng repos seed Observability uncommented in feature-docs (production-style). -->
+- [ ] `docs/explanation/architecture.md` — repo-level system overview (C1 + C2)
+- [ ] `docs/explanation/features/<placeholder>.md` — per-feature explainer (C3); create one per major component
+- ADRs live under `docs/explanation/adr/`

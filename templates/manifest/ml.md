@@ -24,8 +24,8 @@
 - [ ] `docs/reference/experiment-log/` — training run records, metrics, hyperparams
 
 ## Explanation
-<!-- Model architecture and design choices are high-value explanation content
-     because ML decisions are often non-obvious to read off the code. -->
-- [ ] `docs/explanation/model-architecture.md`
-- [ ] `docs/explanation/training-methodology.md`
+<!-- Hybrid C1+C2+C3 layout per rules/doc-tools.md.
+     ML repos seed Observability uncommented in feature-docs (metric tracking / model perf). -->
+- [ ] `docs/explanation/architecture.md` — repo-level system overview (C1 + C2)
+- [ ] `docs/explanation/features/<placeholder>.md` — per-feature explainer (C3); create one per major component
 - ADRs live under `docs/explanation/adr/`

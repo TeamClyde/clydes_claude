@@ -22,7 +22,8 @@
 - [ ] `docs/reference/exit-codes.md` — only if utility has non-trivial exit codes
 
 ## Explanation
-<!-- For one-off scripts, this can be a short "why this exists" section in README.
-     For utility packages, a dedicated design note is worth the maintenance cost. -->
-- [ ] `docs/explanation/why-this-exists.md` — design rationale (optional for one-offs)
-- ADRs live under `docs/explanation/adr/` (rare for single-purpose utilities)
+<!-- Hybrid C1+C2+C3 layout per rules/doc-tools.md.
+     Python-utility repos seed Observability as HTML comment in feature-docs (solo utility, no production telemetry). -->
+- [ ] `docs/explanation/architecture.md` — repo-level system overview (C1 + C2)
+- [ ] `docs/explanation/features/<placeholder>.md` — per-feature explainer (C3); create one per major component
+- ADRs live under `docs/explanation/adr/`
