@@ -68,7 +68,7 @@ Use the canonical algorithm — do not duplicate or restate the walk-up logic he
     - **If parent found in Docs Affected:** Use that path as the value to populate the ADR's `## Related` heading section (as `Parent: <path>`).
     - **If no parent found (orphan):** HARD BLOCK. Prompt user with 4 options:
       - `(1) Pick existing` — list existing `docs/explanation/features/*.md` + `docs/explanation/architecture.md`; user picks one as the parent.
-      - `(2) Declare new feature-doc` — prompt for slug + path; dynamically amend Docs Affected with `- <path> — NEW — <decision summary>` (Phase C synthesis pass will create the doc); log a `[divergence]` journal entry recording the amendment.
+      - `(2) Declare new feature-doc` — prompt for slug + path; dynamically amend Docs Affected with `- <path> — NEW — <decision summary>` (Phase C synthesis pass will create the doc); log a `[divergence]` journal entry recording the amendment. The amendment is written immediately to the design.md file. The Feature-Doc Synthesis Pass reads `## Docs Affected` after the ADR Promotion Scan loop exits, so this entry will be present when the synthesis pass begins.
       - `(3) Defer` — `[adr-candidate]` tag stays in journal; not promoted this close. Future close-subplan may revisit.
       - `(4) Decline` — replace tag with `[adr-declined]`; not promoted; won't re-prompt in future closes.
 
@@ -76,7 +76,7 @@ Use the canonical algorithm — do not duplicate or restate the walk-up logic he
 
     - **Show the journal entry summary to the user.**
     - **Ask: "Promote to formal ADR? (yes/no/defer)"**
-    - **If yes:** Invoke `architecture-decision-records` skill with the journal entry + parent path as input → drafts `docs/explanation/adr/NNNN-<title>.md`. After the wshobson skill returns, `plan-management` post-processes the draft to ensure it contains a `## Related` heading section with `Parent: <parent-path>` as the first non-blank line under that heading. (The wshobson `architecture-decision-records` skill produces a draft using its own heading-section structure; `plan-management` is responsible for inserting/updating the `## Related` section per `templates/adr/template.md` convention — see `rules/doc-tools.md` "Where the Heavy Detail Lives" → `skills/doc-author/SKILL.md`.)
+    - **If yes:** Invoke `architecture-decision-records` skill with the journal entry + parent path as input → drafts `docs/explanation/adr/NNNN-<title>.md`. After the wshobson skill returns, `plan-management` post-processes the draft to ensure the `## Related` heading section contains the correct `Parent:` line. Four cases: (a) `## Related` is absent — insert it with `Parent: <parent-path>` as the first entry; (b) `## Related` is present but contains no `Parent:` line — prepend `Parent: <parent-path>`; (c) `## Related` contains a `None` placeholder — replace the placeholder with `Parent: <parent-path>`; (d) `## Related` already has a `Parent:` line (e.g., from a partial prior run) — leave it unchanged, do not duplicate. (The wshobson `architecture-decision-records` skill produces a draft using its own heading-section structure; `plan-management` is responsible for inserting/updating the `## Related` section per `templates/adr/template.md` convention — see `rules/doc-tools.md` "Where the Heavy Detail Lives" → `skills/doc-author/SKILL.md`.)
     - **If defer:** Leave entry in journal (user can `/docs-refresh adr` later).
     - **If no:** Mark the entry as declined in the journal (append `[adr-declined]` tag).
 
@@ -86,7 +86,7 @@ Use the canonical algorithm — do not duplicate or restate the walk-up logic he
 
 14. **Feature-Doc Synthesis Pass (NEW):** Read the originating plan's `<slug>-design.md` `## Docs Affected` section.
 
-    If Docs Affected is "None — no doc updates needed": skip this step entirely. Proceed to the next step (handoff refresh).
+    If Docs Affected is "None — no doc updates needed": skip this step entirely. The handoff was refreshed earlier in steps 9-10; the mode completes.
 
     **Missing-section semantics:** If the originating plan's `<slug>-design.md` does NOT contain a `## Docs Affected` section (e.g., plan was created before brainstorming Step 10.5 lands), treat this as equivalent to `## Docs Affected: None` and skip this entire step. No orphan-prompt fires for missing sections — only for orphan `[adr-candidate]` tags that lack a parent within an EXISTING `## Docs Affected` section.
 
@@ -151,7 +151,7 @@ Triggered when `close-subplan` is invoked on the top-level plan (no parent `*-pl
     - **If parent found in Docs Affected:** Use that path as the value to populate the ADR's `## Related` heading section (as `Parent: <path>`).
     - **If no parent found (orphan):** HARD BLOCK. Prompt user with 4 options:
       - `(1) Pick existing` — list existing `docs/explanation/features/*.md` + `docs/explanation/architecture.md`; user picks one as the parent.
-      - `(2) Declare new feature-doc` — prompt for slug + path; dynamically amend Docs Affected with `- <path> — NEW — <decision summary>` (Feature-Doc Synthesis Pass will create the doc); log a `[divergence]` journal entry recording the amendment.
+      - `(2) Declare new feature-doc` — prompt for slug + path; dynamically amend Docs Affected with `- <path> — NEW — <decision summary>` (Feature-Doc Synthesis Pass will create the doc); log a `[divergence]` journal entry recording the amendment. The amendment is written immediately to the design.md file. The Feature-Doc Synthesis Pass reads `## Docs Affected` after the ADR Promotion Scan loop exits, so this entry will be present when the synthesis pass begins.
       - `(3) Defer` — `[adr-candidate]` tag stays in journal; not promoted this close. Future close-subplan may revisit.
       - `(4) Decline` — replace tag with `[adr-declined]`; not promoted; won't re-prompt in future closes.
 
@@ -159,7 +159,7 @@ Triggered when `close-subplan` is invoked on the top-level plan (no parent `*-pl
 
     - **Show the journal entry summary to the user.**
     - **Ask: "Promote to formal ADR? (yes/no/defer)"**
-    - **If yes:** Invoke `architecture-decision-records` skill with the journal entry + parent path as input → drafts `docs/explanation/adr/NNNN-<title>.md` with next-available ADR number. After the wshobson skill returns, `plan-management` post-processes the draft to ensure it contains a `## Related` heading section with `Parent: <parent-path>` as the first non-blank line under that heading. (The wshobson `architecture-decision-records` skill produces a draft using its own heading-section structure; `plan-management` is responsible for inserting/updating the `## Related` section per `templates/adr/template.md` convention — see `rules/doc-tools.md` "Where the Heavy Detail Lives" → `skills/doc-author/SKILL.md`.)
+    - **If yes:** Invoke `architecture-decision-records` skill with the journal entry + parent path as input → drafts `docs/explanation/adr/NNNN-<title>.md` with next-available ADR number. After the wshobson skill returns, `plan-management` post-processes the draft to ensure the `## Related` heading section contains the correct `Parent:` line. Four cases: (a) `## Related` is absent — insert it with `Parent: <parent-path>` as the first entry; (b) `## Related` is present but contains no `Parent:` line — prepend `Parent: <parent-path>`; (c) `## Related` contains a `None` placeholder — replace the placeholder with `Parent: <parent-path>`; (d) `## Related` already has a `Parent:` line (e.g., from a partial prior run) — leave it unchanged, do not duplicate. (The wshobson `architecture-decision-records` skill produces a draft using its own heading-section structure; `plan-management` is responsible for inserting/updating the `## Related` section per `templates/adr/template.md` convention — see `rules/doc-tools.md` "Where the Heavy Detail Lives" → `skills/doc-author/SKILL.md`.)
     - **If defer:** Leave entry in journal (user can `/docs-refresh adr` later).
     - **If no:** Mark the entry as declined in the journal (append `[adr-declined]` tag).
 
