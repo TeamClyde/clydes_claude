@@ -73,6 +73,14 @@ Per Jesse's rule "Fix broken things immediately":
 
 No .gitignore verification needed - outside project entirely.
 
+## Inputs
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `BRANCH_NAME` | Yes | New branch name for the worktree (also used as the worktree directory leaf name) |
+| `LOCATION` | Yes | Worktree parent directory (`.worktrees`, `worktrees`, or `~/.config/superpowers/worktrees/*`) |
+| `BASE` | Optional | Explicit base ref to fork from. If omitted, captures the current branch via `git symbolic-ref --short HEAD`; on detached HEAD, captures the SHA prefixed with `sha:`. The captured value is persisted to `.claude/worktrees/<wt-name>/base-branch` so `finishing-a-development-branch` can restore the original context. |
+
 ## Creation Steps
 
 ### 1. Detect Project Name
@@ -94,9 +102,27 @@ case $LOCATION in
     ;;
 esac
 
+# Capture base branch BEFORE creating the worktree (HEAD changes after).
+# Honor explicit `base:` parameter if provided; otherwise capture current branch.
+# Detached-HEAD fallback: store SHA prefixed with `sha:` so cleanup uses `git checkout <sha>`.
+if [ -n "$BASE" ]; then
+  base_ref="$BASE"
+elif base_branch=$(git symbolic-ref --short HEAD 2>/dev/null); then
+  base_ref="$base_branch"
+else
+  base_ref="sha:$(git rev-parse HEAD)"
+fi
+
 # Create worktree with new branch
 git worktree add "$path" -b "$BRANCH_NAME"
 cd "$path"
+
+# Persist base branch per-worktree (NOT global). Pattern mirrors git's
+# .git/worktrees/<name>/ — each worktree owns its own relationship metadata,
+# so concurrent worktrees stay coherent.
+wt_name=$(basename "$path")
+mkdir -p ".claude/worktrees/$wt_name"
+printf '%s\n' "$base_ref" > ".claude/worktrees/$wt_name/base-branch"
 ```
 
 ### 3. Run Project Setup

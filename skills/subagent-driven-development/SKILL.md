@@ -183,10 +183,11 @@ Before dispatching the implementer for a task, assert all of the following. **If
 
 Before marking a task complete in TodoWrite, assert all of the following. **If any check fails, stop and refuse to advance until the condition is met.**
 
-Before running this gate, the orchestrator performs two pre-exit actions:
+Before running this gate, the orchestrator performs three pre-exit actions:
 
 1. **Mark the task's row in the plan's Task Reference table ✅** — edit `<top>-plan.md` and add the ✅ marker to the row. This is the durable completion record the exit gate (X1) confirms. Doing this before the exit gate makes X1 a confirmation step rather than an orphaned precondition.
-2. **If the task created or modified one or more skills:** invoke `pulser --strict --skill <name> --no-anim` (via Bash) before running the exit gate. Fix any warnings or errors first. This is a hard gate — do not skip even if pulser was not listed in the plan's testing section. The implementer subagent does not have the access required to run this; the orchestrator must invoke it.
+2. **Tick all step-level checkboxes inside the just-completed task's detail section** — edit `<top>-plan.md` and change every `- [ ]` to `- [x]` inside the Task N detail section. Bulk-ticking at task close is acceptable (the Task Reference row ✅ is the authoritative completion signal); step checkboxes provide a durable per-step track record for future sessions reading the plan.
+3. **If the task created or modified one or more skills:** invoke `pulser --strict --skill <name> --no-anim` (via Bash) before running the exit gate. Fix any warnings or errors first. This is a hard gate — do not skip even if pulser was not listed in the plan's testing section. The implementer subagent does not have the access required to run this; the orchestrator must invoke it.
 
 - [ ] **X1 — Task Reference row ✅:** The task's row in the plan's Task Reference table has been marked ✅. This is mandatory even for trivial changes.
 - [ ] **X2 — Divergence journaled (if applicable):** If any divergence occurred during the task — architecture change, file path moved, signature changed, scope shift, discovered bug, test-debt finding — a journal entry has been appended via `plan-management:divergence`. See trivial-change exception below.

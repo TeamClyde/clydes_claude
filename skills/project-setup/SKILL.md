@@ -91,6 +91,8 @@ Ask these questions one at a time. Record answers for Phase 3.
 
 3. **Git** — Require Jira key in commit messages? (default: yes if Jira enabled, no otherwise)
 
+3b. **Git** — PR backend? Auto-detected from `git remote get-url origin` if you skip this — only set it explicitly for enterprise hosts (e.g. `github.mycompany.com`, self-hosted Bitbucket Data Center). Options: `github` | `bitbucket` | `manual`. Omit the field unless the auto-detection would get it wrong.
+
 4. **Workflow** — Enable architect review before execution? (default: yes)
 
 5. **Workflow** — Enable TDD for this repo? (default: yes — set to no for config/infra/markdown-only repos)
@@ -147,7 +149,8 @@ Example for a full-featured repo:
   },
   "git": {
     "main-branch": "main",
-    "require-jira-key-in-commits": true
+    "require-jira-key-in-commits": true,
+    "backend": "github"
   },
   "workflow": {
     "architect-review": true,

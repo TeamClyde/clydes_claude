@@ -9,10 +9,10 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
 Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them — don't pick silently.
+- State your assumptions explicitly and proceed on them.
+- If multiple reasonable interpretations exist, pick the most likely one and name it.
 - If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+- Stop and ask when proceeding would cause real rework: destructive actions, ambiguity that can't be resolved by reasonable inference, or choices where being wrong wastes significant work.
 
 ## 2. Simplicity First
 
@@ -75,6 +75,8 @@ Route every operation through the correct abstraction. Never run git commands di
 Invoke `architect` before:
 - Execution begins (via `plan-gate` after `writing-plans`, or manually before `ExitPlanMode`)
 - Any task transitions to Testing or Done
+
+**Form A sub-plans require architect review identically to top-level plans.** When `writing-plans` runs for a sub-plan, plan-gate enters sub-plan mode and still runs architect (+ adherence-audit by default; architect-only with `mode: minimal`). See `skills/plan-gate/skill.md` § Sub-Plan Mode.
 
 Skip for S-sized mechanical tasks (renaming, config-only, single-line fixes). Maximum 3 review iterations — surface BLOCKING issues to user after the third pass.
 
