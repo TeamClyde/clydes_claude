@@ -66,7 +66,8 @@ Every Step-2 dispatch MUST include these five constraints in the prompt. They ar
 
 > 1. Output MUST match the section structure of `templates/feature-explainer.md` (or `templates/architecture.md`) exactly. Do NOT add, remove, or reorder sections.
 > 2. The `## Decisions` section has already been populated by doc-author. Do NOT modify it.
-> 3. Existing prose in any section is authoritative. APPEND or REFINE individual sentences; never REPLACE entire sections.
+> 3a. (`mode=update`) Existing prose in any section is authoritative. APPEND or REFINE individual sentences; never REPLACE entire sections.
+> 3b. (`mode=create`) Template placeholder lines (the example/scaffold prose under each heading) are scaffolding, not authoritative content. Replace them with real content. Do not append to them.
 > 4. Front-matter is authoritative. Update only `**Last updated:**` and append-only fields (Related plans, Related ADRs, Key files). Never rewrite or reorder front-matter fields.
 > 5. Use the front-matter pattern `**Field:** value` exactly as the template does — do NOT switch to YAML frontmatter (no `---` block, no `key: value` lines).
 
@@ -112,6 +113,8 @@ doc-author refuses (returns failure with a clear message — does not silently d
 5. **`mode=update` but target does not exist.** Message: `Target <path> does not exist. Use mode=create.`
 6. **`mode=create` but target already exists.** Message: `Target <path> already exists. Use mode=update (no silent overwrite).`
 7. **`docs-architect` returns content with sections dropped, and re-prompt still fails.** Message: `docs-architect dropped section(s) <names> twice. Surfacing output for manual review. No write performed.`
+8. **`mode=backlink-only` and `accepted-adrs` is empty or absent.** Message: `mode=backlink-only with no accepted-adrs is a no-op. Pass at least one ADR path, or use mode=create/update without accepted-adrs.`
+9. **`mode=create` or `mode=update` and `context-source` is absent.** Message: `context-source is required for mode=create and mode=update. Pass context-source=journal or context-source=codegraph.`
 
 ## Output Contract
 
