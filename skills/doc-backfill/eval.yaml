@@ -27,6 +27,13 @@ tests:
       - contains: "infra-init"
       - not-contains: "get_architecture"
 
+  - name: "refuse rule — empty codegraph clusters"
+    input: "Run /doc-backfill but the codegraph returned no clusters"
+    assert:
+      - contains: "No components detected"
+      - contains: "infra-init"
+      - not-contains: "doc-author"
+
   - name: "user confirmation gate — present before generating"
     input: "Run /doc-backfill on this repo. Codegraph returned 3 clusters: auth, billing, notifications."
     assert:
