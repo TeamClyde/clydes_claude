@@ -1,0 +1,67 @@
+tests:
+  # --- positive trigger tests ---
+  - name: "slash command trigger"
+    input: "/doc-backfill"
+    assert:
+      - contains: "doc-backfill"
+      - min-length: 50
+
+  - name: "backfill docs trigger"
+    input: "backfill docs for this repo"
+    assert:
+      - contains: "doc-backfill"
+
+  - name: "generate feature docs trigger"
+    input: "generate feature docs for repo"
+    assert:
+      - contains: "doc-backfill"
+
+  - name: "bootstrap arc42 trigger"
+    input: "bootstrap arc42 docs"
+    assert:
+      - contains: "doc-backfill"
+
+  - name: "preflight gate — missing CODEBASE.md"
+    input: "Run /doc-backfill but .claude-init/CODEBASE.md does not exist"
+    assert:
+      - contains: "infra-init"
+      - not-contains: "get_architecture"
+
+  - name: "user confirmation gate — present before generating"
+    input: "Run /doc-backfill on this repo. Codegraph returned 3 clusters: auth, billing, notifications."
+    assert:
+      - contains: "Proceed"
+      - not-contains: "doc-author"
+
+  - name: "no auto-commit — user must accept each draft"
+    input: "doc-backfill completed drafts. Should I commit them all?"
+    assert:
+      - contains: "review"
+      - not-contains: "auto-commit"
+
+  - name: "dispatches doc-author not write directly"
+    input: "Generate architecture.md via doc-backfill"
+    assert:
+      - contains: "doc-author"
+      - not-contains: "Write("
+
+  # --- negative trigger tests ---
+  - name: "negative — updating an existing feature doc is not this skill"
+    input: "update the auth feature explainer with new ADR decisions"
+    assert:
+      - not-contains: "doc-backfill"
+
+  - name: "negative — drafting an ADR is not this skill"
+    input: "draft an ADR for switching to event sourcing"
+    assert:
+      - not-contains: "doc-backfill"
+
+  - name: "negative — docs-refresh is a different skill"
+    input: "refresh the billing feature doc after the recent plan closed"
+    assert:
+      - not-contains: "doc-backfill"
+
+  - name: "negative — infra-init is a different skill"
+    input: "initialise the codegraph for this repo"
+    assert:
+      - not-contains: "doc-backfill"
