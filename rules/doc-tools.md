@@ -1,115 +1,77 @@
-# Doc Tools — Multi-Domain Documentation Workflow
+# Doc Tools
 
-## 1. Purpose
-
-This rule documents the multi-domain documentation workflow conventions for repos using the claude-workflow-improvements pipeline. It defines the Diátaxis quadrant convention, the per-repo `docs/manifest.md` pattern, the open domain registry, and how the workflow gates (`project-setup`, `brainstorming`, `plan-management`, `finishing-a-development-branch`) interact with documentation.
-
----
-
-## 2. Diátaxis Convention
+## Diátaxis Quadrants
 
 | Quadrant | Location | User need |
 |---|---|---|
-| Tutorials | `docs/tutorials/` | Learning — first walkthrough, oriented to a new contributor or future-you |
-| How-To | `docs/how-to/` | Doing — task-oriented recipes, runbooks, troubleshooting |
-| Reference | `docs/reference/` | Information — APIs, configs, data formats, domain-specific lookup material |
-| Explanation | `docs/explanation/` | Understanding — architecture, rationale, design notes |
+| Tutorials | docs/tutorials/ | Learning |
+| How-To | docs/how-to/ | Doing |
+| Reference | docs/reference/ | Information |
+| Explanation | docs/explanation/ | Understanding |
 
-**ADRs live under `docs/explanation/adr/`** (Diátaxis Explanation quadrant), **NOT** the older flat `docs/adr/` path.
+ADRs live under `docs/explanation/adr/`, not flat `docs/adr/`.
 
----
+## Explanation Quadrant Layout
 
-## 3. The `docs/manifest.md` Pattern
+Three artifact classes under `docs/explanation/`:
 
-- Every repo has a `docs/manifest.md` — the source of truth for "what docs this repo aspires to have."
-- Seeded at `project-setup` Phase 1.5 from `templates/manifest/<domain>.md`.
-- Format: Diátaxis-organized checkbox list.
-  - `[ ]` = aspirational (not yet created)
-  - `[x]` = required-and-present
-- Inline HTML comments explain *why* each entry is suggested.
+| File | Role | C4 layer |
+|---|---|---|
+| `architecture.md` | Repo-level system overview (single file) | C1 + C2 |
+| `features/<slug>.md` | Per-feature explainer (one per component) | C3 |
+| `adr/NNNN-<slug>.md` | Decision records, immutable | n/a |
 
-**Never** delete an entry from `docs/manifest.md` without deliberate intent — it is the durable record of doc-intent for this repo.
+Every ADR has a required `## Related` heading section with at least one `Parent: <path>` line, pointing to either `docs/explanation/architecture.md` or `docs/explanation/features/<slug>.md`. Multi-parent ADRs (rare cross-cutting case) list one `Parent:` line per parent. Format detail lives in `skills/doc-author/SKILL.md` — do not duplicate here.
 
----
+## Manifest Pattern
 
-## 4. Open Domain Registry
+Every repo has `docs/manifest.md` — source of truth for "what docs this repo aspires to have." Seeded at `project-setup` Phase 1.5 from `templates/manifest/<domain>.md`. Diátaxis-organized checkbox list. Never delete entries without deliberate intent.
 
-The `project.json` `domain:` field is **free text**, not a closed enum.
+## Open Domain Registry
 
-Initial seed templates:
+`project.json` `domain:` is free text. Initial seed templates: `software-eng`, `firmware`, `mobile`, `python-utility`, `ml`. Unknown values fall back to `templates/manifest/_default.md`. Extend by dropping a new `templates/manifest/<name>.md`. One domain per repo (v1).
 
-| Domain value | Intended for |
+## Close-Subplan Doc Order
+
+When a closing sub-plan has both ADR candidates AND affected docs: ADR Promotion Scan runs FIRST, `doc-author` skill runs SECOND. Bottom-up — feature-doc synthesis happens with the accepted ADR list in hand. Execution detail lives in `skills/plan-management/SKILL.md` and `skills/doc-author/SKILL.md`.
+
+## Tier Names
+
+`/docs-status` output uses exactly three severity tiers. Tier names are case-sensitive and shared across the workflow:
+
+- `ERRORS` — actionable failures (file marked `[x]` in manifest but missing; broken internal links; ADR `## Related` Parent: path doesn't exist; feature-doc Decisions section references a missing ADR).
+- `WARNINGS` — drift signals (file exists but mtime > stale threshold; parent doc's Decisions section doesn't backlink an ADR that points to it).
+- `SUGGESTIONS` — aspirational / informational (manifest entry `[ ]` not yet created; file on disk not in manifest).
+
+Skills that emit tiered output MUST use these exact names. Execution detail in `skills/docs-status/SKILL.md`.
+
+## When to Write an ADR
+
+A decision warrants an ADR when one of:
+
+- Framework swap (e.g., switching auth library, ORM, frontend framework)
+- API contract change (request/response shape, auth scheme, versioning)
+- Data model change (schema migration with downstream impact)
+- Infrastructure choice (DB engine, cloud provider, message broker)
+- Security model change (auth flow, secret-handling, encryption-at-rest)
+
+Capture mechanism: brainstorming Step 10 surfaces the ADR-candidate question; `[adr-candidate]` journal tags during execution mark mid-plan decisions worth re-justifying. Promotion happens at sub-plan close via the ADR Promotion Scan in `skills/plan-management/SKILL.md`. ADRs are immutable once `Accepted` — evolve via `## Supersedes` chains, not edits to prior ADRs.
+
+## What is NOT Enforced
+
+- Never block PR or commit on missing docs.
+- Never auto-commit doc mutations — `doc-author` always surfaces drafts for user review.
+- Never push to Confluence without user-initiated action.
+
+## Where the Heavy Detail Lives
+
+| Topic | Source of truth |
 |---|---|
-| `software-eng` | Backend services, APIs, CLI tools |
-| `firmware` | Embedded / hardware-adjacent |
-| `mobile` | iOS / Android app |
-| `python-utility` | Standalone Python scripts or utility packages |
-| `ml` | Machine learning training / inference code |
+| `## Related` heading section format, feature-doc template, ADR backlink shape | `skills/doc-author/SKILL.md` |
+| `/doc-backfill` codegraph harvest | `skills/doc-backfill/SKILL.md` |
+| `/docs-status` cross-link integrity sweeps | `skills/docs-status/SKILL.md` |
+| `/docs-refresh` routing table | `skills/docs-refresh/SKILL.md` |
+| Brainstorming C4 classification | `skills/brainstorming/SKILL.md` |
+| Close-subplan ordering + per-doc 2-step execution + ADR Promotion Scan | `skills/plan-management/SKILL.md` |
 
-**Any domain value not in this initial set falls back to `templates/manifest/_default.md`** (the generic Diátaxis baseline).
-
-To extend the registry: drop a new `templates/manifest/<new-domain>.md` file in the workflow-improvements repo — no code change required.
-
-Constraints:
-- One domain per repo (v1 limitation).
-- If `project.json` is missing the `domain:` field, the workflow prompts the user once, writes the value back, and continues.
-
----
-
-## 5. Wshobson Agent Routing Table
-
-The `/docs-refresh <type>` slash command is the user-facing entry point that routes to the right agent or skill by quadrant.
-
-| Artifact / location | Routed to |
-|---|---|
-| `docs/tutorials/` | `tutorial-engineer` agent |
-| `docs/how-to/` | `docs-architect` agent |
-| `docs/reference/` | `reference-builder` agent |
-| `docs/explanation/` (non-ADR) | `docs-architect` agent |
-| `docs/explanation/adr/` | `architecture-decision-records` skill |
-| `CHANGELOG.md` | `changelog-automation` skill |
-| `openapi.yaml` | `openapi-spec-generation` skill (or `api-documenter` agent for human-readable companion) |
-| Diagrams (inline in any artifact) | `mermaid-expert` agent |
-
----
-
-## 6. `/docs-status` Tiering Convention
-
-`/docs-status` output uses three severity tiers — **never** a flat list:
-
-| Tier | When |
-|---|---|
-| ERRORS | File marked `[x]` in manifest but missing on disk; broken internal links/anchors (via Linkinator MCP); manifest references file outside Diátaxis quadrant convention |
-| WARNINGS | File exists but mtime > 6 months (default threshold; tunable per-repo via `<!-- stale-threshold: N months -->` comment in `docs/manifest.md`) |
-| SUGGESTIONS | Manifest entry `[ ]` (aspirational, not yet created); file exists on disk but not in manifest (orphan — consider adding or removing) |
-
-Deferred to v2: git-log-based drift detection ("code area changed since last doc update"). V1 uses mtime only.
-
----
-
-## 7. Workflow Gate Summary
-
-The doc workflow integrates at these points:
-
-- **`project-setup` Phase 1.5** — scaffolds Diátaxis dirs, seeds `docs/manifest.md` from domain template (or `_default.md` fallback), scaffolds README/CHANGELOG/cliff.toml/ADR-zero
-- **`brainstorming` Step 10** — ADR-candidate flag question (high-signal capture moment when a decision is being made)
-- **`plan-management:divergence`** — `[adr-candidate]` tag in the authoritative taxonomy for mid-execution rationale moments
-- **`plan-management:close-subplan`** (both paths) — scans journal for `[adr-candidate]` entries → prompts ADR promotion via `architecture-decision-records` skill
-- **`finishing-a-development-branch` Step 2.5** — soft `/docs-status` suggestion before PR creation (declinable, no enforcement)
-- **`/docs-status`** — manual audit; tiered output per Section 6
-- **`/docs-refresh <type>`** — manual generation; routes per Section 5
-
----
-
-### What is NOT enforced
-
-- **Never** block PR creation on missing docs.
-- **Never** require manifest entries to exist on disk before a commit lands.
-- **Never** auto-generate or auto-update doc content — **always** user-initiated via `/docs-refresh`.
-- **Never** push to Confluence without user-initiated action via Atlassian MCP.
-
-Solo-developer principle: the system informs; the user decides. The **only** nudge in the entire workflow is the soft `/docs-status` suggestion at plan-close (Section 7).
-
----
-
-> See `plans/multi-domain-doc-workflow/multi-domain-doc-workflow-design.md` for full rationale.
+If a skill disagrees with this rule on convention, this rule wins (priority hierarchy). If two skills disagree on a doc-author-related convention, `doc-author` is canonical.
