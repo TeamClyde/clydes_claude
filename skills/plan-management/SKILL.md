@@ -206,6 +206,8 @@ Every journal entry appended by `divergence` must include at least one tag from 
 
 Multiple tags may apply. Example: a flaky test discovered mid-execution is `[bug] [test-debt]`.
 
+**`[adr-candidate]` parent doc requirement:** Every `[adr-candidate]` entry must have a corresponding `Docs Affected` entry in the originating plan's design.md so close-subplan's ADR Promotion Scan can populate the ADR's `## Related` heading section with a `Parent: <path>` line. If no parent is found at close time, the orphan-handling prompt (4 options: pick existing / declare new / defer / decline) blocks promotion until a parent is confirmed. See `rules/doc-tools.md` for the canonical convention.
+
 #### Workflow
 
 1. Read `.claude/active-plan` to identify the active plan path.
@@ -264,103 +266,21 @@ Multiple tags may apply. Example: a flaky test discovered mid-execution is `[bug
 
 ### `close-subplan` — Roll up a completed sub-plan to the top-level
 
-**Rationale:** This is the load-bearing forcing function for preventing knowledge loss when a sub-plan closes. Without structured closeout content, learnings are stranded in the sub-plan's plan file or transient session memory and never surface to the parent. This mode refuses to close without the required content.
+See `close-subplan.md` for the full step sequence including ADR Promotion Scan (with orphan hard-block), Feature-Doc Synthesis Pass via `doc-author`, and handoff refresh. The mode runs in two paths (Sub-Plan Close + Terminal-State) with identical step logic but distinct framing.
 
-#### Required Inputs (Mandatory — Refuses Without Them)
+**Quick reference — mandatory inputs:** `closeout-summary`, `closeout-decisions`, `closeout-gotchas`. Refuses without all three. If `closeout-gotchas` references a doc that wasn't synthesized (user declined the `doc-author` draft during Feature-Doc Synthesis Pass), emit a WARNING (not a hard block) before completing.
 
-The caller must provide all three closeout fields before this mode proceeds:
+**Quick reference — flow order (both paths):**
 
-| Field | Description |
-|-------|-------------|
-| `closeout-summary` | 1-paragraph summary of what the sub-plan accomplished |
-| `closeout-decisions` | Key decisions made during sub-plan execution (rolls up D-style decisions to top history) |
-| `closeout-gotchas` | Gotchas and lessons worth preserving (rolls up "what broke" content) |
+1. Verify all tasks ✅; check closeout content present
+2. Journal closeout entry (`[subplan-close]`)
+3. Parent task row ✅ in top-level plan
+4. Handoff refresh; revert active-plan marker (sub-plan close) or delete it (terminal)
+5. **ADR Promotion Scan** — orphan hard-block (4-option prompt) gates promotion on a confirmed parent doc path from `Docs Affected`
+6. **Feature-Doc Synthesis Pass** — serial loop over `Docs Affected`; `doc-author` drafts each; user accept/edit/decline; accepted drafts committed via `git-manager`
+7. Report to caller
 
-If any of the three fields is missing or empty: **refuse to close.** Surface the missing fields to the caller and wait. Do not proceed.
-
-#### Top-Level vs. Sub-Plan Detection
-
-Before executing, determine whether the plan being closed is a sub-plan or the top-level plan using the **walk-up algorithm defined in the Active-Plan Marker section** above:
-
-- If the walk-up finds a parent `*-plan.md`: this is a sub-plan. Execute the **sub-plan close path** below with that file as the parent.
-- If the walk-up terminates without finding a parent `*-plan.md` (i.e., the closing plan IS the top-level): execute the **terminal-state path** below.
-
-Use the canonical algorithm — do not duplicate or restate the walk-up logic here.
-
-#### Sub-Plan Close Path
-
-1. Read the child `<child-slug>-plan.md`. Scan the Task Reference table.
-2. **Verify all tasks are ✅.** If any row is not checked, refuse to close. Surface the incomplete tasks to the caller and stop.
-3. **Check required closeout content.** If `closeout-summary`, `closeout-decisions`, or `closeout-gotchas` are missing: refuse to close.
-4. Identify the top-level plan (via walk-up algorithm). Resolve `<top>-journal.md`, `<top>-plan.md`, and `<top>-handoff.md`.
-5. **Idempotency check — journal:** Read `<top>-journal.md`. If a closeout entry for `<child-slug>` already exists (header: `## YYYY-MM-DD — Closed sub-plan <child-slug>`), skip journal append.
-6. If no matching entry: append a closeout journal entry to `<top>-journal.md`:
-   ```markdown
-   ## YYYY-MM-DD — Closed sub-plan <child-slug> [subplan-close]
-
-   **Summary:** <closeout-summary>
-
-   **Key decisions:**
-   <closeout-decisions>
-
-   **Gotchas and lessons:**
-   <closeout-gotchas>
-
-   **Full task detail:** plans/<parent-slug>/<child-slug>/<child-slug>-plan.md
-   ```
-7. **Idempotency check — parent task:** Read `<top>-plan.md`. Find the Task Reference row corresponding to this sub-plan. If it is already ✅, skip.
-8. If not ✅: mark the corresponding parent task row ✅ in `<top>-plan.md`.
-9. **Idempotency check — handoff:** Read `<top>-handoff.md`. If `Active sub-plan:` line is already removed and `Active task:` already reflects the next parent task, skip.
-10. If not updated: refresh `<top>-handoff.md`:
-    - Remove the `Active sub-plan: <child-slug>` line.
-    - Advance `Active task:` to the next unchecked row in the parent Task Reference table.
-    - Bump `Last Updated:` to today's date.
-11. **Idempotency check — active-plan marker:** Read `.claude/active-plan`. If it already points at the parent plan, skip.
-12. If not reverted: write `.claude/active-plan` with the parent plan path.
-13. **ADR Promotion Scan.** Read `<top>-journal.md` from the start of this sub-plan's spawn entry to the just-written closeout entry. Scan for entries tagged `[adr-candidate]` that are not already tagged `[adr-declined]` and do not have a corresponding ADR file in `docs/explanation/adr/`. For each such entry:
-    - Show the journal entry summary to the user.
-    - Ask: "Promote to formal ADR? (yes/no/defer)"
-    - If **yes:** invoke the `architecture-decision-records` skill with the journal entry summary + tags + context as input → drafts `docs/explanation/adr/NNNN-<title>.md` with next-available ADR number (scan `docs/explanation/adr/` for the highest `NNNN-*.md` and increment).
-    - If **defer:** leave the entry as-is (user can run `/docs-refresh adr` later).
-    - If **no:** append the `[adr-declined]` tag to the existing journal line (preserves the trail of considered-and-skipped decisions).
-
-    If no `[adr-candidate]` entries are found for this sub-plan, skip this step silently.
-
-    **Idempotent:** re-running `close-subplan` after partial ADR promotion (user accepted some, deferred others) only re-prompts on the deferred entries — accepted ones already have ADR files; declined ones are tagged `[adr-declined]`; both are filtered out on re-scan.
-
-#### Terminal-State Path (Top-Level Plan Completion)
-
-Triggered when `close-subplan` is invoked on the top-level plan (no parent `*-plan.md` found by walk-up):
-
-1. Read `<top>-plan.md`. Verify all Task Reference rows are ✅. If any are incomplete, refuse and surface them.
-2. **Check required closeout content** (`closeout-summary`, `closeout-decisions`, `closeout-gotchas`). Refuse if missing.
-3. **Idempotency check — journal:** Read `<top>-journal.md`. If a final completion entry already exists (header: `## YYYY-MM-DD — Plan complete`), skip journal append.
-4. If no completion entry: append a final journal entry to `<top>-journal.md`:
-   ```markdown
-   ## YYYY-MM-DD — Plan complete [subplan-close]
-
-   **Summary:** <closeout-summary>
-
-   **Key decisions:**
-   <closeout-decisions>
-
-   **Gotchas and lessons:**
-   <closeout-gotchas>
-   ```
-5. **Idempotency check — handoff terminal state:** Read `<top>-handoff.md`. If `Status:` already reads "All tasks complete; awaiting closeout", skip.
-6. If not terminal: update `<top>-handoff.md` — set status line to "All tasks complete; awaiting closeout" and bump `Last Updated:`.
-7. **Idempotency check — active-plan marker:** Check whether `.claude/active-plan` still exists.
-8. If it exists: **delete** `.claude/active-plan` (do not empty — delete the file). Subsequent SessionStart hooks see no active-plan and exit silently.
-9. **ADR Promotion Scan.** Read the full `<top>-journal.md` from plan start to this final completion entry. Scan for entries tagged `[adr-candidate]` that are not already tagged `[adr-declined]` and do not have a corresponding ADR file in `docs/explanation/adr/`. For each such entry:
-    - Show the journal entry summary to the user.
-    - Ask: "Promote to formal ADR? (yes/no/defer)"
-    - If **yes:** invoke the `architecture-decision-records` skill → drafts `docs/explanation/adr/NNNN-<title>.md` with next-available ADR number.
-    - If **defer:** leave the entry as-is (user can run `/docs-refresh adr` later).
-    - If **no:** append the `[adr-declined]` tag to the existing journal line.
-
-    If no `[adr-candidate]` entries remain unprocessed, skip silently. Same idempotency guarantee as the Sub-Plan Close Path scan above.
-
-10. Report to the caller: plan tree is complete, active-plan marker cleared, `finishing-a-development-branch` flow should now be invoked. If any ADR drafts were created in Step 9, list their paths in the report.
+**Top-Level vs. Sub-Plan Detection:** uses the walk-up algorithm defined in the Active-Plan Marker section above. If walk-up finds a parent `*-plan.md`, run the Sub-Plan Close Path; otherwise run the Terminal-State Path. Full details in `close-subplan.md`.
 
 ---
 
