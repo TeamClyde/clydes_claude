@@ -130,13 +130,13 @@ Format: `MAJOR.MINOR.PATCH` (e.g., `v1.4.2`)
 
 **PR operations** (create PR, post review comments, get PR status, merge) require a platform-specific tool:
 
-**Platform: Bitbucket Cloud.** Tool: `aashari/mcp-server-atlassian-bitbucket` (community MCP). Auth via scoped API token — pipeline integration uses API tokens regardless, so this is consistent with existing practice.
+**Platform: Bitbucket Cloud.** PR operations use the Bitbucket Cloud REST API (`api.bitbucket.org/2.0`) authenticated with an API token. The token pairs with the Atlassian account email and is retrieved at runtime via `git credential fill` — never stored in this repo or passed on the command line. (Bitbucket app passwords are being retired; use an API token.)
 
-Capabilities used: create PR, get PR diff and changed files, post inline review comments, get PR status and checks.
+Capabilities used: create PR, get PR diff and changed files, post inline review comments, get PR status and checks — all via the REST API.
 
-Fallback if MCP is unavailable: output the full PR title and description for manual submission via Bitbucket UI.
+Fallback if no Bitbucket credential is configured (or `curl` is unavailable): output the full PR title and description for manual submission via the Bitbucket UI.
 
-**The existing Atlassian MCP** (used for Jira/Confluence) does not cover Bitbucket PRs. These are separate concerns handled by separate tools.
+**The existing Atlassian MCP** (used for Jira/Confluence) does not cover Bitbucket PRs — those go through the Bitbucket REST API described above. These are separate concerns.
 
 ---
 
@@ -288,7 +288,7 @@ Main context forms the complete commit message and file list, then dispatches th
 3. Dispatch `get-branch-summary` to get commit list and diff
 4. Main context constructs PR title (conventional commit format, Jira key) and populates description template
 5. Verify diff scope matches the linked ticket — if unrelated changes are present, flag to user before opening
-6. Open PR via Bitbucket MCP (see Tooling section) or output details for manual submission
+6. Open PR via the Bitbucket REST API (see Tooling section) or output details for manual submission
 7. Report PR URL
 8. Do not request specific reviewers unless user specifies
 
@@ -299,11 +299,11 @@ Main context forms the complete commit message and file list, then dispatches th
 **Trigger:** Claude reviews a PR when explicitly asked. Review is not automatic — it requires a user instruction or a comment on the PR requesting it.
 
 **What Claude needs:**
-- The full diff and changed file list — fetched via `aashari/mcp-server-atlassian-bitbucket` or via `get-branch-summary` subagent operation if reviewing before PR is open
+- The full diff and changed file list — fetched via the Bitbucket REST API or via `get-branch-summary` subagent operation if reviewing before PR is open
 - The existing test files for any files touched by the diff — needed to assess coverage
 - `CLAUDE.md` for repo-specific conventions to check against
 - Recent git history for context on patterns and why certain structures exist
-- Ability to post inline comments — via Bitbucket MCP
+- Ability to post inline comments — via the Bitbucket REST API
 
 **Steps:**
 1. Fetch the diff and the list of changed files
@@ -351,7 +351,7 @@ Main context determines the version and writes the annotation. Subagent creates 
 | CI failure after push | Report the failing check, link to logs if available. Do not push again until fixed. |
 | Merge conflict | List conflicting files. Stop. Ask user — never auto-resolve. |
 | Pre-commit hook rejection | Show hook output. Auto-fix if the hook supports it (lint/format). Re-attempt commit. Secret scan or commit format failures require manual fix. |
-| No PR MCP configured | Output full PR title and description for manual submission via Bitbucket UI. |
+| No Bitbucket credential, or `curl` unavailable | Output full PR title and description for manual submission via the Bitbucket UI. |
 
 ---
 

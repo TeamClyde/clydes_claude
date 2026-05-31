@@ -158,7 +158,7 @@ Use when a caller (typically a smoke-test subagent) needs to actually create a c
       - Anything else → backend `manual`
 4. **Preflight:**
    - `github`: verify `gh` CLI is available (`command -v gh` on POSIX, `Get-Command gh` on PowerShell). If absent → fall back to `manual` and surface: "GitHub backend detected but `gh` CLI is not installed. Install via https://cli.github.com/ and re-run, or submit the PR manually using the title and body below."
-   - `bitbucket`: verify `@aashari/mcp-server-atlassian-bitbucket` MCP is loaded. If absent → fall back to `manual` with similar message.
+   - `bitbucket`: verify `curl` and a base64 encoder (`openssl` or `base64`) are available. The API token itself is checked inside the REST script (Step 6) via `git credential fill`. If `curl` is absent → fall back to `manual` with a similar message.
    - `manual`: no preflight needed.
 5. **Diff inspection:** fetch the branch diff (via the detected backend's API, or `git diff origin/main...HEAD` for `manual`); flag unrelated changes before opening the PR.
 6. **Open PR:**
@@ -167,7 +167,33 @@ Use when a caller (typically a smoke-test subagent) needs to actually create a c
      gh pr create --base main --title "type: subject [PROJ-N]" --body "$(<from template below or pr-body override>)"
      ```
      Squash-merge is set repo-side via branch protection (not per-PR), so no flag needed.
-   - **`bitbucket`:** open via `@aashari/mcp-server-atlassian-bitbucket` MCP. Title and body as above. Target `main`, squash merge.
+   - **`bitbucket`:** create the PR with a single self-contained REST script (one script, so the secret never persists between steps). No MCP. The script:
+     1. **Retrieve the credential non-interactively** — pipe the host only (no path) into `git credential fill`:
+        ```bash
+        cred=$(printf 'protocol=https\nhost=bitbucket.org\n\n' | git credential fill)
+        user=$(printf '%s\n' "$cred" | sed -n 's/^username=//p')
+        pass=$(printf '%s\n' "$cred" | sed -n 's/^password=//p')
+        ```
+        `user` is the Atlassian account email; `pass` is the API token.
+     2. **If `user` or `pass` is empty** (no credential helper configured), STOP and tell the user to set up their Bitbucket credential — point them at the `secrets-handling` rule (create an API token, then store it by running an authenticated git operation so the OS credential manager captures it). Do not fall into an interactive prompt.
+     3. **Validate** that `user` contains `@` — an API token must pair with the Atlassian email, not a legacy Bitbucket username. If not, surface a clear error.
+     4. **Derive `{workspace}` and `{repo}`** from the `git remote get-url origin` value obtained during backend detection — parse the HTTPS form `https://bitbucket.org/<workspace>/<repo>.git` or the SSH form `git@bitbucket.org:<workspace>/<repo>.git`, stripping any trailing `.git`.
+     5. **Build the auth header in a shell variable** — never pass the token via `curl -u` or any argv position:
+        ```bash
+        b64=$(printf '%s:%s' "$user" "$pass" | openssl base64 -A)   # fallback if no openssl: base64 -w0  (or: base64 | tr -d '\n')
+        auth="Authorization: Basic $b64"
+        ```
+        Native-PowerShell variant (if documenting one): `$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${user}:${pass}"))`.
+     6. **POST the pull request**, passing the header via `-H "$auth"`:
+        ```bash
+        curl -sS -X POST -H "$auth" -H 'Content-Type: application/json' \
+          "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pullrequests" \
+          -d "{\"title\":\"$title\",\"source\":{\"branch\":{\"name\":\"$source_branch\"}},\"destination\":{\"branch\":{\"name\":\"$target_branch\"}},\"description\":\"$description\"}"
+        ```
+        Print only the resulting PR URL / status — never echo `$pass`, `$b64`, or `$auth`.
+     7. **On HTTP 401**, advise the user their API token may be invalid or lack pull-request scope.
+     8. **Unset the secrets** so they do not linger in the shell environment: `unset cred user pass b64 auth`.
+     - **Authentication note:** Bitbucket app passwords are being retired — use an API token paired with your Atlassian account email.
    - **`manual`:** output the title and body to the user; they submit via the host's web UI or their own CLI.
 7. Report PR URL on success (or "manual submission required" with the rendered title/body for the `manual` path).
 
@@ -204,7 +230,8 @@ Stop immediately and surface to the user:
 | Secrets/credentials in staged diff | Do not commit. Surface what was found. |
 | Uncommitted changes when switching branches | Stash or ask user |
 | Merge conflicts | List files, do not auto-resolve |
-| MCP auth failure | Report which MCP failed. Do not retry. |
+| Bitbucket credential missing (empty `git credential fill`) | Stop; direct the user to set up their API token per the `secrets-handling` rule. Do not prompt interactively. |
+| Bitbucket HTTP 401 on PR create | Token may be invalid or lack pull-request scope. Surface the status; do not retry blindly. |
 
 ---
 
@@ -222,6 +249,8 @@ Stop immediately and surface to the user:
 ## Merge Strategy
 
 All PRs squash-merge into `main`. Squash commit message = PR title (conventional commit format). No fast-forward or three-way merge commits on `main`.
+
+The merge strategy is enforced **host-side** — by branch-protection rules or the host's repository merge settings — so this skill documents the expected squash policy; it does not (and cannot) guarantee it per-PR. Configure squash-only at the host to make the policy binding.
 
 ---
 
