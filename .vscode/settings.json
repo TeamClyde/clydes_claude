@@ -1,6 +1,9 @@
 {
   "cSpell.words": [
     "adversarially",
+    "api",
+    "pasteable",
+    "pullrequests",
     "fastapi",
     "fastify",
     "pydantic",
@@ -9,8 +12,13 @@
     "anthropic",
     "anthropics",
     "args",
+    "argv",
     "arXiv",
     "atlassian",
+    "bitbucket",
+    "netrc",
+    "openssl",
+    "base64",
     "callsites",
     "Caylent",
     "automate",
