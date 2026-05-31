@@ -125,7 +125,7 @@ Skill {
 
 Do **not** call `gh pr create` directly from this skill — that bypasses `git-manager`'s backend detection, breaks the abstraction, and skips the WIP/unrelated-change checks in the `publish` workflow.
 
-Then: Cleanup worktree (Step 5)
+Then: Keep the worktree until the PR merges — do **not** run Step 5 cleanup.
 
 #### Option 3: Keep As-Is
 
@@ -157,7 +157,7 @@ Then: Cleanup worktree (Step 5)
 
 ### Step 5: Cleanup Worktree
 
-**For Options 1, 2, 4:**
+**For Options 1 and 4:**
 
 Check if in worktree:
 ```bash
@@ -175,7 +175,18 @@ git worktree remove <worktree-path>
 rm -rf ".claude/worktrees/$wt_name"
 ```
 
-**For Option 3:** Keep worktree (and its sidecar).
+**For Options 2 and 3:** Keep worktree (and its sidecar) — Option 2's PR is still open and may need review-fix pushes.
+
+## Post-Merge Graph Refresh
+
+After **Option 1 (Merge Locally)** — once the feature branch has actually merged into the base branch — refresh the codebase graph so future sessions navigate the merged code.
+
+- **Gate:** only if `.claude-init/CODEBASE.md` exists. If it does not, the repo has no graph — skip this step silently.
+- **Reindex** using the same pattern as `infra-init` Phase 2: verify the tool is available (`ToolSearch("select:index_repository,index_status")`), call `index_repository`, then poll `index_status` until indexing completes. See `infra-init` for the full polling detail — do not duplicate it here.
+- Pass the **correct, fully-qualified absolute path** of the repository to `index_repository` so the index persists against the right project.
+- **Confirm persistence:** after indexing, call `list_projects()` and verify an entry matches this repository. If none matches, surface that to the user rather than reporting success.
+
+Do **not** reindex for **Option 2 (Push and Create PR)** — the code has not merged into the base branch yet (the PR is still open), so indexing would capture unmerged feature-branch state. Tell the user to re-run `/infra-init` after the PR is merged. Skip entirely for Option 3 (Keep As-Is) and Option 4 (Discard).
 
 ## Quick Reference
 

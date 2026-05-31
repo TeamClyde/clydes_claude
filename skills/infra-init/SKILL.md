@@ -82,7 +82,7 @@ ToolSearch("select:index_repository,index_status")
 
 If `index_repository` is not found, stop and tell the user — do not attempt inline installation.
 
-Get the absolute repo path:
+Get the absolute repo path — pass the correct, fully-qualified absolute path to `index_repository` so the index persists against the right project:
 
 ```bash
 REPO_PATH="$(pwd -P)"

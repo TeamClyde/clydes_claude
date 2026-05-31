@@ -195,6 +195,7 @@ Every journal entry appended by `divergence` must include at least one tag from 
 | `[test-debt]` | A test gap or flaky test discovered mid-execution |
 | `[divergence]` | An architecture, file path, signature, or scope change from the plan |
 | `[decision]` | A mid-execution decision that overrides or refines a plan-time decision |
+| `[pause]` | A plan, sub-plan, or epic was paused to prioritize different work — records what was parked and why, so the pause is discoverable when scanning the journal. Distinct from `[decision]`: use it whenever active work is set aside, not merely re-scoped. |
 | `[test-mechanics]` | A change to how tests are run (new flag, env var, fixture pattern, skip group) |
 | `[constraint]` | A runtime-discovered constraint (replaces per-plan integration-test-constraints.md) |
 | `[debug-cascade]` | A debugging cascade root cause and fix |
