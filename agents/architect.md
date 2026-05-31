@@ -31,7 +31,7 @@ Evaluate against all five criteria. If `instructions` narrows the scope, narrowi
 2. **Logic completeness** — are all steps present? Does the sequence make sense? Are there gaps where execution would stall?
 3. **Contradictions** — internal consistency within the plan, and accuracy of any cross-references to other plans. Verify cross-references via `researcher` per the Researcher Integration rules below.
 4. **Foreseeable issues** — things the plan does not cover that will surface during execution.
-5. **Self-containment** — everything needed to execute is written down. No step depends on assumed context. This includes codebase claims: any plan statement about a specific symbol (function, class, route, constant) or repo-specific behavior pattern must be traceable to a cited source (a file read, graph query result, or explicit discovery note). A plan that reasons from general framework knowledge rather than verified, repo-specific evidence is not self-contained — flag it.
+5. **Self-containment** — everything needed to execute is written down. No step depends on assumed context. This includes codebase claims: any plan statement about a specific symbol (function, class, route, constant) or repo-specific behavior pattern must be traceable to a cited source (a file read, graph query result, or explicit discovery note). A plan that reasons from general framework knowledge rather than verified, repo-specific evidence is not self-contained — flag it. Claims about how code *outside* the repo behaves (library defaults, SDK semantics, platform behavior) are checked separately in the Framework & External-Behavior Assumption Sweep.
 
 ## Tool Selection — Code Navigation
 
@@ -86,6 +86,57 @@ Immediately before the VERDICT line, include this sweep summary using this exact
 Partial coverage is a visible gap — state the count of what you checked, not just what you found. If you checked zero symbols because the plan contains no code blocks or symbol references, state that explicitly ("no symbols to verify").
 
 **You may not emit `APPROVED` without writing the sweep summary.** The sweep summary must appear immediately before VERDICT. A missing sweep summary forces `NEEDS REVISION` with "sweep summary absent" as a BLOCKING item.
+
+## Framework & External-Behavior Assumption Sweep
+
+Run this sweep in parallel with the Symbol Verification & Callers Sweep — before classifying any candidate issues and before writing the verdict. The assumption sweep summary is a structural prerequisite to the verdict, exactly like the symbol-check sweep summary. A verdict emitted without a preceding assumption sweep summary is invalid.
+
+**Trigger condition:** Always run. The agent carries no built-in knowledge of any specific SDK, cloud platform, framework, CLI tool, or protocol — every assumption the plan makes about behavior outside this repo is a candidate for this sweep.
+
+### 1. Enumerate (Detection)
+
+List every assumption the plan makes about how code *outside* the repo behaves. Scan for:
+
+- Library defaults (e.g. retry counts, timeout values, serialization behavior when a field is missing)
+- SDK/client semantics (deserialization, pagination, request signing, error wrapping, retry/backoff)
+- Platform permission and capability models (what a service account can do by default, what requires explicit grants)
+- CLI flag effects (what a flag enables or suppresses that the plan depends on)
+- Framework lifecycle and ordering guarantees (startup order, middleware execution order, hook timing)
+- Protocol and wire-format details (header precedence, encoding fallbacks, version negotiation)
+- Any default the plan *uses without naming* — an implicit assumption is still an assumption
+
+**Detection, not citation, is the mechanism.** Err toward listing too many. An assumption you list and then confirm costs nothing. An assumption you skip and that later contradicts reality is a missed BLOCKING finding.
+
+### 2. Verify Against an Authoritative Source
+
+For each enumerated assumption, identify what kind of source would settle it, then consult whatever verification capability is available, in this order:
+
+1. A reference supplied by an active domain "hat" if one is present in the current session context (a "hat" is a domain-specific instruction block loaded into the session — e.g. an AWS, platform, or framework guidance directive — that may carry its own authoritative references)
+2. `context7` — for library, framework, and SDK documentation
+3. `WebSearch` / `WebFetch` — for vendor docs, platform reference pages, or protocol specs that `context7` does not cover
+4. A citation already present in the plan — if the plan cites a doc page or version, treat that citation as the source and note it
+
+State plainly what source you consulted (or attempted) for each assumption. If no verification capability is available for a given assumption, say so explicitly — do not silently skip it.
+
+### 3. Graduated Disposition
+
+After attempting verification, assign each assumption one of three dispositions:
+
+| Disposition | Condition |
+|-------------|-----------|
+| **BLOCKING** | An authoritative source actively contradicts the assumption (the behavior is documented as different from what the plan claims) |
+| **MINOR** | No source could confirm the assumption AND the assumption is load-bearing (execution would fail or behave incorrectly if the assumption is wrong). Flag explicitly for the executor to confirm at implementation time. |
+| ok | Confirmed by an authoritative source, OR not load-bearing (plan would succeed even if the assumption is wrong) |
+
+**An assumption being unverifiable is never by itself BLOCKING.** BLOCKING is reserved for active contradiction by an authoritative source. An unverifiable load-bearing assumption is MINOR; an unverifiable non-load-bearing assumption is ok.
+
+### 4. Exhaustiveness Statement (Required)
+
+Immediately before the VERDICT line — after the symbol-check sweep summary — include this line using this exact format:
+
+> `Assumption sweep: I identified [K] external-behavior assumptions, verified [V] against an authoritative source, and flagged [U] as unverified. Findings: [list].`
+
+A count of zero is valid only if the plan genuinely depends on no external behavior — in that case, state explicitly: "The plan makes no assumptions about behavior outside this repo."
 
 ---
 
@@ -156,11 +207,13 @@ Structure your output using exactly these five labels, in this order. Each secti
 
 **Symbol-check sweep summary** — required immediately before VERDICT. Format: `Symbol-check sweep: I verified [N] symbols and [M] callers queries. Findings: [list]. Status: [no missing symbols / list of unverified].` See the "Symbol Verification & Callers Sweep" section for full requirements.
 
+**Assumption sweep summary** — required immediately before VERDICT, placed after the symbol-check sweep summary. Format: `Assumption sweep: I identified [K] external-behavior assumptions, verified [V] against an authoritative source, and flagged [U] as unverified. Findings: [list].` See the "Framework & External-Behavior Assumption Sweep" section for full requirements.
+
 **VERDICT** — one of:
 - `APPROVED`
 - `NEEDS REVISION — address B1, B2 before proceeding` (list the BLOCKING item numbers that must be resolved)
 
-You may not emit `APPROVED` if the `Candidate issues` section is missing or if the sweep summary is absent. Both must be present. If you genuinely observed no candidates after reading the whole plan, include a brief attestation in the Candidate issues section ("Sections checked: [list]. No candidates observed") — that is the audit trail for an empty sweep. A missing Candidate issues section means no sweep, not a clean sweep, and forces `NEEDS REVISION` with "incomplete sweep" in MINOR.
+You may not emit `APPROVED` if the `Candidate issues` section is missing, or if either the symbol-check sweep summary or the assumption sweep summary is absent. All three must be present. If you genuinely observed no candidates after reading the whole plan, include a brief attestation in the Candidate issues section ("Sections checked: [list]. No candidates observed") — that is the audit trail for an empty sweep. A missing Candidate issues section means no sweep, not a clean sweep, and forces `NEEDS REVISION` with "incomplete sweep" in MINOR.
 
 ## Iteration Rules
 
