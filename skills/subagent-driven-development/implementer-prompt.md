@@ -15,6 +15,7 @@ Task tool (general-purpose):
     Plan goal: <one sentence from plan doc Context section>
     This task's contribution: <one sentence on why this task exists>
     Recent completed tasks (last 3–5): <task IDs + one-line names>
+    Active stack hats: <names + one-line digest each; "none" if no stacks declared>
 
     Task N: [task name]
     **Model:** <chosen-model> — <one-line rationale, e.g. "mechanical: 1 file, clear spec">
@@ -43,4 +44,5 @@ Task tool (general-purpose):
 **Variable suffix authoring rules:**
 - First non-empty line MUST be the marker `[role: implementer]`. The hook strips it.
 - The Plan Anchor block sits immediately above `Task N:`. Cap at last 3–5 completed tasks; digest only (IDs + one-line names, never per-task summaries). Authored by the orchestrator from the plan doc's Context section.
+- The `Active stack hats` line lists the repo's stack best-practices. The implementer MUST make its code follow them (they layer on SE-fundamentals). Resolved by the orchestrator from `project.json` `stacks`; see `rules/stack-hats.md`.
 - Everything else is per-task variable content — never methodological.

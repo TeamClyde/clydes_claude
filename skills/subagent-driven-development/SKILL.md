@@ -252,11 +252,12 @@ Counters orchestrator and implementer drift across long sessions. The orchestrat
 Plan goal: <one sentence from plan doc Context section>
 This task's contribution: <one sentence on why this task exists>
 Recent completed tasks (last 3–5): <task IDs + one-line names, no summaries>
+Active stack hats: <names + a one-line digest each, resolved from project.json stacks; "none" if no stacks declared>
 ```
 
 **Position:** First block of the variable suffix, immediately after the `[role: implementer]` marker line, before the `Task N:` line. The implementer reads "what's the goal" before "what's the task," matching how a human briefs a colleague.
 
-**Author:** Orchestrator (this skill / this context). Re-read the plan doc's Context section before each implementer dispatch — the re-read is itself part of B2 and counters orchestrator-level drift.
+**Author:** Orchestrator (this skill / this context). Re-read the plan doc's Context section before each implementer dispatch — the re-read is itself part of B2 and counters orchestrator-level drift. Also resolve the repo's active stack hats once (read `project.json` `stacks`; for each, read `~/.claude/stacks/<name>.md` `## Hat`) and fill the `Active stack hats` field with a one-line digest per hat. See `rules/stack-hats.md`. This adds ~10–30 tokens to the anchor; keep each hat to a single line.
 
 **Sizing rule (anti-bloat):**
 - Recent completed tasks list: cap at the last 3–5 tasks; digest format only (IDs + one-line names, never per-task summaries).
