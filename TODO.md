@@ -17,13 +17,6 @@
   - [ ] Tier 3 — Focused fixes: UserPromptSubmit slash-command directive, brainstorming two-stage research bookends, project-name PostToolUse self-heal + root-cause fix, plan-gate parallel dispatch with soft-gate adherence-audit, [gate-complete] tag + plan-gate end-of-success :divergence
   - [ ] Tier 2 — Sub-plan spawn: subagent-driven-development frontier rewrite (B1 tier-aware dispatch, B2 re-anchoring, B3 cache-stable prompt prefix, B4 executable-verification preference) — runs in sub-plan after parent Task 10
 
-- [ ] Stack Hats (Phase 1) — global per-stack "hat" catalog + SessionStart injection hook, unified so the architect and code-gen skills also consume active hats. Origin: GitHub #43, #58. — [plan doc](plans/stack-hats/stack-hats-plan.md)
-  - [ ] Catalog backbone: `stacks/_TEMPLATE.md` + `stacks/python.md` seed + setup.sh symlink
-  - [ ] SessionStart `stack-hat-directive.mjs` hook + 9-case test suite + settings wiring
-  - [ ] Hook/catalog docs + klondike_gui integration check
-  - [ ] Unification: `rules/stack-hats.md` contract + architect adherence-check + executing-plans/SDD consumption + docs
-  - Deferred to Phase 2: stack auto-detection, prompt-first tool install, catalog write-back into /project-setup
-
 ## Backlog
 
 - Mobile app workflow observations — real-world testing of memory capture, skill triggering, and CSO effectiveness in a new repo. Mobile app repo on separate machine will be used to observe whether memory is actually being written/read, which skills auto-trigger vs. get skipped, and what friction surfaces. Signal feeds back into memory system and CSO improvements. [scope]
@@ -34,6 +27,7 @@
 
 ## History
 
+- [x] Stack Hats (Phase 1) — completed 2026-06-01. Global per-stack "hat" catalog (`stacks/<tech>.md`) + SessionStart injection hook (10-case test suite), unified so `architect` (criterion 6), `executing-plans`, and `subagent-driven-development` also resolve+leverage active hats off one source (`project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`). Validated end-to-end vs klondike_gui. On `feature/stack-hats` (13 commits, unpushed). Phase 2 (auto-detect/install/write-back) deferred. Closes part of GitHub #43, #58.
 - [x] Workflow doc process rework — completed 2026-05-07. Delivered four-file plan tree (design + plan + journal + handoff), three new plan-management modes (divergence, spawn-subplan, close-subplan) with idempotent atomic three-write invariant, .claude/active-plan marker, constitutional gates across writing-plans / executing-plans / subagent-driven-development / systematic-debugging, scope-driven plan-state validators in git-manager + bash pre-commit, SessionStart Node hook, plan-gate Jira/TDD-disabled branches, and Star Chamber audit pattern (Auditor + Skeptic + Fresh Agent). Bundles GitHub issues #13 + #15 + #18.
 - [x] Codegraph Integration — completed 2026-04-24. Replaced graphify + FastMCP JSON pipeline with codebase-memory-mcp across all rules, skills, agents, and docs. Corrected trace_call_path → trace_path from live binary inspection. Remaining stale references in agents/integration-engineer.md, agents/test-builder.md, and docs/agent-architecture.md (batch-indexer section) are out of scope for this plan.
 - [x] Workflow Audit & Map — completed 2026-04-21. Fixed 4 semantic coherence issues (todo-manager refs, architect tool, plan-gate Case A/B, brainstorming dead path). Created docs/workflow-map.md canonical reference. Brought all 26 skills to Pulser 100/100 (Gotchas + allowed-tools on 21 skills, writing-skills split to 399 lines). Cleaned up committed session artifacts (plans/, tests/). Added adherence-audit skill for ongoing drift detection.
