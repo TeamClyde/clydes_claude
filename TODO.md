@@ -4,16 +4,33 @@
 
 ## Up Next
 
+- [ ] Workflow Feedback Fixes — six triaged workflow-friction fixes. Closes GitHub issues #61, #49, #54, #50, #55, #48, #56, #57. — [plan doc](plans/workflow-feedback-fixes/workflow-feedback-fixes-plan.md)
+  - [ ] Architect external-behavior assumption sweep (#61, #49)
+  - [ ] git-manager Bitbucket via API token, MCP removed (#54, #50)
+  - [ ] `/handoff` skill (#55)
+  - [ ] plan-management `[pause]` tag (#48)
+  - [ ] Post-merge codebase-graph refresh + path correctness (#56, #57)
+  - [ ] Secrets-handling rule (never paste; store-and-retrieve; never echo)
+
 - [ ] Orchestrator Routing v2 — mechanical enforcement of orchestrator routing decisions via Claude Code hooks + agent frontmatter pinning. Closes 8 GitHub workflow-friction issues (#14, #21, #28, #30, #31, #32, #33, #34). — [plan doc](plans/orchestrator-routing-v2/orchestrator-routing-v2-plan.md)
   - [ ] Tier 1 — Mechanical routing core: agent discovery + Haiku frontmatter pinning, PreToolUse Agent dispatch hook, SessionStart graph-tools directive + PreToolUse Grep/Glob enforcement, architect prompt expansion (symbol verification + callers query)
   - [ ] Tier 3 — Focused fixes: UserPromptSubmit slash-command directive, brainstorming two-stage research bookends, project-name PostToolUse self-heal + root-cause fix, plan-gate parallel dispatch with soft-gate adherence-audit, [gate-complete] tag + plan-gate end-of-success :divergence
   - [ ] Tier 2 — Sub-plan spawn: subagent-driven-development frontier rewrite (B1 tier-aware dispatch, B2 re-anchoring, B3 cache-stable prompt prefix, B4 executable-verification preference) — runs in sub-plan after parent Task 10
+
+- [ ] Stack Hats (Phase 1) — global per-stack "hat" catalog + SessionStart injection hook, unified so the architect and code-gen skills also consume active hats. Origin: GitHub #43, #58. — [plan doc](plans/stack-hats/stack-hats-plan.md)
+  - [ ] Catalog backbone: `stacks/_TEMPLATE.md` + `stacks/python.md` seed + setup.sh symlink
+  - [ ] SessionStart `stack-hat-directive.mjs` hook + 9-case test suite + settings wiring
+  - [ ] Hook/catalog docs + klondike_gui integration check
+  - [ ] Unification: `rules/stack-hats.md` contract + architect adherence-check + executing-plans/SDD consumption + docs
+  - Deferred to Phase 2: stack auto-detection, prompt-first tool install, catalog write-back into /project-setup
 
 ## Backlog
 
 - Mobile app workflow observations — real-world testing of memory capture, skill triggering, and CSO effectiveness in a new repo. Mobile app repo on separate machine will be used to observe whether memory is actually being written/read, which skills auto-trigger vs. get skipped, and what friction surfaces. Signal feeds back into memory system and CSO improvements. [scope]
 - feature-dev plugin agent review — revisit feature-dev@claude-plugins-official agents (code-explorer, code-architect, code-reviewer) as potential upgrades to existing custom agents. Plugin was uninstalled 2026-04-20 due to its /feature-dev command bypassing the Jira/git/plan-doc workflow entirely, but the three agents themselves are well-designed and may offer patterns worth absorbing into architect, requesting-code-review, and the writing-plans exploration phase. [scope]
 - Progressive-disclosure split for the three plan-related skills — `skills/adherence-audit/SKILL.md` (216 lines), `skills/plan-gate/SKILL.md` (219 lines), `skills/plan-management/SKILL.md` (386 lines). Pulser flags at 200; Anthropic's official threshold is 500, so no real violation today. Pattern: extract deep-dive sections (mode workflows, severity merge prompt + soft-gate template, output format example) into `references/<topic>.md` files keeping SKILL.md as a navigational overview. One level deep, no cross-linking between references, no duplication between SKILL.md and references. Address when next substantive change touches one of them OR proactively as a workflow-hygiene pass. Deferred 2026-05-09 from orchestrator-routing-v2 epic. [debt]
+- Workflow orchestration for review agents — have a skill run a Workflow (the native multi-agent orchestration tool) that fans out architect / feature-dev:code-reviewer agents via `agent()` `agentType` across review dimensions, with adversarial verify + synthesis. Key design constraint: invert direction — agents are leaf workers, so a skill/main-context orchestrates the Workflow rather than an agent calling Workflow internally (nesting throws). Explored 2026-05-29; deferred. [scope]
+- Post-execution code-review gate — insert an automated code-review checkpoint at the task→Testing transition (alongside the existing architect-at-Testing checkpoint mandated in CLAUDE.md) or just before `finishing-a-development-branch` opens the PR. Closes the standing gap of reviewing written code before the PR. Can be implemented as the fan-out review Workflow from the "Workflow orchestration for review agents" item above. Explored 2026-05-29; deferred. [scope]
 
 ## History
 
