@@ -73,6 +73,7 @@ const missing = [];  // stack names with no/invalid entry
 
 for (const stack of stacks) {
   if (typeof stack !== 'string' || !stack.trim()) continue;
+  if (!/^[A-Za-z0-9_-]+$/.test(stack.trim())) { missing.push(stack); continue; }
   const file = join(stacksDir, `${stack}.md`);
   if (!existsSync(file)) {
     missing.push(stack);

@@ -82,7 +82,7 @@ function assertSilent(r, d) {
   assert(r.stdout.trim() === '', `${d}: expected silent pass, got: ${r.stdout.trim()}`);
 }
 
-console.log('\nStack-hat directive hook — 9 test cases\n');
+console.log('\nStack-hat directive hook — 10 test cases\n');
 
 test('Case 1: no project.json → silent pass', () => {
   assertSilent(runHook({}, { noProjectJson: true }), 'Case 1');
@@ -138,6 +138,14 @@ test('Case 8: malformed entry (no ## Hat) → treated as missing, no throw', () 
 test('Case 9: CLAUDE_DISABLE_WORKFLOW_HOOKS=1 → silent pass', () => {
   writeStack('python', hatFile('t', 'PY_HAT3'));
   assertSilent(runHook({ stacks: ['python'] }, { disableHooks: true }), 'Case 9');
+});
+
+test('Case 10: invalid stack name (path traversal) → treated as missing, no traversal pointer', () => {
+  writeStack('python', hatFile('t', 'PY_HAT4 context managers'));
+  const ctx = ctxOf(runHook({ stacks: ['python', '../evil'] }), 'Case 10');
+  assert(ctx.includes('PY_HAT4'), 'Case 10: valid hat still present');
+  assert(ctx.toLowerCase().includes('no catalog entry'), 'Case 10: invalid name reported as missing');
+  assert(!/read[^\n]*\.\.\//.test(ctx), 'Case 10: must not emit a path-traversing read pointer');
 });
 
 try { rmSync(TMP, { recursive: true, force: true }); } catch { /* non-fatal */ }
