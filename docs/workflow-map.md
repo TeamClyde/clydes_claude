@@ -211,6 +211,7 @@ Hooks live in `hooks/` and are symlinked to `~/.claude/hooks/` by setup.sh.
 |------|------|---------|--------------|
 | `pre-commit` | bash | Before every git commit | Runs per-repo `scripts/run-tests.sh` if executable; runs ESLint and ruff if their config files are present; runs gitleaks secret scanning if installed. Step 5 (Task 14): reads `.claude/active-plan` and refuses in-scope commits if the plan doc is not staged or `--no-verify` is passed. All checks skip gracefully if the tool is absent. |
 | `session-start.mjs` | Node.js | SessionStart | Reads `.claude/active-plan`; surfaces the active plan's handoff file to orient the session. Exits 0 on any error — never blocks a session start. |
+| `sessionStart/stack-hat-directive.mjs` | Node.js | SessionStart | Reads `project.json` `stacks`; injects each `~/.claude/stacks/<stack>.md` `## Hat` section (specialist best-practices + tooling reminders), size-budgeted to full-inline or pointer-to-file. Silent pass when no `stacks`. Never blocks session start. |
 
 ### Intentionally unused hooks
 

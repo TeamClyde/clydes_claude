@@ -132,6 +132,7 @@ Load priority: rules override skills. Highest priority: `CLAUDE.md`.
 | Hook | Status | Trigger | What it does |
 |------|--------|---------|--------------|
 | `pre-commit` | ✅ | Before every git commit | Runs `scripts/run-tests.sh` (if executable); ESLint (if `.eslintrc` present); ruff (if `pyproject.toml` present); gitleaks (if installed). All checks skip gracefully if the tool is absent. |
+| `stack-hat-directive.mjs` | ✅ | SessionStart | Injects per-stack `## Hat` guidance from `~/.claude/stacks/` based on `project.json` `stacks`. Size-budgeted. Phase 1 of stack-hats (detection/install automation is Phase 2). |
 
 ---
 

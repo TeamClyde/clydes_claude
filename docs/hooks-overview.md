@@ -29,6 +29,17 @@ This repo defines several Claude Code hooks at `.claude/hooks/<event>/<intent>.m
 - `CODEBASE.md` present: emit additionalContext with ToolSearch instruction
 **Owner issue:** #31 (loading aspect)
 
+### `sessionStart/stack-hat-directive.mjs`
+
+**Event:** `SessionStart`
+**Purpose:** When `project.json` in CWD declares a non-empty `stacks` array, inject the matching catalog entries' `## Hat` guidance (specialist best-practices + tooling reminders), layered on SE-fundamentals.
+**Behavior:**
+- No `project.json`, no `stacks` field, or empty array: silent pass
+- Reads each `~/.claude/stacks/<stack>.md`, extracts `## Hat`, composes them
+- Size budget (~3200 chars ≈ 800 tokens): full inline when small; pointer-to-file directive when large
+- Declared stack with no entry (or no `## Hat`): emits a one-line "no catalog entry yet" note, never fails
+**Override:** `CLAUDE_DISABLE_WORKFLOW_HOOKS=1`
+
 ### `preToolUse/graph-tools-enforcement.mjs`
 
 **Event:** `PreToolUse` on `Grep` and `Glob` tools
