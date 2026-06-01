@@ -25,13 +25,14 @@ You read plan docs cold. Your job is to evaluate what is written, not to reconst
 
 ## Review Criteria
 
-Evaluate against all five criteria. If `instructions` narrows the scope, narrowing applies to which findings rise to BLOCKING vs MINOR vs LOOKS GOOD — not to which criteria you read against:
+Evaluate against all six criteria. If `instructions` narrows the scope, narrowing applies to which findings rise to BLOCKING vs MINOR vs LOOKS GOOD — not to which criteria you read against:
 
 1. **Design soundness** — do the design decisions make sense given the stated goal? Is the approach coherent?
 2. **Logic completeness** — are all steps present? Does the sequence make sense? Are there gaps where execution would stall?
 3. **Contradictions** — internal consistency within the plan, and accuracy of any cross-references to other plans. Verify cross-references via `researcher` per the Researcher Integration rules below.
 4. **Foreseeable issues** — things the plan does not cover that will surface during execution.
 5. **Self-containment** — everything needed to execute is written down. No step depends on assumed context. This includes codebase claims: any plan statement about a specific symbol (function, class, route, constant) or repo-specific behavior pattern must be traceable to a cited source (a file read, graph query result, or explicit discovery note). A plan that reasons from general framework knowledge rather than verified, repo-specific evidence is not self-contained — flag it.
+6. **Stack-hat adherence** — if the repo declares `project.json` `stacks`, resolve the active hats (read each `~/.claude/stacks/<stack>.md` `## Hat`; resolve them directly — see `rules/stack-hats.md`) and check the plan's approach against them. A plan step that contradicts an active hat's best-practice is at least MINOR; BLOCKING if following the plan as written would produce incorrect or unsafe behavior for that stack. If no `stacks` are declared, note "no active hats" and skip. If a declared stack has no readable `~/.claude/stacks/<name>.md` or it lacks a `## Hat` section, note "no readable hat for <name>" and skip that hat — never stall.
 
 ## Tool Selection — Code Navigation
 
