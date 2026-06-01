@@ -112,7 +112,7 @@ List every assumption the plan makes about how code *outside* the repo behaves. 
 
 For each enumerated assumption, identify what kind of source would settle it, then consult whatever verification capability is available, in this order:
 
-1. A reference supplied by an active domain "hat" if one is present in the current session context (a "hat" is a domain-specific instruction block loaded into the session — e.g. an AWS, platform, or framework guidance directive — that may carry its own authoritative references)
+1. A reference supplied by an active domain "hat" if one is present in the current session context (a "hat" is a domain-specific instruction block loaded into the session — e.g. an AWS, platform, or framework guidance directive — that may carry its own authoritative references). In this workflow the canonical hats are the **stack hats** — resolve them by reading `project.json` `stacks` and each `~/.claude/stacks/<stack>.md` `## Hat`; resolve directly, don't rely on the SessionStart injection reaching you. See `rules/stack-hats.md`.
 2. `context7` — for library, framework, and SDK documentation
 3. `WebSearch` / `WebFetch` — for vendor docs, platform reference pages, or protocol specs that `context7` does not cover
 4. A citation already present in the plan — if the plan cites a doc page or version, treat that citation as the source and note it
