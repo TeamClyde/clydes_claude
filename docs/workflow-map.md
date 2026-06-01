@@ -198,6 +198,9 @@ Rules are in `rules/` and `CLAUDE.md`.
 | `rules/mcp-governance.md` | MCP tool access | No direct Atlassian MCP calls; JQL must include `project=` filter |
 | `rules/plugin-lifecycle.md` | Plugin routing, conflict suppression | Integrated plugins route via `creating-tools`; do not invoke directly |
 | `rules/cspell.md` | Spellcheck false positives | Auto-add to `cspell.json` and `.vscode/settings.json` without asking |
+| `rules/stack-hats.md` | Per-stack best-practice layer | Active hats resolved from `project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`; leveraged at session start (hook), code-generation (`executing-plans`/`subagent-driven-development`), and architect review |
+
+**Stack hats are consumed at three points off one source** (`project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`): the `sessionStart/stack-hat-directive.mjs` hook injects them as ambient reminders; `executing-plans` and `subagent-driven-development` resolve them so generated code follows them; and the `architect` agent resolves them and adherence-checks plans/implementations. Subagents resolve hats deterministically rather than relying on the ambient injection. Contract: `rules/stack-hats.md`.
 
 ---
 
