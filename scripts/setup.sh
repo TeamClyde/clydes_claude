@@ -284,6 +284,9 @@ done
 # Symlink rules/filesystem/ subdirectory as a unit
 install_symlink "$REPO_ROOT/rules/filesystem" "$HOME/.claude/rules/filesystem" "rules/filesystem/"
 
+# Symlink stacks/ catalog directory as a unit (global stack-hat catalog)
+install_symlink "$REPO_ROOT/stacks" "$HOME/.claude/stacks" "stacks/"
+
 install_symlink "$REPO_ROOT/CLAUDE.md" "$HOME/.claude/CLAUDE.md" "CLAUDE.md"
 
 # ---------------------------------------------------------------------------

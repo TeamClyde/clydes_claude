@@ -26,6 +26,8 @@ Load plan, review critically, execute all tasks, report when complete.
 
 **Before starting the first task:** Read `project.json` at repo root if it exists. Note whether `jira.enabled` is true. If absent, assume Jira is enabled (legacy fallback).
 
+**Also resolve the repo's active stack hats:** read `project.json` `stacks`; for each name, read `~/.claude/stacks/<name>.md` and keep its `## Hat` section in context. Make every task's implementation follow these specialist best-practices — they layer on your SE-fundamentals, they do not replace them. If there is no `stacks` field, skip. See `rules/stack-hats.md`.
+
 For each task:
 
 #### Constitutional Entry Gate (assert before starting the task)
@@ -130,6 +132,7 @@ After all tasks complete and verified:
 ## Remember
 - Review plan critically first
 - Follow plan steps exactly
+- Follow the repo's active stack hats when implementing — resolve them from `project.json` `stacks` + `~/.claude/stacks/`
 - Don't skip verifications
 - Reference skills when plan says to
 - Stop when blocked, don't guess

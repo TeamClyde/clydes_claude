@@ -200,6 +200,9 @@ Rules are in `rules/` and `CLAUDE.md`.
 | `rules/plugin-lifecycle.md` | Plugin routing, conflict suppression | Integrated plugins route via `creating-tools`; do not invoke directly |
 | `rules/cspell.md` | Spellcheck false positives | Auto-add to `cspell.json` and `.vscode/settings.json` without asking |
 | `rules/secrets-handling.md` | Credential and secret handling in any workflow | Never ask user to paste a secret into chat; walk through store-once recipe (OS credential manager / `~/.netrc` / shell env var); retrieve at runtime via tool, never echo to stdout |
+| `rules/stack-hats.md` | Per-stack best-practice layer | Active hats resolved from `project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`; leveraged at session start (hook), code-generation (`executing-plans`/`subagent-driven-development`), and architect review |
+
+**Stack hats are consumed at three points off one source** (`project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`): the `sessionStart/stack-hat-directive.mjs` hook injects them as ambient reminders; `executing-plans` and `subagent-driven-development` resolve them so generated code follows them; and the `architect` agent resolves them and adherence-checks plans/implementations. Subagents resolve hats deterministically rather than relying on the ambient injection. Contract: `rules/stack-hats.md`.
 
 ---
 
@@ -213,6 +216,7 @@ Hooks live in `hooks/` and are symlinked to `~/.claude/hooks/` by setup.sh.
 |------|------|---------|--------------|
 | `pre-commit` | bash | Before every git commit | Runs per-repo `scripts/run-tests.sh` if executable; runs ESLint and ruff if their config files are present; runs gitleaks secret scanning if installed. Step 5 (Task 14): reads `.claude/active-plan` and refuses in-scope commits if the plan doc is not staged or `--no-verify` is passed. All checks skip gracefully if the tool is absent. |
 | `session-start.mjs` | Node.js | SessionStart | Reads `.claude/active-plan`; surfaces the active plan's handoff file to orient the session. Exits 0 on any error — never blocks a session start. |
+| `sessionStart/stack-hat-directive.mjs` | Node.js | SessionStart | Reads `project.json` `stacks`; injects each `~/.claude/stacks/<stack>.md` `## Hat` section (specialist best-practices + tooling reminders), size-budgeted to full-inline or pointer-to-file. Silent pass when no `stacks`. Never blocks session start. |
 
 ### Intentionally unused hooks
 
