@@ -10,7 +10,7 @@ When the workflow (or Claude in-session) is about to install a tool, run `vet-in
 
 `vet-install` orchestrates all three in order.
 
-## Surface → Scanner Map
+## Surface → Tool Map
 
 | Surface | Reputation | Security |
 |---|---|---|
@@ -20,13 +20,15 @@ When the workflow (or Claude in-session) is about to install a tool, run `vet-in
 | Claude plugins / skills | GitHub signals | Custom heuristics + manual-review flag |
 | cargo crates | deps.dev | OSV CVE-only (malware = gap — flag it) |
 
+*Gate 2 (vet-capability-fit) has no tool column — it reads the candidate's own docs/README.*
+
 ## Risk Rubric
 
 OpenSSF Scorecard aggregate + injection-relevant sub-checks (Code-Review, Branch-Protection, Dangerous-Workflow, Token-Permissions) + maintenance signals + package age. Stars are a weak tiebreaker only (fake-star caveat applies).
 
 | Tier | Meaning |
 |---|---|
-| GREEN | Recommend to user |
+| GREEN | Recommend — user decides |
 | YELLOW | Surface caveats — user decides |
 | RED | Surface concerns clearly — user decides |
 
@@ -38,4 +40,4 @@ GuardDog, OSV-Scanner, and Cisco mcp-scanner are a pinned trusted set. Their one
 
 ## Graceful Degradation
 
-Missing scanner → report "couldn't scan with \<tool\>", recommend installing it, continue. Never error the funnel.
+Missing scanner → report "couldn't scan with `<tool>`", recommend installing it, continue. Never error the funnel.
