@@ -22,7 +22,7 @@ Pick the row matching the finalist's install surface. Each external scanner is i
 
 | Surface | Malware scan | CVE scan |
 |---|---|---|
-| CLI tools / project deps (pip, npm) | GuardDog | OSV-Scanner |
+| CLI tools / project deps (pypi, npm) | GuardDog | OSV-Scanner |
 | MCP servers | Cisco mcp-scanner (YARA + static) | — |
 | IDE / VSCode extensions | GuardDog (on the `.vsix`) | — |
 | Claude plugins / skills | **Custom heuristics** (no external scanner) | — |
@@ -37,10 +37,10 @@ GuardDog catches malware heuristics (typosquat, malicious install-scripts, obfus
 ```bash
 # Malware heuristics — scan a published package by ecosystem (pypi | npm).
 # uvx runs GuardDog without a persistent install; the container form is equivalent.
-uvx guarddog <ecosystem> scan <package> --output-format json
+uvx guarddog <ecosystem> scan <package> --output-format=json
 #   container alternative: docker pull ghcr.io/datadog/guarddog
 # Or verify an entire manifest (requirements.txt / package.json):
-uvx guarddog <ecosystem> verify <manifest-path> --output-format json
+uvx guarddog <ecosystem> verify <manifest-path> --output-format=json
 
 # Known CVEs — scan the project lockfile.
 osv-scanner scan -L <lockfile> --format json
@@ -55,18 +55,30 @@ YARA + static-analysis engines need no API key. (LLM-judge engines do — skip t
 
 ```bash
 # One-time install is bootstrap-exempt: uv tool install cisco-ai-mcp-scanner
-mcp-scanner --format json <path-or-config-of-mcp-server>
-#   confirm subcommand/flags with `mcp-scanner --help` if the above errors.
+#
+# `static` subcommand scans a pre-generated tools JSON without connecting to a live server.
+# --analyzers yara  → offline YARA engine; no API key required.
+# --format raw      → JSON-parseable output (valid values: summary/detailed/table/by_severity/raw;
+#                     "json" is NOT a valid value).
+mcp-scanner --analyzers yara --format raw static --tools <path-to-tools-list.json>
+#   confirm exact subcommand/flags with `mcp-scanner --help` if the above errors.
 ```
 
-Parse the JSON for flagged YARA rules and static findings.
+Parse the raw output for flagged YARA rules and static findings.
 
 ### IDE / VSCode extensions — GuardDog on the .vsix
 
+GuardDog has a dedicated `extension` ecosystem — first check whether it handles `.vsix` directly:
+
 ```bash
-# A .vsix is a zip; GuardDog scans the unpacked package tree for the same
-# malware heuristics (install-scripts, obfuscation, exfil).
-uvx guarddog npm scan <path-to-unpacked-vsix> --output-format json
+uvx guarddog extension --help    # preferred: use `guarddog extension scan` if supported
+```
+
+If `guarddog extension scan` is available, prefer it. Otherwise unpack manually (a `.vsix` is a zip archive) and use the `npm` ecosystem:
+
+```bash
+unzip <path-to-vsix> -d /tmp/vsix-unpacked    # .vsix is a zip archive
+uvx guarddog npm scan /tmp/vsix-unpacked --output-format=json
 ```
 
 ### Claude plugins / skills — Custom heuristics (NO external scanner)
