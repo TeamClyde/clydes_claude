@@ -104,7 +104,7 @@ function assertSilent(result, description) {
 
 // ── Cases ─────────────────────────────────────────────────────────────────────
 
-console.log('\nInstall-vetting advisory hook — 12 test cases\n');
+console.log('\nInstall-vetting advisory hook — 21 test cases\n');
 
 // Case 1: pip install (Python surface) → ask
 test('Case 1: pip install requests → ask', () => {
@@ -207,9 +207,84 @@ test('Case 12: advisory-only guarantee — no input produces deny', () => {
   }
 });
 
+// Case 13: pip3 install (Python pip3 surface) → ask
+test('Case 13: pip3 install flask → ask', () => {
+  const result = runHook('pip3 install flask');
+  assertAsk(result, 'Case 13');
+});
+
+// Case 14: python -m pip install (python -m surface) → ask
+test('Case 14: python -m pip install requests → ask', () => {
+  const result = runHook('python -m pip install requests');
+  assertAsk(result, 'Case 14');
+});
+
+// Case 15: npm add (npm add surface, distinct from npm install) → ask
+test('Case 15: npm add lodash → ask', () => {
+  const result = runHook('npm add lodash');
+  assertAsk(result, 'Case 15');
+});
+
+// Case 16: poetry add (poetry surface) → ask
+test('Case 16: poetry add httpx → ask', () => {
+  const result = runHook('poetry add httpx');
+  assertAsk(result, 'Case 16');
+});
+
+// Case 17: pdm add (pdm surface) → ask
+test('Case 17: pdm add x → ask', () => {
+  const result = runHook('pdm add x');
+  assertAsk(result, 'Case 17');
+});
+
+// Case 18: uv tool install (uv surface) → ask
+test('Case 18: uv tool install ruff → ask', () => {
+  const result = runHook('uv tool install ruff');
+  assertAsk(result, 'Case 18');
+});
+
+// Case 19: uvx (uvx surface) → ask
+test('Case 19: uvx ruff → ask', () => {
+  const result = runHook('uvx ruff');
+  assertAsk(result, 'Case 19');
+});
+
+// Case 20: pipx install (pipx surface) → ask
+test('Case 20: pipx install black → ask', () => {
+  const result = runHook('pipx install black');
+  assertAsk(result, 'Case 20');
+});
+
+// Case 21: gem install (Ruby surface) → ask
+test('Case 21: gem install rails → ask', () => {
+  const result = runHook('gem install rails');
+  assertAsk(result, 'Case 21');
+});
+
+// Case 22: malformed JSON stdin → silent passthrough + exit 0
+test('Case 22: malformed JSON stdin → silent passthrough', () => {
+  const result = runHook(null, { rawPayload: null });
+  // Override: pass raw malformed string directly
+  const malformedResult = (() => {
+    const r = spawnSync('node', [HOOK], {
+      input: '{not valid json',
+      encoding: 'utf8',
+      env: { ...process.env },
+      timeout: 5000,
+    });
+    return {
+      stdout: r.stdout || '',
+      stderr: r.stderr || '',
+      exitCode: r.status ?? -1,
+    };
+  })();
+  assertSilent(malformedResult, 'Case 22');
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed + failed} cases: ${passed} passed, ${failed} failed`);
 if (failed > 0) {
   process.exit(1);
 }
+

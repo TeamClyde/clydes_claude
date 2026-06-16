@@ -105,6 +105,11 @@ const lower = command.toLowerCase();
  * Returns true if `needle` appears at a "shell word start" position in `haystack`.
  * A shell word start is: the beginning of the string, or after one of: space,
  * tab, ;, |, &, (, `\n`.
+ *
+ * Note: only the FIRST occurrence of `needle` (via indexOf) is inspected. A
+ * needle whose first occurrence is embedded mid-word followed by a later
+ * boundary-aligned occurrence would be a false-negative — accepted because no
+ * realistic shell command produces that shape.
  */
 function matchesAtWordStart(haystack, needle) {
   const idx = haystack.indexOf(needle);
@@ -112,18 +117,6 @@ function matchesAtWordStart(haystack, needle) {
   if (idx === 0) return true;
   const prev = haystack[idx - 1];
   return /[\s;|&(`\n]/.test(prev);
-}
-
-/**
- * Returns true if `needle` appears at a word start AND is immediately followed
- * by whitespace or end-of-string (i.e. needle is a complete token, not a prefix
- * of a longer word).
- */
-function matchesWholeToken(haystack, needle) {
-  if (!matchesAtWordStart(haystack, needle)) return false;
-  const after = haystack[needle.length + (haystack.indexOf(needle))];
-  // after is undefined (end of string) or whitespace
-  return after === undefined || /\s/.test(after);
 }
 
 // Ordered checks — most specific first to avoid double-matching.
