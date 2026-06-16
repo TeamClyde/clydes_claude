@@ -83,6 +83,17 @@
     "Xiv",
     "yaml",
     "followups",
-    "vsix"
+    "vsix",
+    "deps",
+    "OpenSSF",
+    "Scorecard",
+    "scorecard",
+    "GuardDog",
+    "starsCount",
+    "forksCount",
+    "openIssuesCount",
+    "overallScore",
+    "pushed",
+    "osv"
   ]
 }
