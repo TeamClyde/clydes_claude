@@ -82,6 +82,7 @@
     "Orch",
     "Xiv",
     "yaml",
-    "followups"
+    "followups",
+    "vsix"
   ]
 }

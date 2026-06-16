@@ -84,7 +84,8 @@
     "Orch",
     "Xiv",
     "yaml",
-    "followups"
+    "followups",
+    "vsix"
   ],
   "ignorePaths": ["node_modules", ".git"]
 }
