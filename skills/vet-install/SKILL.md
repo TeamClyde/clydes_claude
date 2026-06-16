@@ -13,7 +13,7 @@ Entry point for all workflow/Claude-initiated install vetting. Given a candidate
 See `rules/install-vetting.md` for the full tier definitions, surface map, and bootstrap exception.
 
 **Two entry points for this skill:**
-- `/project-setup` Phase 2b — the prompt-first installer calls `vet-install` before adding any tool.
+- `/project-setup` **Phase 3.5 (Stack Setup)** — the prompt-first installer calls `vet-install` before adding any tool.
 - The advisory `PreToolUse` hook nudge (Task 6) — surfaces this skill when an install-like tool call is detected. When invoked from the hook with a raw install command, derive the install surface from the package-manager prefix: `pip`/`pip3`/`pipx`/`poetry`/`pdm`/`uv`/`uvx`/`npm`/`yarn`/`pnpm`/`bun`/`gem` → CLI dep; `cargo install` → cargo crate; `claude mcp add` → MCP server; `code --install-extension` → VSCode extension.
 
 ## Inputs

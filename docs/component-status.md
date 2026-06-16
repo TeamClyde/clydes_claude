@@ -68,6 +68,7 @@ Invoked via: `Skill { skill: "<name>", args: "..." }`
 | `infra-init` | ✅ | Codebase graph generation. |
 | `e2e-init` | ✅ | Per-repo testing backbone. Creates `testing-plan.md`. |
 | `project-setup` | ✅ | New-repo onboarding wizard. |
+| `skills/project-setup/detect-stacks.mjs` | ✅ | Marker-to-stack detector for project-setup Phase 3.5 (Stack Setup). |
 | `adherence-audit` | ✅ | Semantic consistency checker. |
 | `pulser` | ✅ | Skill/agent structural quality check. |
 
@@ -142,7 +143,7 @@ Load priority: rules override skills. Highest priority: `CLAUDE.md`.
 | Hook | Status | Trigger | What it does |
 |------|--------|---------|--------------|
 | `pre-commit` | ✅ | Before every git commit | Runs `scripts/run-tests.sh` (if executable); ESLint (if `.eslintrc` present); ruff (if `pyproject.toml` present); gitleaks (if installed). All checks skip gracefully if the tool is absent. |
-| `stack-hat-directive.mjs` | ✅ | SessionStart | Injects per-stack `## Hat` guidance from `~/.claude/stacks/` based on `project.json` `stacks`. Size-budgeted. Phase 1 of stack-hats (detection/install automation is Phase 2). |
+| `stack-hat-directive.mjs` | ✅ | SessionStart | Injects per-stack `## Hat` guidance from `~/.claude/stacks/` based on `project.json` `stacks`. Size-budgeted. Phase 1 of stack-hats (detection/install automation: Phase 2b — project-setup Phase 3.5 + detect-stacks.mjs). |
 | `install-vetting-advisory.mjs` | ✅ | PreToolUse on Bash | Detects install commands; returns `permissionDecision: "ask"` recommending `vet-install` funnel. Never denies. Silent pass for non-installs. |
 
 ---

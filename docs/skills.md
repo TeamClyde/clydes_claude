@@ -65,7 +65,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 |-------|----------------|
 | `infra-init` | Codebase graph: 3-phase orchestration (structure → batch-index → graph-build) |
 | `e2e-init` | Per-repo testing backbone: produces `testing-plan.md`, `e2e-plan.md`, `run-tests.sh` |
-| `project-setup` | New-repo onboarding wizard; generates `project.json`; configures Jira and workflow preferences |
+| `project-setup` | New-repo onboarding wizard; generates `project.json`; configures Jira and workflow preferences; Phase 3.5 detects stacks and drives the install-vetting funnel for the stack's tooling |
 | `adherence-audit` | Semantic consistency checker: dead references, mismatches, orphaned components |
 | `pulser` | Structural quality check for new skills/agents against Anthropic's 7 principles |
 

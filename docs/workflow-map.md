@@ -3,7 +3,7 @@
 Canonical reference for how skills, agents, rules, hooks, and plugins connect in the
 Claude workflow. Update this file whenever a component is added, removed, or rewired.
 
-Last updated: 2026-05-28
+Last updated: 2026-06-16
 
 ---
 
@@ -116,7 +116,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 |-------|--------------|---------|
 | `infra-init` | New repo session or codebase changed | Builds codebase graph + CODEBASE.md |
 | `e2e-init` | New repo, test backbone needed | Generates testing-plan.md, run-tests.sh, integration-test-constraints.md (static section) |
-| `project-setup` | Onboarding new repo to Claude workflow | CLAUDE.md + project.json setup wizard |
+| `project-setup` | Onboarding new repo to Claude workflow | CLAUDE.md + project.json setup wizard; Phase 3.5 (Stack Setup) detects stacks → proposes project.json "stacks" → drives the vet-install funnel per catalog tool → writes docs/reference/stack-setup.md |
 | `adherence-audit` | Periodic / when adding new tools | Semantic consistency check across all components |
 | `doc-author` | Invoked by `plan-management:close-subplan`, `/doc-backfill`, `/docs-refresh feature\|architecture` | Wrapper around `docs-architect` agent with merge-not-replace + 2-step (backlink → synthesis) constraints. Single entry point for all `docs/explanation/architecture.md` and `features/*.md` mutations. Args: target, mode (`create`/`update`/`backlink-only`), context-source (`codegraph`/`journal`), accepted-adrs, optional plan-doc. Does not auto-commit — caller owns review + commit. |
 | `doc-backfill` | User-invoked `/doc-backfill` (no args) | Whole-repo one-shot codegraph-driven backfill. Generates `docs/explanation/architecture.md` (C1+C2) + one `features/<slug>.md` per detected C3 component via `doc-author` mode=`create`. Preflight requires `/infra-init` to have been run. C1 actors written as TODO comments (codegraph cannot detect external systems). |
@@ -205,7 +205,7 @@ Rules are in `rules/` and `CLAUDE.md`.
 
 **Stack hats are consumed at three points off one source** (`project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`): the `sessionStart/stack-hat-directive.mjs` hook injects them as ambient reminders; `executing-plans` and `subagent-driven-development` resolve them so generated code follows them; and the `architect` agent resolves them and adherence-checks plans/implementations. Subagents resolve hats deterministically rather than relying on the ambient injection. Contract: `rules/stack-hats.md`.
 
-**The install-vetting funnel runs in 3 gates** (`vet-reputation` → `vet-capability-fit` → `vet-security`), orchestrated by `vet-install`. Advisory/never-block — the user always decides. Triggered by the `preToolUse/install-vetting-advisory.mjs` hook (nudge on install-like Bash commands) and by `/project-setup` Phase 2b. Surface-to-tool map: CLI/deps → deps.dev + GitHub / GuardDog + OSV-Scanner; MCP → Cisco mcp-scanner; VSCode → GuardDog on .vsix; Claude plugins/skills → custom heuristics; cargo → OSV CVE-only. Contract: `rules/install-vetting.md`.
+**The install-vetting funnel runs in 3 gates** (`vet-reputation` → `vet-capability-fit` → `vet-security`), orchestrated by `vet-install`. Advisory/never-block — the user always decides. Triggered by the `preToolUse/install-vetting-advisory.mjs` hook (nudge on install-like Bash commands) and by `/project-setup` Phase 3.5 (Stack Setup). Surface-to-tool map: CLI/deps → deps.dev + GitHub / GuardDog + OSV-Scanner; MCP → Cisco mcp-scanner; VSCode → GuardDog on .vsix; Claude plugins/skills → custom heuristics; cargo → OSV CVE-only. Contract: `rules/install-vetting.md`.
 
 ---
 
