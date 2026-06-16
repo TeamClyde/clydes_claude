@@ -2,7 +2,7 @@
 name: project-setup
 description: Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUDE.md is missing or generic, or the codebase graph hasn't been generated. Configures Jira integration, testing setup, and workflow preferences.
 argument-hint: "(no arguments needed — interactive)"
-allowed-tools: Read, Write, Edit, Bash, Glob
+allowed-tools: Read, Write, Edit, Bash, Glob, Skill
 ---
 
 # project-setup
@@ -184,6 +184,92 @@ After writing, validate:
 ```bash
 python -m json.tool project.json
 ```
+
+---
+
+## Phase 3.5 — Stack Setup
+
+Runs after Phase 3 (project.json exists), before Phase 4. Detects the repo's stack(s),
+proposes the `stacks` array, and drives prompt-first tooling install through the
+install-vetting funnel. **Verification-first, advisory, prompt-first throughout:** never
+auto-edit tool config, never auto-install, never auto-author a catalog entry.
+
+### Step 1 — Detect stacks
+
+Run the detector against the repo root:
+
+```bash
+node ~/.claude/skills/project-setup/detect-stacks.mjs .
+```
+
+It emits JSON: `{ "repoRoot": "...", "detected": [{ "stack": "python", "markers": ["pyproject.toml"] }, ...] }`.
+
+- **Empty `detected`** → report: "No recognized stack markers found at the repo root. If this
+  repo uses a stack, its markers aren't in the detector map yet — extend
+  `skills/project-setup/detect-stacks.mjs` and author the stack's `~/.claude/stacks/<stack>.md`
+  catalog entry." Then skip the rest of Phase 3.5.
+
+### Step 2 — Propose and confirm `stacks`
+
+- Show the detected stacks and the markers that triggered each.
+- If `project.json` already has a `stacks` array, show a diff (detected vs declared) — never clobber.
+- Ask the user to confirm or prune the list (propose-then-confirm; never silently write).
+- On confirm, use the Edit tool to set `stacks` in `project.json` to the confirmed array.
+
+### Step 3 — Per-stack catalog-coverage verification (escape gate)
+
+For each confirmed stack `<s>`:
+
+- Check that `~/.claude/stacks/<s>.md` exists AND contains a `## Tooling` H2 section
+  (read the file; confirm a line matching `^## Tooling`).
+- **Missing file, or no `## Tooling`** → **ESCAPE this stack**: report "Stack `<s>` detected
+  but no usable catalog entry (`~/.claude/stacks/<s>.md` with `## Tooling`). Stack Setup does
+  not author catalog entries — this stack must be catalogued upstream first (copy
+  `stacks/_TEMPLATE.md` to `stacks/<s>.md` and fill both sections). Skipping `<s>`." Continue
+  with the next stack. **Never auto-author.**
+- **Present** → proceed to Step 4 for `<s>`.
+
+### Step 4 — Drive the funnel per tier-1 tool
+
+Read the `## Tooling` section of `~/.claude/stacks/<s>.md` (the section ends at the next `## `
+heading). Within it, the `- **CLI tools:**` line is a header; each indented sub-bullet beneath
+it (e.g. `` - `ruff` — lint + format … Install: `pip install ruff` ``) is one tool entry. For
+each such sub-bullet, extract the tool name, its `Install:` command, and its role description.
+The `- **MCPs:**` and `- **VSCode extensions:**` bullets are NOT CLI tools — skip them (see the
+note at the end of this step). For each CLI tool:
+
+1. Run the funnel (the user decides — relay its consolidated report):
+   ```
+   Skill { skill: "vet-install", args: "candidate: <tool> surface: CLI dep need: <role from the catalog bullet>" }
+   ```
+2. The report ends with "Proceed with install? (yes/no)". Relay it; do not decide for the user.
+3. **On "yes"** → run the tool's `Install:` command via Bash (e.g. `pip install ruff`). The advisory
+   PreToolUse hook may nudge again here — that is expected and harmless; the tool was just vetted.
+4. **On "no"** → skip the tool; record nothing.
+5. After an install, capture: tool name, installed version (`<tool> --version` or package-manager
+   query), install location, source (the install command), and the three gate verdicts from the
+   `vet-install` report.
+
+MCP servers and VSCode extensions listed in `## Tooling` are **out of v1 auto-install scope** —
+surface them as "the catalog also recommends: <list>" for the user to handle manually.
+
+### Step 5 — Write the per-repo install record
+
+- If `docs/reference/stack-setup.md` does not exist, seed it from `templates/stack-setup-record.md`.
+- Fill **Detected stacks** and **Last updated** (today's date — `date +%Y-%m-%d` via the Bash tool,
+  or `Get-Date -Format 'yyyy-MM-dd'` in PowerShell), and append one row per installed tool to the
+  **Installed Tools** table: stack, tool, version, install location, source, Gate-1 / Gate-2 /
+  Gate-3 verdicts (copied from the funnel report), date.
+- Surface the draft for review before writing (prompt-first). Do **not** auto-commit — the user
+  commits it as part of normal git flow.
+
+### Notes
+
+- Prompt-first end to end: never edit tool config files (`pyproject.toml`, `.eslintrc`,
+  `analysis_options.yaml`, …), never auto-install, never auto-author catalog entries.
+- Polyglot repos: all detected stacks are proposed; the user prunes at Step 2.
+- A detected-but-uncatalogued stack escaping at Step 3 is **intended** verification-first behavior,
+  not an error — the catalog is the upstream source of truth.
 
 ---
 
