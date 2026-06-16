@@ -94,6 +94,12 @@
     "openIssuesCount",
     "overallScore",
     "pushed",
-    "osv"
+    "osv",
+    "subcommand",
+    "multiline",
+    "toml",
+    "TOML",
+    "pyproject",
+    "crates"
   ]
 }
