@@ -40,7 +40,7 @@ Produces: GREEN / YELLOW / RED tier + supporting signals.
 ### Gate 2 — Capability Fit
 
 ```
-Skill { skill: "vet-capability-fit", args: "candidate: <candidate> need: <stated need>" }
+Skill { skill: "vet-capability-fit", args: "candidate: <candidate> need: <stated need, or the need inferred from why this candidate came up>" }
 ```
 
 Produces: `does` / `partially` / `does-not` verdict + satisfying component.
