@@ -118,7 +118,11 @@
     "atob",
     "pypi",
     "unparseable",
-    "PreToolUse"
+    "PreToolUse",
+    "pnpm",
+    "pdm",
+    "poetry",
+    "bun"
   ],
   "ignorePaths": ["node_modules", ".git"]
 }

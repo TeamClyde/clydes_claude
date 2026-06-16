@@ -116,6 +116,10 @@
     "atob",
     "pypi",
     "unparseable",
-    "PreToolUse"
+    "PreToolUse",
+    "pnpm",
+    "pdm",
+    "poetry",
+    "bun"
   ]
 }
