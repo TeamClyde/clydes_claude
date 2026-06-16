@@ -2,7 +2,7 @@
 
 Current implementation status of all workflow components. Update this file when a component is added, removed, deprecated, or changed state.
 
-Last updated: 2026-04-22
+Last updated: 2026-06-16
 
 ---
 
@@ -143,7 +143,7 @@ Load priority: rules override skills. Highest priority: `CLAUDE.md`.
 | Hook | Status | Trigger | What it does |
 |------|--------|---------|--------------|
 | `pre-commit` | ✅ | Before every git commit | Runs `scripts/run-tests.sh` (if executable); ESLint (if `.eslintrc` present); ruff (if `pyproject.toml` present); gitleaks (if installed). All checks skip gracefully if the tool is absent. |
-| `stack-hat-directive.mjs` | ✅ | SessionStart | Injects per-stack `## Hat` guidance from `~/.claude/stacks/` based on `project.json` `stacks`. Size-budgeted. Phase 1 of stack-hats (detection/install automation: Phase 2b — project-setup Phase 3.5 + detect-stacks.mjs). |
+| `stack-hat-directive.mjs` | ✅ | SessionStart | Injects per-stack `## Hat` guidance from the `~/.claude/stacks/<tech>.md` catalog (authoring contract `stacks/_TEMPLATE.md`: `## Tooling` + `## Hat`) based on `project.json` `stacks`. Size-budgeted. Phase 1 of stack-hats; detection/install automation lives in `project-setup` Phase 3.5 + `detect-stacks.mjs`. |
 | `install-vetting-advisory.mjs` | ✅ | PreToolUse on Bash | Detects install commands; returns `permissionDecision: "ask"` recommending `vet-install` funnel. Never denies. Silent pass for non-installs. |
 
 ---
@@ -161,3 +161,4 @@ Located in `templates/`. Copied on use — not symlinked.
 | `mcp-settings.json` | ✅ | MCP settings template |
 | `pr-description.md` | ✅ | PR description template |
 | `testing-plan.md` | ✅ | Starter template for `.claude/testing-plan.md` (used by `e2e-init`) |
+| `stack-setup-record.md` | ✅ | Per-repo install-record seed for `docs/reference/stack-setup.md` (written by `project-setup` Phase 3.5 — stack-hats Phase 2b) |

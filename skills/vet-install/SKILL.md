@@ -22,6 +22,7 @@ See `rules/install-vetting.md` for the full tier definitions, surface map, and b
 |---|---|---|
 | Candidate | Yes (or stated need) | Package name, `github.com/<owner>/<repo>`, or a capability need |
 | Install surface | Yes | `CLI dep`, `MCP server`, `VSCode extension`, `Claude plugin/skill`, `cargo crate` |
+| Need | Optional | The problem the candidate should solve. When provided (e.g. by `/project-setup` Phase 3.5 as `need: <role>`), it scopes Gate 2's capability-fit check; when omitted, the need is inferred from why the candidate came up. |
 
 If only a **stated need** is given (no named candidate), invoke `vet-reputation` in `discover-from-need` mode first to produce a ranked shortlist, then run Gates 2 and 3 on the top pick.
 
