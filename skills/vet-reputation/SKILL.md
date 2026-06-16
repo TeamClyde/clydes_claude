@@ -1,6 +1,6 @@
 ---
 name: vet-reputation
-description: Use when assessing the reputation, quality, or trustworthiness of an open-source tool before install — either scoring a named candidate or discovering ranked candidates from a stated need. Gate 1 of the install-vetting funnel.
+description: Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustworthy before installing it. Gate 1 of the install-vetting funnel.
 allowed-tools: WebFetch, WebSearch
 ---
 
@@ -25,14 +25,18 @@ Steps:
 2. **Fetch deps.dev v3 project record.**
 
    ```
-   GET https://api.deps.dev/v3/projects/github.com/{owner}/{repo}
+   GET https://api.deps.dev/v3/projects/github.com%2F{owner}%2F{repo}
    ```
 
-   Public endpoint — no auth required. Returns:
-   - `scorecard.overallScore` (0–10, OpenSSF Scorecard aggregate)
-   - Per-check scores inside `scorecard.checks[]` — extract these four injection-relevant checks by name: `Code-Review`, `Branch-Protection`, `Dangerous-Workflow`, `Token-Permissions`
+   Public endpoint — no auth required. Note: only the `/` separating `github.com` from the `{owner}/{repo}` path is percent-encoded as `%2F`; `{owner}` and `{repo}` themselves are inserted literally (the slash between owner and repo is NOT encoded). Example: `.../github.com%2Fpallets%2Fflask`.
+
+   Returns top-level fields:
    - `starsCount`, `forksCount`, `openIssuesCount`
    - `license`
+
+   Inside the `scorecard` sub-object:
+   - `scorecard.overallScore` (0–10, OpenSSF Scorecard aggregate)
+   - `scorecard.checks[]` — an array of objects shaped `{ "name": "...", "score": <int>, "reason": "...", ... }`. Extract these four injection-relevant checks by name: `Code-Review`, `Branch-Protection`, `Dangerous-Workflow`, `Token-Permissions`. The per-check value field is `score` (integer 0–10). A check that could not be run returns `score: -1` (e.g. when token permissions are insufficient) — treat `-1` as "check unavailable", NOT as a failing score ≤ 2.
 
 3. **Fetch maintenance recency from GitHub API (unauthenticated).**
 
@@ -67,7 +71,7 @@ Apply in order. First matching rule sets the tier.
 | `archived: true` | RED — archived, no longer maintained |
 | No GitHub source found; registry-only package | YELLOW — reduced confidence (registry signals only; no Scorecard) |
 | `scorecard.overallScore` < 4.0 | RED |
-| Any of `Code-Review`, `Branch-Protection`, `Dangerous-Workflow`, `Token-Permissions` score ≤ 2 | YELLOW (flag which check failed) |
+| Any of `Code-Review`, `Branch-Protection`, `Dangerous-Workflow`, `Token-Permissions` has `score` ≤ 2 (excluding `-1` — treat `-1` as unavailable, not failing) | YELLOW (flag which check failed) |
 | `pushed_at` > 18 months ago | YELLOW — stale maintenance |
 | `scorecard.overallScore` ≥ 7.0 and none of the above | GREEN |
 | `scorecard.overallScore` 4.0–6.9 and none of the above | YELLOW |
