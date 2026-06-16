@@ -239,10 +239,10 @@ The `- **MCPs:**` and `- **VSCode extensions:**` bullets are NOT CLI tools — s
 note at the end of this step). For each CLI tool:
 
 1. Run the funnel (the user decides — relay its consolidated report):
-   ```
+   ```text
    Skill { skill: "vet-install", args: "candidate: <tool> surface: CLI dep need: <role from the catalog bullet>" }
    ```
-2. The report ends with "Proceed with install? (yes/no)". Relay it; do not decide for the user.
+2. The report ends with "Proceed with install? (yes / no / see Gate N details)". Relay it; do not decide for the user.
 3. **On "yes"** → run the tool's `Install:` command via Bash (e.g. `pip install ruff`). The advisory
    PreToolUse hook may nudge again here — that is expected and harmless; the tool was just vetted.
 4. **On "no"** → skip the tool; record nothing.
