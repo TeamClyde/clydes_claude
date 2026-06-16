@@ -4,7 +4,7 @@ A **stack hat** is specialist best-practice + tooling guidance for a technology 
 
 ## Source of truth
 
-- A repo opts in via `project.json`: `"stacks": ["python", "react"]`.
+- A repo opts in via `project.json`: `"stacks": ["python", "react"]`. The `stacks` array may be hand-edited, or auto-populated by the `project-setup` skill's **Phase 3.5 — Stack Setup**, which detects the repo's stack(s) and proposes the array (propose-then-confirm; never silently written).
 - Each stack's guidance is the `## Hat` section of `~/.claude/stacks/<stack>.md`.
 - The architect agent's "active domain hat" (`agents/architect.md`) IS a stack hat — same concept, one mechanism.
 
