@@ -1,0 +1,55 @@
+tests:
+  # Positive trigger tests
+  - name: "core use case — about to install a CLI tool"
+    input: "I need to install ripgrep as a CLI dep. Can you vet it first?"
+    assert:
+      - contains: "vet-install"
+      - min-length: 50
+
+  - name: "MCP server install — should trigger"
+    input: "Before we install this MCP server, run the install vetting funnel on it"
+    assert:
+      - contains: "vet-install"
+
+  - name: "capability need — discover and vet"
+    input: "I need a Python linter. Vet a good candidate before we install anything."
+    assert:
+      - contains: "vet-install"
+
+  - name: "plugin/skill surface — should trigger"
+    input: "We're about to add a new Claude skill from a GitHub repo. Vet it first."
+    assert:
+      - contains: "vet-install"
+
+  - name: "VSCode extension vetting — should trigger"
+    input: "Before adding this VSCode extension to project-setup, run the vetting funnel"
+    assert:
+      - contains: "vet-install"
+
+  - name: "consolidated report check — must contain all three gate names"
+    input: "Vet axios npm package as a CLI dep"
+    assert:
+      - contains: "vet-reputation"
+      - contains: "vet-capability-fit"
+      - contains: "vet-security"
+
+  # Negative trigger tests
+  - name: "negative — reputation check only is not this skill"
+    input: "Check the reputation of this npm package"
+    assert:
+      - not-contains: "vet-install"
+
+  - name: "negative — security scan only is not this skill"
+    input: "Run a security scan on this package"
+    assert:
+      - not-contains: "vet-install"
+
+  - name: "negative — code review is not this skill"
+    input: "Review the code in this pull request"
+    assert:
+      - not-contains: "vet-install"
+
+  - name: "negative — capability fit only is not this skill"
+    input: "Does ripgrep support multiline matching?"
+    assert:
+      - not-contains: "vet-install"

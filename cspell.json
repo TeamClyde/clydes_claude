@@ -117,7 +117,8 @@
     "Cisco",
     "atob",
     "pypi",
-    "unparseable"
+    "unparseable",
+    "PreToolUse"
   ],
   "ignorePaths": ["node_modules", ".git"]
 }

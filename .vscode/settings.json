@@ -115,6 +115,7 @@
     "Cisco",
     "atob",
     "pypi",
-    "unparseable"
+    "unparseable",
+    "PreToolUse"
   ]
 }
