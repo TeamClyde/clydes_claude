@@ -104,6 +104,15 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | `using-git-worktrees` | Creates and manages git worktrees for feature isolation |
 | `using-superpowers` | Conversation-start orientation: skill discovery, instruction priority, Orientation Protocol |
 
+### Install Vetting
+
+| Skill | Responsibility |
+|-------|----------------|
+| `vet-install` | Entry point for the 3-gate install-vetting funnel; runs gates in order, consolidates one report, always asks user before any install — never auto-installs |
+| `vet-reputation` | Gate 1 — assesses whether a tool is reputable, well-maintained, and trustworthy before installing |
+| `vet-capability-fit` | Gate 2 — determines whether a candidate tool covers the stated need and which component provides that capability |
+| `vet-security` | Gate 3 — scans a finalist tool for malware or known CVEs before installing |
+
 ---
 
 ## Orchestration Skill Designs

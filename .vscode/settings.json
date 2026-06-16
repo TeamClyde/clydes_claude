@@ -120,6 +120,11 @@
     "pnpm",
     "pdm",
     "poetry",
-    "bun"
+    "bun",
+    "npm",
+    "uv",
+    "adrs",
+    "Linkinator",
+    "github"
   ]
 }

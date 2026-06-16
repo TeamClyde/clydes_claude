@@ -35,10 +35,11 @@ Claude Code provides several mechanisms for persistent instructions. Each has di
 The instruction system has three layers:
 
 **Layer 1 — Always-on (~110 lines):**
-Two files that load every session across all projects. These contain only guidance that must be active before any task-specific work begins.
+Files that load every session across all projects. These contain only guidance that must be active before any task-specific work begins.
 
 - `~/.claude/CLAUDE.md` (~80 lines) — workflow sequence, delegation routing, architect gates, task sizing, sync rules
 - `~/.claude/rules/filesystem-efficiency.md` (~30 lines) — targeted reads, prohibited glob patterns, plan-doc-first
+- `~/.claude/rules/install-vetting.md` — install-vetting funnel policy; 3-gate advisory funnel (`vet-reputation` → `vet-capability-fit` → `vet-security`) orchestrated by `vet-install`; surface-to-tool map; bootstrap exception
 
 **Layer 2 — Path-scoped rules (~200 lines):**
 Two rule files that load when Claude reads specific artifacts. The Layer 1 workflow sequence naturally directs Claude to read these artifacts at the right time, which triggers the rules automatically.

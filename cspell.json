@@ -122,7 +122,12 @@
     "pnpm",
     "pdm",
     "poetry",
-    "bun"
+    "bun",
+    "npm",
+    "uv",
+    "adrs",
+    "Linkinator",
+    "github"
   ],
   "ignorePaths": ["node_modules", ".git"]
 }
