@@ -26,7 +26,7 @@ Gate 2 answers exactly two questions:
 
 ## Steps
 
-1. **Collect the stated need.** If not provided explicitly, ask before proceeding. The need must be specific enough to test against (e.g., "parse TOML files", "manage GitHub PRs from CLI", "scan Python deps for CVEs").
+1. **Collect the stated need.** If it is absent or too vague to test against (e.g., "does it work for me"), ask for clarification before proceeding. The need must be specific enough to match against evidence (e.g., "parse TOML files", "manage GitHub PRs from CLI", "scan Python deps for CVEs").
 
 2. **Fetch the candidate's own evidence.** In order of preference:
    - Project README (via `WebFetch` on the GitHub/registry page)
@@ -70,7 +70,7 @@ Verdict: does | partially | does-not
 ### Evidence
 <1–3 sentences citing the specific README section, docs page, or --help output reviewed>
 
-Advisory — this report informs; it does not install or block. Proceed to Gate 3 (vet-security) via vet-install.
+Advisory — this report informs; it does not install or block. If proceeding, Gate 3 (vet-security) runs via vet-install.
 ```
 
 ## Graceful Degradation
@@ -86,7 +86,7 @@ Never let a fetch failure abort the report. Always emit a verdict, even if confi
 1. **Advisory-only is load-bearing.** The skill emits a report; it never installs or blocks. State this explicitly in every output.
 2. **Read the candidate's own docs first.** Gate 2 has no external scanner — per `rules/install-vetting.md`: "Gate 2 has no tool column — it reads the candidate's own docs/README."
 3. **Scope discipline.** Do not score reputation or scan for CVEs inside this gate; those belong to Gates 1 and 3 respectively.
-4. **Satisfying component is required output.** Even a `does` verdict must name the specific component, subcommand, or feature that satisfies the need. This field feeds minimal-extraction in Phase 2b — a vague "yes it works" answer is incomplete.
+4. **Satisfying component is required output.** Even a `does` verdict must name the specific component, subcommand, or feature that satisfies the need. The orchestrator uses this field to scope the install to the minimal needed component, so a vague "yes it works" answer is incomplete.
 5. **Partial fit must enumerate both sides.** A `partially` verdict without explicit "IS covered" and "IS NOT covered" lists is incomplete.
 6. **Researcher dispatch is focused, not exploratory.** Give the Agent a single tight question (e.g., "Does ripgrep's `--multiline` flag support zero-width assertions?"). Do not ask it to summarize the tool or explore its feature set.
 7. **Bootstrap exception.** Per `rules/install-vetting.md`: GuardDog, OSV-Scanner, and Cisco mcp-scanner are the pre-trusted scanner set. Do not run this skill on them.
