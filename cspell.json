@@ -102,7 +102,22 @@
     "toml",
     "TOML",
     "pyproject",
-    "crates"
+    "crates",
+    "uvx",
+    "pipx",
+    "YARA",
+    "SARIF",
+    "typosquat",
+    "exfil",
+    "exfiltration",
+    "obfuscation",
+    "lockfile",
+    "datadog",
+    "ghcr",
+    "Cisco",
+    "atob",
+    "pypi",
+    "unparseable"
   ],
   "ignorePaths": ["node_modules", ".git"]
 }
