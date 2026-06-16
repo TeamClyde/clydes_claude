@@ -49,6 +49,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/preToolUse/install-vetting-advisory.mjs",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [
