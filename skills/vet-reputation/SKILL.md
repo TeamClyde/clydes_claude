@@ -136,4 +136,4 @@ Never let a fetch failure abort the report. Always emit a tier, even if confiden
 3. **All four injection-relevant checks matter independently.** A high aggregate Scorecard score does not excuse a `Dangerous-Workflow` score of 0 — surface each check score separately.
 4. **Stars are a tiebreaker, not a signal.** Never upgrade a YELLOW to GREEN on star count alone. Always cite the fake-star caveat.
 5. **Registry-only packages get reduced confidence.** Explicitly state "Scorecard unavailable" and keep the tier at YELLOW floor regardless of registry signals.
-6. **Bootstrap exception.** Per `rules/install-vetting.md`: GuardDog, OSV-Scanner, and Cisco mcp-scanner are the pre-trusted scanner set. Do not run this skill on them.
+6. **Bootstrap exception.** Per `rules/install-vetting.md`: OSV-Scanner and Cisco mcp-scanner are the pre-trusted scanner set. Do not run this skill on them.

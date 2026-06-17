@@ -89,4 +89,4 @@ Never let a fetch failure abort the report. Always emit a verdict, even if confi
 4. **Satisfying component is required output.** Even a `does` verdict must name the specific component, subcommand, or feature that satisfies the need. The orchestrator uses this field to scope the install to the minimal needed component, so a vague "yes it works" answer is incomplete.
 5. **Partial fit must enumerate both sides.** A `partially` verdict without explicit "IS covered" and "IS NOT covered" lists is incomplete.
 6. **Researcher dispatch is focused, not exploratory.** Give the Agent a single tight question (e.g., "Does ripgrep's `--multiline` flag support zero-width assertions?"). Do not ask it to summarize the tool or explore its feature set.
-7. **Bootstrap exception.** Per `rules/install-vetting.md`: GuardDog, OSV-Scanner, and Cisco mcp-scanner are the pre-trusted scanner set. Do not run this skill on them.
+7. **Bootstrap exception.** Per `rules/install-vetting.md`: OSV-Scanner and Cisco mcp-scanner are the pre-trusted scanner set. Do not run this skill on them.
