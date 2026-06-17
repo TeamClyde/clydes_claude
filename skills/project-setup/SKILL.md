@@ -202,7 +202,7 @@ Run the detector against the repo root:
 node ~/.claude/skills/project-setup/detect-stacks.mjs .
 ```
 
-It emits JSON: `{ "repoRoot": "...", "detected": [{ "stack": "python", "markers": ["pyproject.toml"] }, ...] }`.
+It emits JSON: `{ "repoRoot": "...", "detected": [{ "stack": "python", "markers": ["pyproject.toml"], "dir": "." }, ...] }`. Each detection's `dir` is its location relative to the repo root (`.` = root); a non-`.` value signals a wrapper/monorepo layout, handled in Step 2. The detector matches exact-filename markers and extension markers (e.g. `.slcp`/`.csproj`/`.sln`) across the root + subdirs to depth 2 (noise dirs skipped).
 
 - **Empty `detected`** → report: "No recognized stack markers found at the repo root. If this
   repo uses a stack, its markers aren't in the detector map yet — extend
@@ -212,22 +212,43 @@ It emits JSON: `{ "repoRoot": "...", "detected": [{ "stack": "python", "markers"
 ### Step 2 — Propose and confirm `stacks`
 
 - Show the detected stacks and the markers that triggered each.
+- **Wrapper / monorepo layouts:** if a detected stack's `dir` is not `.`, surface the subdir path(s) and ask which root to onboard — never silently auto-select. If the same stack appears under multiple `dir`s, list them together and let the user pick the root.
 - If `project.json` already has a `stacks` array, show a diff (detected vs declared) — never clobber.
 - Ask the user to confirm or prune the list (propose-then-confirm; never silently write).
 - On confirm, use the Edit tool to set `stacks` in `project.json` to the confirmed array.
 
-### Step 3 — Per-stack catalog-coverage verification (escape gate)
+### Step 3 — Per-stack catalog-coverage verification + net-new on-ramp
 
 For each confirmed stack `<s>`:
 
 - Check that `~/.claude/stacks/<s>.md` exists AND contains a `## Tooling` H2 section
   (read the file; confirm a line matching `^## Tooling`).
-- **Missing file, or no `## Tooling`** → **ESCAPE this stack**: report "Stack `<s>` detected
-  but no usable catalog entry (`~/.claude/stacks/<s>.md` with `## Tooling`). Stack Setup does
-  not author catalog entries — this stack must be catalogued upstream first (copy
-  `stacks/_TEMPLATE.md` to `stacks/<s>.md` and fill both sections). Skipping `<s>`." Continue
-  with the next stack. **Never auto-author.**
 - **Present** → proceed to Step 4 for `<s>`.
+- **Missing file, or no `## Tooling`** → the stack is **uncatalogued**. Do NOT dead-end and do
+  NOT auto-author. Run the guided, approval-gated **net-new on-ramp** (Step 3a) to produce a
+  catalog entry the user reviews before anything is written.
+
+### Step 3a — Net-new stack on-ramp (uncatalogued → drafted catalog entry, approval-gated)
+
+Verification-first: nothing is written without explicit user approval. For an uncatalogued stack `<s>`:
+
+1. **Discover** candidate tier-1 tools for `<s>` — read the repo's own build/config files (the
+   detected markers, e.g. a `.slcp`/`.csproj`) and do a targeted lookup of the stack's standard
+   lint / format / type / test / build tooling.
+2. **Research** each candidate: `Skill { skill: "vet-reputation", args: "<need> ... discover-from-need" }`
+   (or `vet-install` with a stated need) to produce a ranked shortlist.
+3. **Vet** the finalist(s) through the funnel:
+   `Skill { skill: "vet-install", args: "candidate: <tool> surface: <surface> need: <role>" }`.
+   Relay the consolidated report; the user decides (yes / no), exactly as the Step-4 per-tool loop.
+4. **Draft** `stacks/<s>.md` from `stacks/_TEMPLATE.md` — fill `## Tooling` (the vetted tools,
+   their `Install:` commands, roles) and a starter `## Hat` (specialist best-practices for `<s>`)
+   from the vetted findings.
+5. **Surface the draft for explicit user review/approval** — a HARD GATE. Do NOT write it silently.
+6. **On approval:** write `stacks/<s>.md`, run `bash scripts/setup.sh --force` to symlink it into
+   `~/.claude/stacks/`, then proceed to Step 4 for the now-catalogued `<s>`.
+   **On decline:** skip `<s>` (record nothing).
+
+This is the **ONLY** catalog-authoring path, and it is always approval-gated — never auto-author, never silent.
 
 ### Step 4 — Drive the funnel per tier-1 tool
 
