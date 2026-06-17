@@ -13,7 +13,7 @@ Entry point for all workflow/Claude-initiated install vetting. Given a candidate
 See `rules/install-vetting.md` for the full tier definitions, surface map, and bootstrap exception.
 
 **Two entry points for this skill:**
-- `/project-setup` **Phase 3.5 (Stack Setup)** — the prompt-first installer calls `vet-install` before adding any tool.
+- `/project-setup` **Phase 4 (Tooling Setup)** — the prompt-first installer calls `vet-install` before adding any tool.
 - The advisory `PreToolUse` hook nudge (Task 6) — surfaces this skill when an install-like tool call is detected. When invoked from the hook with a raw install command, derive the install surface from the package-manager prefix: `pip`/`pip3`/`pipx`/`poetry`/`pdm`/`uv`/`uvx`/`npm`/`yarn`/`pnpm`/`bun`/`gem` → CLI dep; `cargo install` → cargo crate; `claude mcp add` → MCP server; `code --install-extension` → VSCode extension (use `AI IDE extension` if it's an AI/agentic extension); an autonomous-agent / agent-framework install → `AI CLI agent` (not `CLI dep`); `winget`/`choco`/`brew install` → `OS package manager` (reputation-only — Gate 1 only, no Gate 3 scan). Gate 3's semantic pass runs for the agentic surfaces only; ordinary packages get the deterministic OSV scan alone. The reviewer's self-assess valve handles misclassification.
 
 ## Inputs
@@ -22,7 +22,7 @@ See `rules/install-vetting.md` for the full tier definitions, surface map, and b
 |---|---|---|
 | Candidate | Yes (or stated need) | Package name, `github.com/<owner>/<repo>`, or a capability need |
 | Install surface | Yes | **Agentic** (get Gate 3's semantic pass): `MCP server`, `Claude plugin/skill`, `AI IDE extension`, `AI CLI agent`. **Package / non-agentic** (deterministic scan only): `CLI dep`, `cargo crate`, `VSCode extension` (non-AI), `OS package manager`. |
-| Need | Optional | The problem the candidate should solve. When provided (e.g. by `/project-setup` Phase 3.5 as `need: <role>`), it scopes Gate 2's capability-fit check; when omitted, the need is inferred from why the candidate came up. |
+| Need | Optional | The problem the candidate should solve. When provided (e.g. by `/project-setup` Phase 4 as `need: <role>`), it scopes Gate 2's capability-fit check; when omitted, the need is inferred from why the candidate came up. |
 
 If only a **stated need** is given (no named candidate), invoke `vet-reputation` in `discover-from-need` mode first to produce a ranked shortlist, then run Gates 2 and 3 on the top pick.
 

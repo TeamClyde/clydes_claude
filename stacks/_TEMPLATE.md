@@ -9,7 +9,7 @@
 > - The hook extracts **only** `## Hat` at session start — keep it ≤ ~25 lines
 >   of concise, specialist guidance (best-practice reminders + "leverage tool X
 >   for Y" pointers). It is additive to SE-fundamentals, never a restatement.
-> - `## Tooling` is consumed by setup automation (project-setup Phase 3.5 — Stack Setup), not at runtime.
+> - `## Tooling` is consumed by setup automation (project-setup Phase 4 — Tooling Setup), not at runtime.
 > - A section ends at the next `## ` heading. Do not use H2 headings inside a
 >   section — use H3 (`###`) or lists instead.
 

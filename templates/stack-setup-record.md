@@ -1,7 +1,7 @@
-# Stack Setup Record
+# Tooling Setup Record
 
-Per-repo provenance + audit trail for tools installed via the `project-setup` Stack Setup
-phase (Phase 3.5). Records what was set up *in this repo*, with the install-vetting verdict
+Per-repo provenance + audit trail for tools installed via the `project-setup` Tooling Setup
+phase (Phase 4). Records what was set up *in this repo*, with the install-vetting verdict
 for each tool. This file is committed and repo-local — distinct from the global
 `~/.claude/stacks/<stack>.md` catalog entries (reusable stack knowledge).
 

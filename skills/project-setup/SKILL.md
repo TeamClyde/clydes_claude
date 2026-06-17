@@ -187,9 +187,9 @@ python -m json.tool project.json
 
 ---
 
-## Phase 3.5 — Stack Setup
+## Phase 4 — Tooling Setup
 
-Runs after Phase 3 (project.json exists), before Phase 4. Detects the repo's stack(s),
+Runs after Phase 3 (project.json exists), before Phase 5. Detects the repo's stack(s),
 proposes the `stacks` array, and drives prompt-first tooling install through the
 install-vetting funnel. **Verification-first, advisory, prompt-first throughout:** never
 auto-edit tool config, never auto-install, never auto-author a catalog entry.
@@ -207,7 +207,7 @@ It emits JSON: `{ "repoRoot": "...", "detected": [{ "stack": "python", "markers"
 - **Empty `detected`** → report: "No recognized stack markers found at the repo root. If this
   repo uses a stack, its markers aren't in the detector map yet — extend
   `skills/project-setup/detect-stacks.mjs` and author the stack's `~/.claude/stacks/<stack>.md`
-  catalog entry." Then skip the rest of Phase 3.5.
+  catalog entry." Then skip the rest of Phase 4.
 
 ### Step 2 — Propose and confirm `stacks`
 
@@ -294,7 +294,7 @@ surface them as "the catalog also recommends: <list>" for the user to handle man
 
 ---
 
-## Phase 4 — Symlink Health Check (workflow repo only)
+## Phase 5 — Symlink Health Check (workflow repo only)
 
 Detect the workflow repo: check for all three of `setup.sh`, `skills/`, and `agents/` at the repo root. If all three are present, run:
 
