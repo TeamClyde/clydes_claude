@@ -287,6 +287,9 @@ install_symlink "$REPO_ROOT/rules/filesystem" "$HOME/.claude/rules/filesystem" "
 # Symlink stacks/ catalog directory as a unit (global stack-hat catalog)
 install_symlink "$REPO_ROOT/stacks" "$HOME/.claude/stacks" "stacks/"
 
+# Symlink templates/ as a unit so project-setup can scaffold docs on ANY target repo
+install_symlink "$REPO_ROOT/templates" "$HOME/.claude/templates" "templates/"
+
 install_symlink "$REPO_ROOT/CLAUDE.md" "$HOME/.claude/CLAUDE.md" "CLAUDE.md"
 
 # ---------------------------------------------------------------------------
