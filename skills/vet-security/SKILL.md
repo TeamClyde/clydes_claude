@@ -1,147 +1,106 @@
 ---
 name: vet-security
 description: Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of the install-vetting funnel.
-allowed-tools: Bash, Read, Grep
+allowed-tools: Bash, Read, Grep, Agent
 ---
 
 # vet-security — Install-Vetting Gate 3
 
 ## Overview
 
-Malware and CVE scanning for the single finalist candidate, immediately before install. Selects the scanner by install surface, runs it as a subprocess, parses its JSON output, and emits per-surface findings plus an overall GREEN / YELLOW / RED security verdict. **Advisory only — never blocks; the funnel never halts on this gate's output. The orchestrator or user decides.**
+Malware and CVE screening for the single finalist candidate, immediately before install. Gate 3 is **two layers**:
 
-See `rules/install-vetting.md` for the tier definitions, the surface→tool map, the bootstrap exception, and the full 3-gate funnel this skill feeds. Gate 3 runs only on the finalist that already cleared Gate 1 (`vet-reputation`) and Gate 2 (`vet-capability-fit`).
+1. **Deterministic layer (always).** Surface-selected scanners + a required pre-scan, run as subprocesses; un-injectable, fast.
+2. **Semantic layer (agentic surfaces only).** An isolated `ai-tool-security-reviewer` subagent reviews the candidate's static artifacts against OWASP ASI/AST for the natural-language manipulation signatures structurally miss (OWASP AST08).
+
+It emits per-surface findings plus an overall GREEN / YELLOW / RED verdict. **Advisory only — never blocks; the funnel never halts on this gate's output. The orchestrator or user decides.**
+
+See `rules/install-vetting.md` for tier definitions, the surface→tool map, the bootstrap exception, and the full 3-gate funnel this skill feeds. Gate 3 runs only on the finalist that cleared Gate 1 (`vet-reputation`) and Gate 2 (`vet-capability-fit`).
 
 ## Scope
 
-Gate 3 answers exactly one question: **is the finalist safe to install?** — split into malware (supply-chain) and known-CVE risk. It does not re-assess reputation (Gate 1) or capability fit (Gate 2).
+Gate 3 answers exactly one question: **is the finalist safe to install?** — malware (supply-chain) + known-CVE risk, plus (for agentic surfaces) instruction-manipulation risk. It does not re-assess reputation (Gate 1) or capability fit (Gate 2).
 
-## Surface → Scanner
+## Deterministic layer — Surface → Scanner
 
-Pick the row matching the finalist's install surface. Each external scanner is invoked as a **subprocess via Bash** with JSON (or SARIF) output, then parsed.
+Pick the row matching the finalist's install surface. Each external scanner is invoked as a **subprocess via Bash** with JSON output, then parsed.
 
-| Surface | Malware scan | CVE scan |
-|---|---|---|
-| CLI tools / project deps (pypi, npm) | GuardDog | OSV-Scanner |
-| MCP servers | Cisco mcp-scanner (YARA + static) | — |
-| IDE / VSCode extensions | GuardDog (on the `.vsix`) | — |
-| Claude plugins / skills | **Custom heuristics** (no external scanner) | — |
-| cargo / Rust crates | **gap — flag it** (no malware scanner) | OSV-Scanner |
+| Surface | Malware scan | CVE scan | Semantic pass? |
+|---|---|---|---|
+| CLI tools / project deps (pypi, npm) | OSV (`MAL-` feed) | OSV | No |
+| cargo / Rust crates | OSV (`MAL-` feed) | OSV | No |
+| MCP servers | Cisco mcp-scanner (YARA + static) | — | **Yes** |
+| Claude plugins / skills | **Custom heuristics** (no external scanner) | — | **Yes** |
+| AI IDE / VSCode extensions | unpack `.vsix` → OSV on bundled deps | OSV (bundled deps) | **Yes** |
+| AI CLI tools / agents | OSV on the package + lifecycle-script inspection | OSV | **Yes** |
+| **OS package managers (winget / choco / brew)** | **none — reputation-only (Gate 1)** | **none** | No |
 
-> Before running any documented invocation below, if the exact flag/subcommand errors, run the tool's `--help` first and adapt — published CLI syntax drifts between versions. Default to the form shown; only deviate if it errors.
+> **Exact per-surface invocations live in [`scanners.md`](scanners.md)** — the OSV.dev API + `osv-scanner` commands (with the Windows PATH/BOM caveats), the Cisco mcp-scanner command, the `.vsix` unpack, the plugins/skills heuristics table, the **required deterministic pre-scan** checklist, the OS-package-manager reputation-only note, and the graceful-degradation probe. Load it when running the deterministic pass.
 
-### CLI tools / project deps — GuardDog + OSV-Scanner
+**Load-bearing facts** (detail in `scanners.md`):
+- **OSV does both, across all three ecosystems** — CVE **and** `MAL-` malware for PyPI, npm, and crates.io. Cargo malware is **not** a gap (verified — `rustdecimal` → `MAL-2022-1`).
+- **Pre-install single-package check = the OSV.dev API** (`POST https://api.osv.dev/v1/query`, name+version) — no binary; a name lookup against a public DB (local-only-safe). Use the `osv-scanner` binary for lockfile/unpacked-dir scans.
+- **Required pre-scan** before every semantic pass: Unicode / encoded-blob / hardcoded-URL / install-time-exec / config-namespace-mismatch / embedded-NL-prompt checks; hits are passed to the reviewer.
+- **OS package managers (winget/choco/brew) are reputation-only** (Gate 1) — no Gate-3 scanner row; do not mark them couldn't-scan-YELLOW.
 
-GuardDog catches malware heuristics (typosquat, malicious install-scripts, obfuscation, data exfiltration). OSV-Scanner catches known CVEs from the lockfile.
+## Semantic layer — `ai-tool-security-reviewer` (agentic surfaces only)
 
-```bash
-# Malware heuristics — scan a published package by ecosystem (pypi | npm).
-# uvx runs GuardDog without a persistent install; the container form is equivalent.
-uvx guarddog <ecosystem> scan <package> --output-format=json
-#   container alternative: docker pull ghcr.io/datadog/guarddog
-# Or verify an entire manifest (requirements.txt / package.json):
-uvx guarddog <ecosystem> verify <manifest-path> --output-format=json
+For the four agentic surfaces (MCP servers, Claude plugins/skills, AI IDE extensions, AI CLI tools/agents), after the deterministic pass, run the semantic review. Ordinary `CLI dep` / `cargo crate` / OS-package-manager surfaces do **not** get this pass.
 
-# Known CVEs — scan the project lockfile.
-osv-scanner scan -L <lockfile> --format json
-#   if `scan -L` errors on the installed version, try: osv-scanner --lockfile <lockfile> --format json
-```
-
-Parse GuardDog JSON for non-empty findings per rule (e.g. `npm-exfiltrate-sensitive-data`, `code-execution`). Parse OSV JSON `results[].packages[].vulnerabilities[]` for CVE IDs and severities.
-
-### MCP servers — Cisco mcp-scanner
-
-YARA + static-analysis engines need no API key. (LLM-judge engines do — skip them; the static engines are sufficient for this gate.)
-
-```bash
-# One-time install is bootstrap-exempt: uv tool install cisco-ai-mcp-scanner
-#
-# `static` subcommand scans a pre-generated tools JSON without connecting to a live server.
-# --analyzers yara  → offline YARA engine; no API key required.
-# --format raw      → JSON-parseable output (valid values: summary/detailed/table/by_severity/raw;
-#                     "json" is NOT a valid value).
-mcp-scanner --analyzers yara --format raw static --tools <path-to-tools-list.json>
-#   confirm exact subcommand/flags with `mcp-scanner --help` if the above errors.
-```
-
-Parse the raw output for flagged YARA rules and static findings.
-
-### IDE / VSCode extensions — GuardDog on the .vsix
-
-GuardDog has a dedicated `extension` ecosystem — first check whether it handles `.vsix` directly:
-
-```bash
-uvx guarddog extension --help    # preferred: use `guarddog extension scan` if supported
-```
-
-If `guarddog extension scan` is available, prefer it. Otherwise unpack manually (a `.vsix` is a zip archive) and use the `npm` ecosystem:
-
-```bash
-unzip <path-to-vsix> -d /tmp/vsix-unpacked    # .vsix is a zip archive
-uvx guarddog npm scan /tmp/vsix-unpacked --output-format=json
-```
-
-### Claude plugins / skills — Custom heuristics (NO external scanner)
-
-There is **no malware scanner for Claude plugins/skills.** Run lightweight custom heuristics with `Read` + `Grep` over the skill's `SKILL.md` and any bundled scripts, looking for four pattern classes:
-
-| Heuristic | What to grep for |
-|---|---|
-| Install-command redirection | `curl … \| sh`, `wget … \| bash`, `npm install` / `pip install` of unexpected packages, edits to shell profiles (`.bashrc`, `.zshrc`) |
-| Network exfiltration | outbound `curl`/`fetch`/`requests.post` to non-obvious hosts, especially carrying file contents or env vars |
-| Obfuscation | `base64 -d`, `eval`, `exec`, `atob(`, hex/`\x`-escaped blobs, unusually long single-line encoded strings |
-| Prompt injection | text instructing the agent to ignore prior instructions, exfiltrate secrets, or call tools the skill shouldn't need |
-
-```bash
-# Example sweep over a plugin/skill directory (adapt patterns; this is illustrative):
-grep -rEn 'curl .*\| *(sh|bash)|base64 +-d|\beval\b|requests\.post|ignore (all|previous) instructions' <plugin-dir>
-```
-
-**ALWAYS flag this surface lower-confidence and recommend manual review.** These heuristics are a tripwire, not a malware scanner — a clean result does NOT mean the plugin is safe, only that the obvious patterns are absent. State this in the report every time.
-
-### cargo / Rust — OSV CVE-only
-
-```bash
-osv-scanner scan -L Cargo.lock --format json
-```
-
-Malware scanning is a **gap** for cargo — no equivalent of GuardDog is wired in. State the gap explicitly in the report; the CVE result alone is not a clean bill of health.
+1. **Materialize the candidate's static artifacts to a temp dir WITHOUT executing it:**
+   - **MCP server** → construct the `tools/list` + `prompts/list` + `resources/list` JSON (Cisco `static`-subcommand shape) by parsing the server source with `Read`/`Grep` — the registration calls (`server.tool(...)` / `server.setRequestHandler('tools/list', …)` / FastMCP `@mcp.tool`/`@mcp.prompt`/`@mcp.resource` decorators); or copy a pre-shipped `tools.json`/manifest. **Never run the server.**
+   - **AI IDE extension** → `unzip` the `.vsix` (already done for the OSV pass).
+   - **AI CLI agent** → `pip download` / `npm pack` (no install), then `tar xf <pkg>.tgz -C <tmp>` so lifecycle scripts and the entry point are readable.
+   - **Claude plugin/skill** → copy the skill dir as-is.
+2. **Dispatch the reviewer:**
+   ```
+   Agent { subagent_type: "ai-tool-security-reviewer", prompt: "<temp-dir path> + surface: <surface> + pre-scan findings: <deterministic hits>" }
+   ```
+   It returns an enum-locked verdict (`verdict` GREEN/YELLOW/RED, `agentic`, `confidence`, `findings[]`, `summary`).
+   - **Runtime caveat:** a newly-created agent is not dispatchable by `subagent_type` in the session that created it — the registry is fixed at session start. This path works at runtime / in a fresh session; an in-session "agent not found" right after authoring is not a defect.
+3. **Merge** the reviewer's verdict into the worst-tier roll-up (below), validating the returned schema. **Malformed / non-schema output → treat as a manual-review flag** (do not silently drop it). The semantic verdict is **advisory and tainted** — it informs the roll-up; it never blocks.
+4. **Delete the temp dir** after the verdict is received.
 
 ## Verdict Rubric
 
-Apply per surface, then roll up. The overall verdict is the **worst** per-scan tier (one RED makes the finalist RED).
+Apply per scan/layer, then roll up. The overall verdict is the **worst** per-scan tier (one RED makes the finalist RED).
 
 | Condition | Tier |
 |---|---|
-| Confirmed malware finding (GuardDog rule hit, mcp-scanner YARA hit, or a custom-heuristic match that survives inspection) | RED |
+| Confirmed malware (OSV `MAL-` id, mcp-scanner YARA hit, or a custom-heuristic match that survives inspection) | RED |
+| Semantic reviewer returns RED (tool-poisoning / exfiltration / goal-hijack confirmed) | RED |
 | Any CVE of HIGH or CRITICAL severity | RED |
 | CVE of MODERATE/LOW severity only | YELLOW (list IDs) |
+| Semantic reviewer returns YELLOW | YELLOW (carry its findings) |
 | Custom-heuristic surface (plugins/skills) with no match | YELLOW floor — lower-confidence, manual review recommended |
-| cargo malware gap (CVE scan clean, no malware scanner available) | YELLOW — note the gap |
 | A required scanner was missing → couldn't scan | YELLOW — "couldn't scan; tool missing" (never RED, never error) |
-| All applicable scans ran and returned no findings | GREEN |
+| All applicable scans + the semantic pass ran and returned no findings | GREEN |
 
-Tiers inform; none block.
+Tiers inform; none block. The semantic verdict is advisory — a GREEN semantic result does not override a RED deterministic finding, and vice versa: worst-tier wins.
 
 ## Output Format
 
 ```
 ## vet-security: <finalist>
 
-Surface: <CLI dep | MCP server | VSCode extension | Claude plugin/skill | cargo crate>
+Surface: <CLI dep | cargo crate | MCP server | Claude plugin/skill | AI IDE extension | AI CLI agent | OS package manager>
 Overall verdict: GREEN | YELLOW | RED
 
-### Scans Run
+### Deterministic layer
 - <scanner>: <ran / couldn't scan — tool missing> — <one-line result>
-- <scanner>: <ran / couldn't scan — tool missing> — <one-line result>
+- Pre-scan: <Unicode/blob/URL/exec/namespace/NL-prompt hits, or "clean">
+
+### Semantic layer (agentic surfaces only)
+- ai-tool-security-reviewer: <verdict + 1-line summary, or "N/A — non-agentic surface">
 
 ### Findings
-- Malware: <rule/heuristic hits, or "none">
-- CVEs: <IDs + severities, or "none">
+- Malware: <OSV MAL- ids / YARA / heuristic hits, or "none">
+- CVEs: <ids + severities, or "none">
+- Semantic: <OWASP-anchored findings from the reviewer, or "none">
 
 ### Confidence & Gaps
-<Note any couldn't-scan paths, the plugins/skills lower-confidence + manual-review flag,
-or the cargo malware gap. "none" if a full scan ran with a real scanner.>
+<couldn't-scan paths; plugins/skills lower-confidence + manual-review flag; OS-package-manager reputation-only note;
+the semantic layer's advisory + LLM-judge-false-negative caveat. "none" if a full scan + semantic pass ran cleanly.>
 
 ### Summary
 <1–3 sentences explaining the verdict>
@@ -151,38 +110,14 @@ Advisory — this report informs; it does not install or block. The funnel does 
 
 ## Graceful Degradation
 
-**This is the defining behavior of this gate.** A missing scanner must NEVER throw or abort the funnel.
-
-For every scanner-absent path:
-
-1. Detect absence cheaply — check exit code / "command not found" before relying on output.
-2. Report exactly: **"couldn't scan with `<tool>` — tool not installed"**.
-3. Recommend installing it, and note its one-time install is the **bootstrap exception** in `rules/install-vetting.md` (the scanners are a pinned trusted set — do not run the funnel on them).
-4. **Continue.** Run the other applicable scanner(s), set the per-scan tier to YELLOW ("couldn't scan"), and still emit a full report.
-
-```bash
-# Probe before scanning; degrade gracefully instead of erroring.
-if command -v osv-scanner >/dev/null 2>&1; then
-  osv-scanner scan -L "$lockfile" --format json
-else
-  echo "couldn't scan with osv-scanner — tool not installed (bootstrap exception applies)"
-fi
-```
-
-Other degradation cases:
-- Scanner runs but returns non-JSON / malformed output → state "scanner output unparseable"; set that scan to YELLOW; do not crash.
-- Scanner exits non-zero because it *found something* (some tools signal findings via exit code) → that is a finding, not a failure — parse it as RED/YELLOW per the rubric, not a couldn't-scan.
-- Both scanners for a surface missing → YELLOW overall with "no scans could run — recommend installing <tools>"; never error.
-
-Never let a scanner failure abort the report. Always emit a verdict, even when nothing could be scanned.
+**The defining behavior of this gate.** A missing scanner — or an unavailable semantic reviewer — must NEVER throw or abort the funnel. Probe before scanning (incl. the `osv-scanner` Windows full-path fallback), report the absent tool's one-time install as the **bootstrap exception** (`rules/install-vetting.md`), set that scan to YELLOW "couldn't scan", run whatever else can, and **always emit a verdict**. The probe pattern and per-case handling (unparseable output, OSV.dev unreachable, reviewer unavailable, both unavailable — all → YELLOW, never abort) are in [`scanners.md`](scanners.md) § Graceful degradation.
 
 ## Gotchas
 
-1. **Advisory-only is load-bearing.** The skill emits a report; it never installs, never blocks, and the funnel never halts on it. State this explicitly in every output.
-2. **Graceful degradation never errors the funnel.** A missing scanner is a YELLOW "couldn't scan", not an exception. Probe with `command -v` first, report the bootstrap exception, and continue with whatever else can run.
-3. **Plugins/skills are ALWAYS lower-confidence.** The custom heuristics are a tripwire, not a malware scanner. A clean grep does NOT mean safe — flag lower-confidence and recommend manual review every single time.
-4. **cargo malware is a known gap.** OSV covers CVEs only; there is no malware scanner for crates here. A clean OSV run is YELLOW with the gap noted, not GREEN.
-5. **A finding is not a scan failure.** Some scanners exit non-zero when they detect something. Distinguish "tool missing / couldn't run" (YELLOW couldn't-scan) from "tool ran and found malware/CVEs" (RED/YELLOW finding) by checking for parseable findings, not exit code alone.
-6. **Verify CLI syntax before trusting it.** Published flags drift (`osv-scanner scan -L` vs `--lockfile`; GuardDog `scan` vs `verify`). If the documented form errors, run `--help` and adapt rather than reporting a false "couldn't scan".
-7. **Verdict roll-up is worst-tier.** One RED scan makes the finalist RED even if other scans are GREEN. Do not average tiers.
-8. **Bootstrap exception.** Per `rules/install-vetting.md`: GuardDog, OSV-Scanner, and Cisco mcp-scanner are the pre-trusted scanner set. Do not run this skill — or any gate — on the scanners themselves.
+1. **Advisory-only is load-bearing.** The skill emits a report; it never installs, never blocks, and the funnel never halts on it — not even on RED, and not on a semantic-reviewer RED. State this explicitly in every output.
+2. **The semantic verdict is advisory and tainted.** It is the worst-case-skewable LLM layer — merge it worst-tier, validate its schema, flag malformed output for manual review, and never let it override a deterministic RED. It has a non-zero false-negative floor; absence of semantic findings is not proof of safety.
+3. **OSV does both, across all three ecosystems.** One tool covers CVE **and** `MAL-` malware for PyPI, npm, and crates.io — cargo malware is **not** a gap. Prefer the OSV.dev API for the pre-install single-package check (no binary, name lookup); use the `osv-scanner` binary (Windows full-path fallback) for lockfile/unpacked-dir scans. A non-zero exit means it *found* something — a finding, not a failure.
+4. **Never run the candidate to materialize MCP artifacts.** Construct the `tools/list` JSON by parsing source statically (Read/Grep), or copy a shipped manifest — the reviewer is read-only and the orchestrator must not execute an unvetted server.
+5. **Plugins/skills are ALWAYS lower-confidence.** The heuristics + semantic pass are a tripwire, not a malware scanner — flag lower-confidence and recommend manual review every time.
+6. **OS package managers have no Gate-3 scanner.** winget/choco/brew are reputation-only (Gate 1). Report that explicitly; do not mark them couldn't-scan-YELLOW.
+7. **Bootstrap exception.** Per `rules/install-vetting.md`: OSV-Scanner and Cisco mcp-scanner are the pinned trusted scanner set. Do not run this skill — or any gate — on the scanners themselves. If a documented CLI form errors, run `--help` and adapt rather than reporting a false "couldn't scan". Verdict roll-up is worst-tier — one RED makes the finalist RED.
