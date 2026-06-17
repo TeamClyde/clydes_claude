@@ -95,7 +95,7 @@ Ask these questions one at a time. Record answers for Phase 3.
     - `python-utility` — standalone Python scripts or utility packages
     - `ml` — machine learning training / inference code
 
-    **Accept any free-text value** (not restricted to the list above). Write the answer to `project.json` `domain:` field. If user already has a domain set from Phase 1, confirm rather than re-prompt.
+    **Accept any free-text value** (not restricted to the list above). Write the answer to `project.json` `domain:` field. If `project.json` already has a `domain` (re-run), confirm rather than re-prompt.
 
     The domain registry is **open by design** — new domains are added by creating `~/.claude/templates/manifest/<new-domain>.md` files, not by code changes. If the user provides a custom domain not in the initial seed list, Phase 1.5 will fall back to `~/.claude/templates/manifest/_default.md` and report that fallback (see Phase 1.5 step 3 fallback logic).
 
@@ -178,7 +178,7 @@ Runs after Phase 3, before Phase 4. All steps are idempotent — every action sk
    - Skip the seed entirely if `docs/manifest.md` already exists.
 
 4. **Scaffold root-level docs** (each skip if target exists):
-   - `README.md` ← `~/.claude/templates/README.md`
+   - `README.md` ← `~/.claude/templates/README.md` — **check case-insensitively** before creating: look for any existing variant (`readme.md`, `Readme.md`, `README.MD`, etc.) so a case-sensitive filesystem (Linux/CI) does not create a duplicate beside an existing variant.
    - `CHANGELOG.md` ← `~/.claude/templates/CHANGELOG.md` — **check case-insensitively** before creating: look for any existing variant (`changelog.md`, `ChangeLog.md`, `CHANGELOG.MD`, etc.) so a case-sensitive filesystem (Linux/CI) does not create a duplicate beside an existing lowercase variant.
    - `cliff.toml` ← `~/.claude/templates/cliff.toml`, with substitution:
      - If `project.json` has `jira.enabled: true`: use sed (or Edit tool) to replace `{{JIRA_URL_BASE}}` with `https://<jira.workspace>` (read `jira.workspace` directly from the just-written `project.json`), then remove the `# JIRA_LINK_BLOCK_START` and `# JIRA_LINK_BLOCK_END` sentinel comment lines.
