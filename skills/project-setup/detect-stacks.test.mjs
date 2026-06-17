@@ -7,9 +7,9 @@
  * mirrors install-vetting-advisory.test.mjs.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +19,17 @@ const DETECTOR = resolve(__filename, '..', 'detect-stacks.mjs');
 function withFixture(files, fn) {
   const dir = mkdtempSync(join(tmpdir(), 'detect-stacks-'));
   for (const f of files) writeFileSync(join(dir, f), '');
+  try { return fn(dir); } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+/** Like withFixture but supports nested paths (e.g. 'inner/go.mod'). */
+function withTree(paths, fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'detect-stacks-'));
+  for (const p of paths) {
+    const full = join(dir, p);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, '');
+  }
   try { return fn(dir); } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -83,6 +94,43 @@ test('matched stack reports its triggering markers', () => withFixture(['pyproje
   const { parsed } = runDetector(dir);
   assert(parsed !== null, 'no JSON parsed from detector stdout');
   assert(parsed.detected[0].markers.includes('pyproject.toml'), `got ${JSON.stringify(parsed.detected[0])}`);
+}));
+
+test('extension marker: *.slcp → silabs-embedded', () => withFixture(['sm_fw_g2.slcp'], (dir) => {
+  const { parsed } = runDetector(dir);
+  assert(eq(stacksOf(parsed), ['silabs-embedded']), `got ${JSON.stringify(parsed && parsed.detected)}`);
+}));
+
+test('extension marker: *.csproj → csharp', () => withFixture(['App.csproj'], (dir) => {
+  const { parsed } = runDetector(dir);
+  assert(eq(stacksOf(parsed), ['csharp']), `got ${JSON.stringify(parsed && parsed.detected)}`);
+}));
+
+test('root marker reports dir "."', () => withFixture(['pyproject.toml'], (dir) => {
+  const { parsed } = runDetector(dir);
+  assert(parsed.detected[0].dir === '.', `got ${JSON.stringify(parsed.detected[0])}`);
+}));
+
+test('wrapper layout: marker only in subdir → detected with that dir', () => withTree(['inner/go.mod'], (dir) => {
+  const { parsed } = runDetector(dir);
+  assert(eq(stacksOf(parsed), ['go']), `got ${JSON.stringify(parsed && parsed.detected)}`);
+  const goEntry = parsed.detected.find((d) => d.stack === 'go');
+  assert(goEntry && goEntry.dir === 'inner', `expected dir 'inner', got ${JSON.stringify(goEntry)}`);
+}));
+
+test('noise dirs skipped: marker in node_modules → not detected', () => withTree(['node_modules/pkg/package.json'], (dir) => {
+  const { parsed } = runDetector(dir);
+  assert(eq(parsed.detected, []), `got ${JSON.stringify(parsed.detected)}`);
+}));
+
+test('depth-2 marker detected', () => withTree(['a/b/Cargo.toml'], (dir) => {
+  const { parsed } = runDetector(dir);
+  assert(eq(stacksOf(parsed), ['rust']), `got ${JSON.stringify(parsed && parsed.detected)}`);
+}));
+
+test('depth-3 marker NOT detected (bounded scan)', () => withTree(['a/b/c/go.mod'], (dir) => {
+  const { parsed } = runDetector(dir);
+  assert(eq(parsed.detected, []), `got ${JSON.stringify(parsed.detected)}`);
 }));
 
 console.log(`\n${passed + failed} cases: ${passed} passed, ${failed} failed`);
