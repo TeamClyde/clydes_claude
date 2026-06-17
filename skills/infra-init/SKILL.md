@@ -77,7 +77,7 @@ Prerequisite: codebase-memory-mcp must already be registered in `~/.claude/setti
 before proceeding:
 
 ```
-ToolSearch("select:index_repository,index_status")
+ToolSearch("select:mcp__codebase-memory-mcp__index_repository,mcp__codebase-memory-mcp__index_status")
 ```
 
 If `index_repository` is not found, stop and tell the user — do not attempt inline installation.
@@ -211,6 +211,6 @@ Wait for this agent to complete. It writes `.claude-init/CODEBASE.md` and sets `
 ## Gotchas
 
 1. Requires python3.11 or python3.14 specifically — not generic python3.
-2. Call ToolSearch("select:index_repository") at Phase 2 start to verify codebase-memory-mcp is loaded.
+2. Call ToolSearch("select:mcp__codebase-memory-mcp__index_repository") at Phase 2 start to verify codebase-memory-mcp is loaded.
 3. Phase 3 reads meta.repo_path from progress.json — verify it was written in Phase 2 before spawning the graph-builder agent.
 4. The codebase-memory-mcp project name is path-derived but the conversion (slashes→hyphens, internal underscores preserved) is non-obvious. Always pull it from `list_projects()` output — never construct it client-side.

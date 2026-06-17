@@ -201,7 +201,7 @@ const symbol = extractSymbol(patternStr);
 const reason =
   `Blocked: query looks like a code-symbol search. Use graph tools instead. ` +
   `For this query: query_graph({"cypher":"MATCH (f:Function) WHERE f.name = '${symbol}' RETURN f.file, f.line"}). ` +
-  `Or load graph tools first if not loaded: ToolSearch(select:search_graph,query_graph,trace_path,get_architecture,search_code,get_code_snippet).`;
+  `Or load graph tools first if not loaded: ToolSearch("select:mcp__codebase-memory-mcp__search_graph,mcp__codebase-memory-mcp__query_graph,mcp__codebase-memory-mcp__trace_path,mcp__codebase-memory-mcp__get_architecture,mcp__codebase-memory-mcp__search_code,mcp__codebase-memory-mcp__get_code_snippet").`;
 
 const blockOutput = {
   hookSpecificOutput: {

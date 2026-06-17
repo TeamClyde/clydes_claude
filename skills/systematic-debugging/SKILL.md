@@ -130,7 +130,7 @@ You MUST complete each phase before proceeding to the next.
    | What is the path from A to B? | `trace_path` |
    | Find code by name or text | `search_code` (ranked, deduplicated) |
 
-   See `rules/filesystem/efficiency.md` § "Codebase Graph Tools" for the canonical decision table. Load tools once per session via `ToolSearch("select:search_code,search_graph,query_graph,trace_path,get_architecture")`.
+   See `rules/filesystem/efficiency.md` § "Codebase Graph Tools" for the canonical decision table. Load tools once per session via `ToolSearch("select:mcp__codebase-memory-mcp__search_code,mcp__codebase-memory-mcp__search_graph,mcp__codebase-memory-mcp__query_graph,mcp__codebase-memory-mcp__trace_path,mcp__codebase-memory-mcp__get_architecture")`.
 
    No graph in the repo? Grep/Read is fine — proceed normally.
 

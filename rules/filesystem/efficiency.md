@@ -37,7 +37,7 @@ Always scope with `path="src/function/"` or equivalent. A broad glob on a repo w
 
 When a codebase graph is present (`.claude-init/CODEBASE.md` exists), graph tools are the **default** for symbol and code navigation. Grep is the **fallback** for non-source files (logs, generated output, configs) or when reading specific implementation logic the graph doesn't capture.
 
-Load the tools once per session via Tool Search: `ToolSearch("select:search_code,search_graph,query_graph,trace_path,get_architecture")`.
+Load the tools once per session via Tool Search: `ToolSearch("select:mcp__codebase-memory-mcp__search_code,mcp__codebase-memory-mcp__search_graph,mcp__codebase-memory-mcp__query_graph,mcp__codebase-memory-mcp__trace_path,mcp__codebase-memory-mcp__get_architecture")`.
 
 | Need | Tool |
 |------|------|
