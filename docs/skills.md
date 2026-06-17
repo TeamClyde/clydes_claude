@@ -65,7 +65,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 |-------|----------------|
 | `infra-init` | Codebase graph: 3-phase orchestration (structure → batch-index → graph-build) |
 | `e2e-init` | Per-repo testing backbone: produces `testing-plan.md`, `e2e-plan.md`, `run-tests.sh` |
-| `project-setup` | New-repo onboarding wizard; generates `project.json`; configures Jira and workflow preferences; Phase 3.5 detects stacks and drives the install-vetting funnel for the stack's tooling |
+| `project-setup` | New-repo onboarding wizard; generates `project.json`; configures Jira and workflow preferences; Phase 4 (Tooling Setup) detects stacks and drives the install-vetting funnel for the stack's tooling |
 | `adherence-audit` | Semantic consistency checker: dead references, mismatches, orphaned components |
 | `pulser` | Structural quality check for new skills/agents against Anthropic's 7 principles |
 
@@ -111,7 +111,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | `vet-install` | Entry point for the 3-gate install-vetting funnel; runs gates in order, consolidates one report, always asks user before any install — never auto-installs |
 | `vet-reputation` | Gate 1 — assesses whether a tool is reputable, well-maintained, and trustworthy before installing |
 | `vet-capability-fit` | Gate 2 — determines whether a candidate tool covers the stated need and which component provides that capability |
-| `vet-security` | Gate 3 — scans a finalist tool for malware or known CVEs before installing |
+| `vet-security` | Gate 3 — two-layer: OSV (CVE + `MAL-` malware) + Cisco mcp-scanner + `ai-tool-security-reviewer` semantic pass for agentic surfaces; advisory |
 
 ---
 
