@@ -30,7 +30,7 @@ Use `repo_type` from `structure.json` to select category names. Override any nam
 Read `.claude-init/progress.json` and extract `meta.repo_path`. Load MCP tools:
 
 ```
-ToolSearch("select:list_projects,get_architecture,search_graph,query_graph")
+ToolSearch("select:mcp__codebase-memory-mcp__list_projects,mcp__codebase-memory-mcp__get_architecture,mcp__codebase-memory-mcp__search_graph,mcp__codebase-memory-mcp__query_graph")
 ```
 
 Call `list_projects()` to find the project identifier that matches `meta.repo_path`. Use that identifier as the `project` parameter in all subsequent MCP calls.
@@ -53,8 +53,10 @@ Use `search_graph` or `query_graph` to find files matching each category's direc
 
 Example queries for Category 2 (feature call-chain tops):
 ```
-query_graph(project=<project_name>, query="MATCH (f:Function) WHERE f.file CONTAINS '/screen/' OR f.file CONTAINS '/controller/' OR f.file CONTAINS '/handler/' RETURN DISTINCT f.file LIMIT 100")
+query_graph(project=<project_name>, query="MATCH (f:Function) WHERE f.qualified_name CONTAINS '.screen.' OR f.qualified_name CONTAINS '.controller.' OR f.qualified_name CONTAINS '.handler.' RETURN DISTINCT f.qualified_name LIMIT 100")
 ```
+
+Note: `qualified_name` is dotted (`.pkg.module.symbol`), not a slash path — `f.file` is empty in current codebase-memory-mcp builds, so filter and return `qualified_name`.
 
 | Category | Match condition |
 |----------|----------------|
