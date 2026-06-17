@@ -33,7 +33,8 @@ def detect(root: Path) -> dict:
         repo_type = "flutter-mobile"
     elif has("android") and has("ios") and has("package.json"):
         repo_type = "react-native"
-    elif has("CMakeLists.txt") or any(root.glob("*.ino")):
+    elif (has("CMakeLists.txt") or any(root.glob("*.ino"))
+            or any(root.glob("*.slcp")) or any(root.glob("*.cproject"))):
         repo_type = "firmware-embedded"
     elif has("package.json"):
         body = _read_text(root / "package.json")
