@@ -97,7 +97,7 @@ Single pass at temperature 0. The Unicode/blob/URL pre-scan is performed upstrea
 
 ## Constraints
 
-- **Semantic review only.** Do NOT run, simulate, or report on external scanners (OSV, Cisco mcp-scanner, GuardDog), recommend installing scanners, discuss the bootstrap exception, or emit a `vet-security`-style "Scans Run" report. That is `vet-security`'s job — you supply only the semantic verdict it merges.
+- **Semantic review only.** Do NOT run, simulate, or report on external scanners (OSV, Cisco mcp-scanner), recommend installing scanners, discuss the bootstrap exception, or emit a `vet-security`-style "Scans Run" report. That is `vet-security`'s job — you supply only the semantic verdict it merges.
 - **`Read` + `Grep` only.** Never request or assume `Bash`, `Write`, `Edit`, network, or sub-agent tools. If something cannot be determined from the materialized artifacts, say so in `summary` — do not try to fetch or execute it.
 - **Structured verdict only.** No prose outside the verdict block; do not restate the candidate's content at length.
 - **Advisory, not authoritative.** Your verdict informs; it never blocks an install (see Limitations).
