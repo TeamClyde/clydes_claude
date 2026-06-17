@@ -14,14 +14,14 @@ See `rules/install-vetting.md` for the full tier definitions, surface map, and b
 
 **Two entry points for this skill:**
 - `/project-setup` **Phase 3.5 (Stack Setup)** — the prompt-first installer calls `vet-install` before adding any tool.
-- The advisory `PreToolUse` hook nudge (Task 6) — surfaces this skill when an install-like tool call is detected. When invoked from the hook with a raw install command, derive the install surface from the package-manager prefix: `pip`/`pip3`/`pipx`/`poetry`/`pdm`/`uv`/`uvx`/`npm`/`yarn`/`pnpm`/`bun`/`gem` → CLI dep; `cargo install` → cargo crate; `claude mcp add` → MCP server; `code --install-extension` → VSCode extension.
+- The advisory `PreToolUse` hook nudge (Task 6) — surfaces this skill when an install-like tool call is detected. When invoked from the hook with a raw install command, derive the install surface from the package-manager prefix: `pip`/`pip3`/`pipx`/`poetry`/`pdm`/`uv`/`uvx`/`npm`/`yarn`/`pnpm`/`bun`/`gem` → CLI dep; `cargo install` → cargo crate; `claude mcp add` → MCP server; `code --install-extension` → VSCode extension (use `AI IDE extension` if it's an AI/agentic extension); an autonomous-agent / agent-framework install → `AI CLI agent` (not `CLI dep`); `winget`/`choco`/`brew install` → `OS package manager` (reputation-only — Gate 1 only, no Gate 3 scan). Gate 3's semantic pass runs for the agentic surfaces only; ordinary packages get the deterministic OSV scan alone. The reviewer's self-assess valve handles misclassification.
 
 ## Inputs
 
 | Input | Required | Values |
 |---|---|---|
 | Candidate | Yes (or stated need) | Package name, `github.com/<owner>/<repo>`, or a capability need |
-| Install surface | Yes | `CLI dep`, `MCP server`, `VSCode extension`, `Claude plugin/skill`, `cargo crate` |
+| Install surface | Yes | **Agentic** (get Gate 3's semantic pass): `MCP server`, `Claude plugin/skill`, `AI IDE extension`, `AI CLI agent`. **Package / non-agentic** (deterministic scan only): `CLI dep`, `cargo crate`, `VSCode extension` (non-AI), `OS package manager`. |
 | Need | Optional | The problem the candidate should solve. When provided (e.g. by `/project-setup` Phase 3.5 as `need: <role>`), it scopes Gate 2's capability-fit check; when omitted, the need is inferred from why the candidate came up. |
 
 If only a **stated need** is given (no named candidate), invoke `vet-reputation` in `discover-from-need` mode first to produce a ranked shortlist, then run Gates 2 and 3 on the top pick.
@@ -106,7 +106,7 @@ Advisory — this report informs; it does not install or block. You decide.
 Include the `### Confidence & Gaps` section whenever:
 - Gate 1 returns reduced-confidence (registry-only package, no Scorecard available)
 - Gate 3 is on the `Claude plugin/skill` surface (always lower-confidence — heuristics only)
-- Gate 3 is on `cargo crate` (malware gap — CVE scan only)
+- Gate 3 on `cargo crate` — OSV covers CVE + `MAL-` malware (feed-completeness caveats apply, as for any ecosystem)
 - Any gate couldn't run a scanner ("couldn't scan — tool missing")
 - A gate-skill returned an error (surface as a gap, not a silent failure)
 
@@ -126,6 +126,6 @@ If a gate-skill fails or returns an error:
 2. **Never auto-install, not even on all-GREEN.** Always-ask is an explicit design decision. An "auto-proceed on all-GREEN" path does not exist and must not be added.
 3. **Low-confidence signals must be surfaced, not dropped.** Gate 3's plugin/skill heuristic path is always lower-confidence — it must appear in `### Confidence & Gaps` every time. Gate 1's registry-only reduced confidence likewise. Silently omitting these signals defeats the funnel's purpose.
 4. **Scope: workflow/Claude-initiated installs only.** This funnel covers tools that the workflow or Claude is about to install. It does not apply to the user's own terminal commands. Per `rules/install-vetting.md`: "Scope: workflow/Claude-initiated installs only, never the user's own terminal."
-5. **Bootstrap exception.** GuardDog, OSV-Scanner, and Cisco mcp-scanner are the pre-trusted scanner set. Do not run this funnel on them — their one-time install is the sanctioned un-vetted bootstrap. Per `rules/install-vetting.md`.
+5. **Bootstrap exception.** OSV-Scanner and Cisco mcp-scanner are the pre-trusted scanner set. Do not run this funnel on them — their one-time install is the sanctioned un-vetted bootstrap. Per `rules/install-vetting.md`.
 6. **Gate-skill failures are gaps, not crashes.** If a gate-skill errors, surface it in `### Confidence & Gaps` and continue. Never abort the consolidated report.
 7. **One report, not three.** The orchestrator's job is consolidation. Do not present three separate gate reports to the user — compose them into the single consolidated format above.
