@@ -104,6 +104,21 @@ Record in `.claude-init/progress.json`:
 { "meta": { "repo_path": "<REPO_PATH>" }, "index": { "status": "complete" } }
 ```
 
+### Vendored / SDK noise
+
+Large vendored trees (e.g. `wiseconnect3_sdk_*/`, `cjson/`, `Middlewares/`) inflate the graph and drown out application code. codebase-memory-mcp **honors `.gitignore`** — directories listed there are reported in `excluded.dirs` and skipped during indexing (verified empirically against v0.8.1). There is no `exclude` parameter on `index_repository`.
+
+**Mitigation:** Before running `/infra-init` on a firmware or embedded repo with large SDK trees, add the vendor dirs to the repo's `.gitignore`:
+
+```
+# Vendored SDK — exclude from codebase-memory-mcp indexing
+wiseconnect3_sdk_*/
+cjson/
+Middlewares/
+```
+
+Then index normally. If `.gitignore` changes are undesirable, an alternative is to pass a subpath as `repo_path` (e.g. the `src/` directory containing only application code) — the graph will be scoped to that subtree.
+
 ---
 
 ## Phase 2.5 — Supplemental Enrichment
