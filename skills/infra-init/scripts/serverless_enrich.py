@@ -40,7 +40,7 @@ _LineLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _con
 def _construct_cfn_tag(loader: _LineLoader, tag_suffix: str, node: yaml.Node) -> Any:
     """Handle CloudFormation intrinsic tags (!Sub, !Ref, !GetAtt, !Join, !If, ...).
 
-    We don't evaluate CloudFormation — we just need YAML parsing to not explode.
+    We don't evaluate CloudFormation -> we just need YAML parsing to not explode.
     Return the underlying value (scalar/sequence/mapping) with the tag discarded.
     For env_var defaults this means `!Sub "${Stage}-foo"` becomes the literal
     string "${Stage}-foo", which is the right shape for downstream consumers.
@@ -102,7 +102,7 @@ def _event_to_trigger(event_entry: Any) -> tuple[str | None, dict | None]:
                 return f"cron:{body['schedule']}", None
             bus = body.get("eventBus")
             if bus:
-                # !Ref FilterLifeEventBus → scalar "FilterLifeEventBus"
+                # !Ref FilterLifeEventBus -> scalar "FilterLifeEventBus"
                 return f"eventbridge:{bus}", None
             pattern = body.get("pattern")
             if isinstance(pattern, dict):
@@ -130,7 +130,7 @@ def enrich_supplemental(enrichments: dict, root: Path) -> dict:
             sls_path = p
             break
     if sls_path is None:
-        log.info("No serverless.yml/template.yaml found — skipping serverless enrichment")
+        log.info("No serverless.yml/template.yaml found - skipping serverless enrichment")
         return enrichments
 
     sls = _load_yaml(sls_path) or {}

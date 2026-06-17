@@ -1,7 +1,7 @@
 """Detect the target repo's type from its top-level manifest files.
 
 Writes `.claude-init/structure.json` with `repo_type` + `key_dirs`. Does NOT
-enumerate source files — graphify owns that.
+enumerate source files -> graphify owns that.
 """
 
 from __future__ import annotations
