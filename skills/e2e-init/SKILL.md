@@ -178,18 +178,23 @@ Template for the Firmware static-analysis backbone:
 
 set -uo pipefail
 
+RC=0
 SA_RAN=false
 
 if command -v cppcheck &>/dev/null; then
   echo "Running cppcheck..."
-  cppcheck --error-exitcode=1 --quiet . && echo "cppcheck: OK"
+  cppcheck --error-exitcode=1 --quiet . && echo "cppcheck: OK" || RC=1
   SA_RAN=true
 fi
 
 if command -v clang-tidy &>/dev/null; then
   echo "Running clang-tidy (dry-run check)..."
-  # REPLACE: adjust file glob and compile-commands path for this repo
-  find . -name '*.c' -o -name '*.cpp' | head -50 | xargs clang-tidy --quiet
+  # REPLACE: adjust file selection / compile-commands path for this repo
+  # (prefer compile_commands.json when present).
+  files=$(find . -name '*.c' -o -name '*.cpp')
+  if [ -n "$files" ]; then
+    printf '%s\n' "$files" | xargs clang-tidy --quiet || RC=1
+  fi
   SA_RAN=true
 fi
 
@@ -198,6 +203,8 @@ if [ "$SA_RAN" = false ]; then
   echo "(Install cppcheck or clang-tidy to enable static-analysis checks here.)"
   exit 0
 fi
+
+exit "$RC"
 ```
 
 After writing this template, replace the placeholder comments with any
@@ -206,6 +213,7 @@ compile-commands path if a `compile_commands.json` is present).
 
 **After completing the Firmware branch, skip the rest of Step 5.** The
 service-boundary host-runner template below does not apply to Firmware repos.
+A **Mixed** repo (firmware + host-testable services) still applies the non-firmware host-runner template to its services — the firmware static-analysis backbone above is not auto-applied to its firmware portion.
 
 ---
 
