@@ -127,7 +127,14 @@
     "uv",
     "adrs",
     "Linkinator",
-    "github"
+    "github",
+    "Snyk",
+    "datamarking",
+    "Lakera",
+    "Semgrep",
+    "Trivy",
+    "Xinference",
+    "GHSA"
   ],
   "ignorePaths": ["node_modules", ".git"]
 }
