@@ -117,6 +117,8 @@ cjson/
 Middlewares/
 ```
 
+**⚠️ Caveat:** `.gitignore`-ing a vendored SDK also untracks it from version control. If the SDK is intentionally committed (common in firmware repos), use the subpath `repo_path` mitigation below instead, which leaves version control untouched.
+
 Then index normally. If `.gitignore` changes are undesirable, an alternative is to pass a subpath as `repo_path` (e.g. the `src/` directory containing only application code) — the graph will be scoped to that subtree.
 
 ---
