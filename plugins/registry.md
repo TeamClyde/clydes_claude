@@ -36,6 +36,117 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
 
 ---
 
+## atlassian
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Active
+- **Pinned version:** `9b52fb18e184` (gitCommitSha)
+- **Provides:** Atlassian MCP (Jira + Confluence) + skills `atlassian:capture-tasks-from-meeting-notes`, `:generate-status-report`, `:search-company-knowledge`, `:spec-to-backlog`, `:triage-issue`.
+- **Domain ownership:** Jira/Confluence integration. MCP tools are **never called directly** — routed through the `jira-workflow-manager` agent per `rules/mcp-governance.md`.
+- **Last audited:** 2026-06-18
+- **Notes:** Jira disabled in this repo (`project.json` jira.enabled=false); used in other repos. MCP tool schemas deferred via Tool Search.
+
+---
+
+## aws-serverless
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Active
+- **Pinned version:** `d3a93d70cb46` (gitCommitSha)
+- **Provides:** AWS Serverless MCP + skills `aws-serverless:aws-lambda`, `:api-gateway`, `:aws-serverless-deployment`, `:aws-lambda-durable-functions`.
+- **Domain ownership:** AWS serverless development (Lambda / SAM / API Gateway / event source mappings).
+- **Last audited:** 2026-06-18
+- **Notes:** Largest MCP tool surface (~30 tools); context cost mitigated by Tool Search (`ENABLE_TOOL_SEARCH=true`). Read-only by default — generates templates, never auto-deploys.
+
+---
+
+## context7
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Active
+- **Provides:** Context7 MCP (`resolve-library-id`, `query-docs`) — live library/framework documentation lookup.
+- **Domain ownership:** Up-to-date external library docs; preferred over web search for library API/config/CLI questions.
+- **Last audited:** 2026-06-18
+- **Notes:** Stray local-scope enable in `template-image-generator` disabled + purged 2026-06-18; user-scope install retained.
+
+---
+
+## playwright
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Active
+- **Provides:** Playwright MCP (browser automation — navigate, click, snapshot, network, etc.).
+- **Domain ownership:** Browser-driven E2E / frontend verification.
+- **Last audited:** 2026-06-18
+- **Notes:** Situational; tool schemas deferred via Tool Search.
+
+---
+
+## pyright-lsp
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Active
+- **Provides:** Pyright language-server integration (Python symbol resolution, type inference).
+- **Domain ownership:** Code-level Python lookups during planning. Referenced in `rules/filesystem/efficiency.md` as the planning-time symbol/type/enum lookup tool (replacement for grepping source).
+- **Last audited:** 2026-06-18
+
+---
+
+## claude-md-management
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Active
+- **Provides:** `claude-md-management:revise-claude-md` (command), `claude-md-management:claude-md-improver` (skill).
+- **Domain ownership:** CLAUDE.md auditing and improvement. No local equivalent.
+- **Last audited:** 2026-06-18
+
+---
+
+## security-guidance
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Active
+- **Provides:** PreToolUse hook (`Edit|Write|MultiEdit`) — multi-layer secure-coding review (regex pattern warnings → LLM diff review → agentic commit-time reviewer) for injection / XSS / secrets / unsafe-deserialization in code being written.
+- **Domain ownership:** Continuous edit-time secure-coding review of **own code**. Distinct surface from install-vetting (`vet-*`, which reviews **third-party tools** pre-install) and from `/security-review` (manual, on-demand) — it complements both rather than duplicating them.
+- **Last audited:** 2026-06-18
+- **Notes:**
+  - Hook shells to `python3` on every edit — verify it resolves on Windows/git-bash per `rules/filesystem/path-portability.md`; if silently erroring, fix or disable.
+  - Stray local-scope enable in `template-image-generator` disabled + purged 2026-06-18; user-scope install retained.
+
+---
+
+## explanatory-output-style
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Active
+- **Provides:** "explanatory" output style (educational insights during work).
+- **Domain ownership:** Personal output-style preference. Not part of the orchestration layer.
+- **Last audited:** 2026-06-18
+
+---
+
+## marketing-skills (project-scoped)
+
+- **Source:** `github.com/coreyhaines31/marketingskills` (marketingskills marketplace — third-party, not Anthropic-official)
+- **State:** Active (project: `template-image-generator`)
+- **Pinned version:** `1.9.0` (`114587831efb`)
+- **Provides:** Marketing / Amazon-listing skills.
+- **Domain ownership:** `template-image-generator` repo only. Niche; not global.
+- **Last audited:** 2026-06-18
+- **Notes:** Only installed plugin from a non-official marketplace — apply the Pre-Install Checklist / install-vetting funnel on any update.
+
+---
+
+## frontend-design (project-scoped)
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Active (project: `klondike_gui`)
+- **Provides:** Frontend design guidance skills/agents.
+- **Domain ownership:** `klondike_gui` repo only.
+- **Last audited:** 2026-06-18
+
+---
+
 ## superpowers
 
 - **Source:** https://github.com/claude-ai/superpowers (claude-plugins-official)
@@ -47,6 +158,36 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
 - **Notes:**
   - Integrated (local skills took priority), then removed. Local skills (`brainstorming`, `test-driven-development`, `writing-plans`, etc.) are the canonical entry points.
   - setup.sh enforces removal: `claude plugin uninstall superpowers` runs on every setup run while this entry is Removed.
+  - 2026-06-18: a surviving local-scope enable + install record in `template-image-generator` (missed by setup.sh's user-scope `uninstall`) was disabled and purged from `installed_plugins.json`. setup.sh's uninstall does **not** cover project/local-scope enables — see the `reference-windows-plugin-local-scope` memory.
+
+---
+
+## commit-commands
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Removed (2026-06-18)
+- **Provided:** `/commit`, `/commit-push-pr`, `/clean_gone`.
+- **Reason:** Overlapped and conflicted with the `git-manager` skill — the mandated git path (`CLAUDE.md`: never run git directly). git-manager does strictly more (Jira trailers, plan-doc sync, branch safety).
+- **Fold-in flagged:** `/clean_gone` ([gone]-branch + worktree pruning), a capability git-manager lacks — TeamClyde/clydes_claude #71.
+
+---
+
+## feature-dev
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Removed (2026-06-18)
+- **Provided:** agents `code-architect`, `code-explorer`, `code-reviewer`; `/feature-dev` 7-phase command.
+- **Reason:** Overlapped `brainstorming` / `writing-plans` / `architect` / `Explore` / `requesting-code-review`, and `/feature-dev` bypassed the plan-doc → plan-gate → architect pipeline entirely.
+- **Fold-in flagged:** parallel multi-lens reviewer (3 concurrent reviewers — simplicity/bugs/conventions — with ≥80%-confidence filtering) into `requesting-code-review` — TeamClyde/clydes_claude #72.
+
+---
+
+## claude-code-setup
+
+- **Source:** claude-plugins-official marketplace (`anthropics/claude-plugins-official`)
+- **State:** Removed (2026-06-18)
+- **Provided:** `claude-automation-recommender` skill (read-only; recommends top automations per category).
+- **Reason:** Overlapped `project-setup` (which actually configures, not just recommends) + `adherence-audit` (drift detection). Recommend-only; superseded for a mature workflow.
 
 ---
 
