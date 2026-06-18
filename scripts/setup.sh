@@ -327,17 +327,18 @@ echo "Step 7 — Installing Claude Code plugins"
 PLUGINS=(
   "atlassian@claude-plugins-official"
   "aws-serverless@claude-plugins-official"
-  "claude-code-setup@claude-plugins-official"
   "claude-md-management@claude-plugins-official"
-  "commit-commands@claude-plugins-official"
   "context7@claude-plugins-official"
   "explanatory-output-style@claude-plugins-official"
-  "feature-dev@claude-plugins-official"
+  "playwright@claude-plugins-official"
   "plugin-dev@claude-plugins-official"
   "pyright-lsp@claude-plugins-official"
   "security-guidance@claude-plugins-official"
   "skill-creator@claude-plugins-official"
 )
+# Removed from this list 2026-06-18: commit-commands, feature-dev, claude-code-setup.
+# They are marked Removed in plugins/registry.md and the enforcement pass below
+# uninstalls them; they no longer belong in the install list.
 
 # Snapshot installed plugins once so each iteration can check without a subprocess
 PLUGIN_LIST_OUTPUT=""

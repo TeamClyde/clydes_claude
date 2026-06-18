@@ -144,7 +144,10 @@
     "choco",
     "subpath",
     "ossf",
-    "mgr"
+    "mgr",
+    "aws",
+    "marketingskills",
+    "sh"
   ],
   "ignorePaths": ["node_modules", ".git"]
 }
