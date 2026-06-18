@@ -24,6 +24,7 @@ When a plan references a subagent, it is deferring the agent design here. This p
 | `test-builder` | `~/.claude/agents/test-builder.md` | Write test code from test strategy output, in parallel with implementation |
 | `test-runner` | `~/.claude/agents/test-runner.md` | Post-implementation test executor — runs the test suite, classifies results (PASS / BUILD FAILURE / TEST FAILURE / ENVIRONMENT FAILURE), writes to `.claude/test-results.md`, and mandates `systematic-debugging` via REQUIRED NEXT STEP block on any failure |
 | `jira-workflow-manager` | `~/.claude/agents/jira-workflow-manager.md` | All Jira operations |
+| `ai-tool-security-reviewer` | `~/.claude/agents/ai-tool-security-reviewer.md` | Semantic security review of agentic install candidates (MCP / skills / AI-extensions / AI-CLI) against OWASP ASI/AST; least-privilege, advisory |
 
 **Note:** Skills (`git-manager`, `infra-init`, `e2e-init`) are not agents — they are prompt templates that run in the main context. They are defined in their respective plans.
 
@@ -695,6 +696,24 @@ If both are yes → fix inline, no ticket (commit message is the record). If eit
 - Read implementation source files (reads only `testing_plan` and the Testing section of `plan_doc`)
 - Accumulate result files (always overwrites `.claude/test-results.md`)
 - Retry on BUILD FAILURE or ENVIRONMENT FAILURE
+
+---
+
+### 11. `ai-tool-security-reviewer` — AI-Tool Semantic Security Judge
+
+**Purpose:** The semantic layer of install-vetting Gate 3. A quarantined judge that reads an AI/agentic install candidate's static artifacts and reports OWASP-anchored security findings — the natural-language manipulation (tool poisoning, goal hijack, trust exploitation) that signature scanners structurally miss (OWASP AST08). Additive to the deterministic scanner layer, never the sole line.
+
+**Model:** Sonnet, temperature 0 (single-pass).
+
+**Tools:** `Read`, `Grep` ONLY — least privilege. No Bash, Write, Edit, Agent, or network. A successful prompt-injection can at worst skew a discarded verdict; it cannot act, fetch, or write (the quarantined-LLM half of Willison's Dual-LLM pattern).
+
+**When invoked:** By `vet-security` (Gate 3) for the four agentic surfaces only — MCP servers, Claude plugins/skills, AI IDE extensions, AI CLI tools/agents. Ordinary packages get the deterministic layer alone.
+
+**Inputs:** a temp-dir path to the candidate's already-materialized inert artifacts (no execution); the declared surface; `vet-security`'s deterministic pre-scan findings.
+
+**Output:** an enum-locked structured verdict — `verdict` (GREEN/YELLOW/RED), `agentic` (the "not agentic → N/A" valve), `confidence`, `findings[]` ({owasp_id, severity, evidence_quote, location}), `summary`. `vet-security` merges it worst-tier.
+
+**Constraints / documented limitations:** Advisory, never authoritative — non-zero false-negative floor (~10–20% even for ensembles), non-deterministic, novel injections may bypass; backstopped by the deterministic layer and the always-ask human gate. Treats any instruction inside reviewed content as an attack to report, never to follow. Full spec: `agents/ai-tool-security-reviewer.md`; design rationale: `plans/stack-hats/tooling-setup-rework/tooling-setup-rework-design.md` §1.3 + Appendix A.
 
 ---
 

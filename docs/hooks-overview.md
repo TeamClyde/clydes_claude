@@ -64,6 +64,18 @@ This repo defines several Claude Code hooks at `.claude/hooks/<event>/<intent>.m
 **Override:** `CLAUDE_DISABLE_WORKFLOW_HOOKS=1`
 **Owner issue:** #14 (closes with limitation note)
 
+### `preToolUse/install-vetting-advisory.mjs`
+
+**Event:** `PreToolUse` on `Bash` tool
+**Purpose:** Advisory install nudge — detects install commands and recommends running the `vet-install` funnel before proceeding.
+**Behavior:**
+- Matches install commands across package managers: pip/pip3/pipx/poetry/pdm/uvx/uv (Python); npm/yarn/pnpm/bun (Node); cargo install (Rust); gem install (Ruby); code --install-extension (VSCode); claude mcp add (MCP)
+- Install detected → returns `permissionDecision: "ask"` with a recommendation to run `vet-install` first
+- NEVER returns `deny` — advisory only; user always has final say
+- Non-install commands, non-Bash tool, or bypass active → silent exit 0 (pass-through)
+**Override:** `CLAUDE_DISABLE_WORKFLOW_HOOKS=1`
+**Test suite:** `.claude/hooks/preToolUse/install-vetting-advisory.test.mjs` (22 cases)
+
 ### `postToolUse/graph-tools-self-heal.mjs`
 
 **Event:** `PostToolUse` on `mcp__codebase-memory-mcp__*` tools

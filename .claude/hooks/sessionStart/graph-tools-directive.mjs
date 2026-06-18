@@ -33,7 +33,7 @@ const output = {
     hookEventName: 'SessionStart',
     additionalContext:
       'This repo has a codebase graph. Graph tools are deferred — load via:\n\n' +
-      '  ToolSearch(select:search_graph,query_graph,trace_path,get_architecture,search_code,get_code_snippet)\n\n' +
+      '  ToolSearch("select:mcp__codebase-memory-mcp__search_graph,mcp__codebase-memory-mcp__query_graph,mcp__codebase-memory-mcp__trace_path,mcp__codebase-memory-mcp__get_architecture,mcp__codebase-memory-mcp__search_code,mcp__codebase-memory-mcp__get_code_snippet")\n\n' +
       'before any code-search work. If you reach for Grep or Glob on source files, stop and load graph tools first. ' +
       'The .claude/hooks/preToolUse/graph-tools-enforcement.mjs hook will block source-symbol Grep when graph tools are available.',
   },

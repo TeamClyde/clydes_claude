@@ -16,12 +16,19 @@ Thin orchestrator. Structural indexing is handled by codebase-memory-mcp (global
 
 ```bash
 resolve_python() {
-  if command -v python3.11 >/dev/null 2>&1; then echo python3.11; return 0
-  elif command -v python3.14 >/dev/null 2>&1; then echo python3.14; return 0
-  else
-    echo "ERROR: /infra-init requires python3.11 or python3.14; neither found on PATH." >&2
-    return 1
-  fi
+  # Try interpreters in preference order; accept the first that RUNS and is >= 3.11.
+  # Explicit minor-version names first (reliable on macOS/Linux), then generic names
+  # (python3/python/py) so a Windows box that only has those still resolves. Each candidate
+  # is executed and version-checked, so the Windows-Store "python3" stub (which prints
+  # "Python was not found" and exits non-zero) is rejected rather than selected.
+  for cand in python3.14 python3.13 python3.12 python3.11 python3 python "py -3"; do
+    ver="$($cand -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)" || continue
+    case "$ver" in
+      3.1[1-9]|3.[2-9][0-9]) echo "$cand"; return 0 ;;
+    esac
+  done
+  echo "ERROR: /infra-init requires Python >= 3.11; none found on PATH (tried python3.11-3.14, python3, python, py -3)." >&2
+  return 1
 }
 PY="$(resolve_python)" || exit 1
 ```
@@ -77,32 +84,50 @@ Prerequisite: codebase-memory-mcp must already be registered in `~/.claude/setti
 before proceeding:
 
 ```
-ToolSearch("select:index_repository,index_status")
+ToolSearch("select:mcp__codebase-memory-mcp__index_repository,mcp__codebase-memory-mcp__index_status")
 ```
 
 If `index_repository` is not found, stop and tell the user — do not attempt inline installation.
 
-Get the absolute repo path — pass the correct, fully-qualified absolute path to `index_repository` so the index persists against the right project:
+Get the absolute repo path — pass the correct, fully-qualified absolute path to `index_repository` so the index persists against the right project. Use `git rev-parse --show-toplevel`, **not** `pwd -P`: on Windows git-bash `pwd -P` returns an MSYS `/c/Users/...` path the native MCP binary cannot resolve (it fails with a generic "Pipeline failed. Check repo_path exists"), whereas `--show-toplevel` emits the OS-native form (`C:/Users/...` on Windows, `/Users/...` or `/home/...` on macOS/Linux) on every platform. See `rules/filesystem/path-portability.md`.
 
 ```bash
-REPO_PATH="$(pwd -P)"
+REPO_PATH="$(git rev-parse --show-toplevel)"
 ```
 
-Call:
+Call `index_repository` and capture the `project` field from its response — that canonical project key is what `index_status` requires (the tool takes `project`, **not** `repo_path`):
 
 ```
-index_repository(repo_path="<REPO_PATH>")
+index_repository(repo_path="<REPO_PATH>")   # returns { "project": "<PROJECT>", "status": ... }
 ```
 
-Then poll until complete — call `index_status(repo_path="<REPO_PATH>")` up to 20 times, waiting
-30 seconds between calls (10-minute timeout). If status never reaches `complete`, stop and
-surface the error to the user.
+Then poll until complete — call `index_status(project="<PROJECT>")` up to 20 times, waiting
+30 seconds between calls (10-minute timeout). If `index_repository` already returns a terminal
+status (`indexed`/`complete`), the first poll confirms it immediately. If status never reaches
+`complete`, stop and surface the error to the user.
 
 Record in `.claude-init/progress.json`:
 
 ```json
 { "meta": { "repo_path": "<REPO_PATH>" }, "index": { "status": "complete" } }
 ```
+
+### Vendored / SDK noise
+
+Large vendored trees (e.g. `wiseconnect3_sdk_*/`, `cjson/`, `Middlewares/`) inflate the graph and drown out application code. codebase-memory-mcp **honors `.gitignore`** — directories listed there are reported in `excluded.dirs` and skipped during indexing (verified empirically against v0.8.1). There is no `exclude` parameter on `index_repository`.
+
+**Mitigation:** Before running `/infra-init` on a firmware or embedded repo with large SDK trees, add the vendor dirs to the repo's `.gitignore`:
+
+```
+# Vendored SDK — exclude from codebase-memory-mcp indexing
+wiseconnect3_sdk_*/
+cjson/
+Middlewares/
+```
+
+**⚠️ Caveat:** `.gitignore`-ing a vendored SDK also untracks it from version control. If the SDK is intentionally committed (common in firmware repos), use the subpath `repo_path` mitigation below instead, which leaves version control untouched.
+
+Then index normally. If `.gitignore` changes are undesirable, an alternative is to pass a subpath as `repo_path` (e.g. the `src/` directory containing only application code) — the graph will be scoped to that subtree.
 
 ---
 
@@ -210,7 +235,9 @@ Wait for this agent to complete. It writes `.claude-init/CODEBASE.md` and sets `
 
 ## Gotchas
 
-1. Requires python3.11 or python3.14 specifically — not generic python3.
-2. Call ToolSearch("select:index_repository") at Phase 2 start to verify codebase-memory-mcp is loaded.
+1. Requires Python >= 3.11. The resolver tries python3.11-3.14, then generic python3/python/py, **executing each candidate** to verify its version — so the Windows-Store python3 stub (which only prints "Python was not found") is rejected rather than selected.
+2. Call ToolSearch("select:mcp__codebase-memory-mcp__index_repository") at Phase 2 start to verify codebase-memory-mcp is loaded.
 3. Phase 3 reads meta.repo_path from progress.json — verify it was written in Phase 2 before spawning the graph-builder agent.
 4. The codebase-memory-mcp project name is path-derived but the conversion (slashes→hyphens, internal underscores preserved) is non-obvious. Always pull it from `list_projects()` output — never construct it client-side.
+5. Set `REPO_PATH` with `git rev-parse --show-toplevel`, never `pwd -P`. On Windows git-bash `pwd -P` returns an MSYS `/c/...` path the native MCP binary rejects ("Pipeline failed"); `--show-toplevel` returns the OS-native path on every platform. See `rules/filesystem/path-portability.md`.
+6. `index_status` takes `project`, not `repo_path`. Capture the `project` key from `index_repository`'s response and poll with it; a literal `index_status(repo_path=...)` errors — the tool has no `repo_path` parameter.

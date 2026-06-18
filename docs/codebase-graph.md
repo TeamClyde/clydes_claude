@@ -198,7 +198,7 @@ Reads the directory tree, package manifests, top-level config files, and README.
 **Prerequisite:** `codebase-memory-mcp` must be registered in `~/.claude/settings.json`. Verify:
 
 ```
-ToolSearch("select:index_repository,index_status")
+ToolSearch("select:mcp__codebase-memory-mcp__index_repository,mcp__codebase-memory-mcp__index_status")
 ```
 
 If `index_repository` is not found, stop and tell the user. Get the absolute repo path, then call:

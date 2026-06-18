@@ -3,7 +3,7 @@
 Canonical reference for how skills, agents, rules, hooks, and plugins connect in the
 Claude workflow. Update this file whenever a component is added, removed, or rewired.
 
-Last updated: 2026-05-28
+Last updated: 2026-06-16
 
 ---
 
@@ -116,7 +116,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 |-------|--------------|---------|
 | `infra-init` | New repo session or codebase changed | Builds codebase graph + CODEBASE.md |
 | `e2e-init` | New repo, test backbone needed | Generates testing-plan.md, run-tests.sh, integration-test-constraints.md (static section) |
-| `project-setup` | Onboarding new repo to Claude workflow | CLAUDE.md + project.json setup wizard |
+| `project-setup` | Onboarding new repo to Claude workflow | CLAUDE.md + project.json setup wizard; Phase 4 (Tooling Setup) detects stacks → proposes project.json "stacks" → drives the vet-install funnel per catalog tool → writes docs/reference/stack-setup.md |
 | `adherence-audit` | Periodic / when adding new tools | Semantic consistency check across all components |
 | `doc-author` | Invoked by `plan-management:close-subplan`, `/doc-backfill`, `/docs-refresh feature\|architecture` | Wrapper around `docs-architect` agent with merge-not-replace + 2-step (backlink → synthesis) constraints. Single entry point for all `docs/explanation/architecture.md` and `features/*.md` mutations. Args: target, mode (`create`/`update`/`backlink-only`), context-source (`codegraph`/`journal`), accepted-adrs, optional plan-doc. Does not auto-commit — caller owns review + commit. |
 | `doc-backfill` | User-invoked `/doc-backfill` (no args) | Whole-repo one-shot codegraph-driven backfill. Generates `docs/explanation/architecture.md` (C1+C2) + one `features/<slug>.md` per detected C3 component via `doc-author` mode=`create`. Preflight requires `/infra-init` to have been run. C1 actors written as TODO comments (codegraph cannot detect external systems). |
@@ -201,8 +201,11 @@ Rules are in `rules/` and `CLAUDE.md`.
 | `rules/cspell.md` | Spellcheck false positives | Auto-add to `cspell.json` and `.vscode/settings.json` without asking |
 | `rules/secrets-handling.md` | Credential and secret handling in any workflow | Never ask user to paste a secret into chat; walk through store-once recipe (OS credential manager / `~/.netrc` / shell env var); retrieve at runtime via tool, never echo to stdout |
 | `rules/stack-hats.md` | Per-stack best-practice layer | Active hats resolved from `project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`; leveraged at session start (hook), code-generation (`executing-plans`/`subagent-driven-development`), and architect review |
+| `rules/install-vetting.md` | Install-vetting funnel policy | Defines the 3-gate advisory funnel (`vet-reputation` → `vet-capability-fit` → `vet-security`), orchestrated by `vet-install`. Advisory/never-block. Two-layer Gate 3 (deterministic + advisory `ai-tool-security-reviewer` semantic pass for agentic surfaces). Surface→tool map: CLI/deps + cargo → deps.dev + GitHub / OSV-Scanner (CVE + `MAL-` malware); MCP → Cisco mcp-scanner + semantic reviewer; AI IDE/VSCode ext → OSV on unpacked deps (+ semantic reviewer if AI); Claude plugins/skills → heuristics + semantic reviewer; OS package managers (winget/choco/brew) → reputation-only. |
 
 **Stack hats are consumed at three points off one source** (`project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`): the `sessionStart/stack-hat-directive.mjs` hook injects them as ambient reminders; `executing-plans` and `subagent-driven-development` resolve them so generated code follows them; and the `architect` agent resolves them and adherence-checks plans/implementations. Subagents resolve hats deterministically rather than relying on the ambient injection. Contract: `rules/stack-hats.md`.
+
+**The install-vetting funnel runs in 3 gates** (`vet-reputation` → `vet-capability-fit` → `vet-security`), orchestrated by `vet-install`. Advisory/never-block — the user always decides. Triggered by the `preToolUse/install-vetting-advisory.mjs` hook (nudge on install-like Bash commands) and by `/project-setup` Phase 4 (Tooling Setup). Two-layer Gate 3: deterministic scanners + an advisory local `ai-tool-security-reviewer` semantic pass (OWASP ASI/AST) for agentic surfaces. Surface-to-tool map: CLI/deps + cargo → deps.dev + GitHub / OSV-Scanner (CVE + `MAL-` malware); MCP → Cisco mcp-scanner + semantic reviewer; AI IDE/VSCode ext → OSV on unpacked deps (+ semantic reviewer if AI); Claude plugins/skills → heuristics + semantic reviewer; OS package managers → reputation-only. Contract: `rules/install-vetting.md`.
 
 ---
 
@@ -217,6 +220,7 @@ Hooks live in `hooks/` and are symlinked to `~/.claude/hooks/` by setup.sh.
 | `pre-commit` | bash | Before every git commit | Runs per-repo `scripts/run-tests.sh` if executable; runs ESLint and ruff if their config files are present; runs gitleaks secret scanning if installed. Step 5 (Task 14): reads `.claude/active-plan` and refuses in-scope commits if the plan doc is not staged or `--no-verify` is passed. All checks skip gracefully if the tool is absent. |
 | `session-start.mjs` | Node.js | SessionStart | Reads `.claude/active-plan`; surfaces the active plan's handoff file to orient the session. Exits 0 on any error — never blocks a session start. |
 | `sessionStart/stack-hat-directive.mjs` | Node.js | SessionStart | Reads `project.json` `stacks`; injects each `~/.claude/stacks/<stack>.md` `## Hat` section (specialist best-practices + tooling reminders), size-budgeted to full-inline or pointer-to-file. Silent pass when no `stacks`. Never blocks session start. |
+| `preToolUse/install-vetting-advisory.mjs` | Node.js | PreToolUse on Bash | Detects install commands across package managers; returns `permissionDecision: "ask"` recommending `vet-install` funnel first. NEVER denies. Silent pass for non-installs. Override: `CLAUDE_DISABLE_WORKFLOW_HOOKS`. |
 
 ### Intentionally unused hooks
 
