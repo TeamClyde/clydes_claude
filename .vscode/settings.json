@@ -135,6 +135,12 @@
     "GHSA",
     "cppcheck",
     "cwd",
-    "ts"
+    "ts",
+    "silabs",
+    "winget",
+    "choco",
+    "subpath",
+    "ossf",
+    "mgr"
   ]
 }
