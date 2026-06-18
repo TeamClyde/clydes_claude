@@ -44,10 +44,10 @@ Ask the user which init skills to run. Skip any whose output already exists.
 | Skill | Output | Skip condition |
 |-------|--------|----------------|
 | `init` | `CLAUDE.md` | CLAUDE.md exists at repo root |
+| `infra-init` | codebase knowledge graph (`.claude-init/CODEBASE.md`) | ask user if they want this |
 | `e2e-init` | e2e test scaffolding | ask user if they want this |
-| `infra-init` | codebase knowledge graph | ask user if they want this |
 
-Run selected skills one at a time. Wait for each to complete before proceeding.
+Run selected skills one at a time, **in this order** — `infra-init` before `e2e-init`, because e2e-init uses `.claude-init/CODEBASE.md` (an infra-init output) as its primary structure source and falls back to slower globbing when it is absent. Wait for each to complete before proceeding.
 
 ---
 
@@ -277,12 +277,17 @@ Read the `## Tooling` section of `~/.claude/stacks/<s>.md` (the section ends at 
 heading). Within it, the `- **CLI tools:**` line is a header; each indented sub-bullet beneath
 it (e.g. `` - `ruff` — lint + format … Install: `pip install ruff` ``) is one tool entry. For
 each such sub-bullet, extract the tool name, its `Install:` command, and its role description.
+**Derive the install surface from the `Install:` command** — it determines which vetting gates
+apply: `choco`/`winget`/`scoop`/`apt`/`dnf`/`brew`/`pacman` → `OS package manager` (Gate-1
+reputation-only per `rules/install-vetting.md`); `pip`/`pipx`/`npm`/`cargo`/`gem`/`go install` →
+`CLI dep`. Mislabeling an OS-package-manager tool as `CLI dep` wrongly invokes Gate 3's package
+scanner, which cannot cover e.g. an LLVM-from-choco install.
 The `- **MCPs:**` and `- **VSCode extensions:**` bullets are NOT CLI tools — skip them (see the
 note at the end of this step). For each CLI tool:
 
 1. Run the funnel (the user decides — relay its consolidated report):
    ```text
-   Skill { skill: "vet-install", args: "candidate: <tool> surface: CLI dep need: <role from the catalog bullet>" }
+   Skill { skill: "vet-install", args: "candidate: <tool> surface: <derived surface> need: <role from the catalog bullet>" }
    ```
 2. The report ends with "Proceed with install? (yes / no / see Gate N details)". Relay it; do not decide for the user.
 3. **On "yes"** → run the tool's `Install:` command via Bash (e.g. `pip install ruff`). The advisory

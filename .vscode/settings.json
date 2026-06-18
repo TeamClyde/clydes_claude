@@ -132,6 +132,9 @@
     "Semgrep",
     "Trivy",
     "Xinference",
-    "GHSA"
+    "GHSA",
+    "cppcheck",
+    "cwd",
+    "ts"
   ]
 }
