@@ -7,11 +7,11 @@
 
 ## Tutorials
 <!-- Learning-oriented. The first walkthrough for a new contributor (or future-you). -->
-- [ ] `docs/tutorials/getting-started.md` — first-run walkthrough (created in Phase 1B T16)
+- [x] `docs/tutorials/getting-started.md` — first-run walkthrough
 
 ## How-To
 <!-- Task-oriented recipes. -->
-- [ ] `docs/how-to/setup.md` — install / setup recipe (created in Phase 1B T16)
+- [x] `docs/how-to/setup.md` — install / setup recipe
 
 ## Reference
 <!-- Information-oriented. Generated artifacts + durable lookup material. -->
