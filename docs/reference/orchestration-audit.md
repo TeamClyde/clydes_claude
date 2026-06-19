@@ -13,6 +13,22 @@ deadlocking** even though a mid-run **session-token limit killed ~200 of its 290
 watchdog + quorum barrier turned a catastrophic mass-failure into partial results instead of the
 #76-class freeze it was built to prevent. That is the primitive's first real validation.
 
+```mermaid
+flowchart LR
+    M["main-context · Workflow tool · cap=14"] --> F
+    subgraph RUN["fail-successfully fan-out — every agent() wrapped in runUnit watchdog"]
+        direction LR
+        F["Find<br/>18 finders / 6 dimensions<br/>✅ complete"] --> V["Verify<br/>3-vote quorumBarrier<br/>⚠️ partial"] --> S["Synthesize<br/>❌ killed"]
+    end
+    F --> CLS["per-edge classification<br/>140 edges ✅"]
+    V --> C15["15 confirmed<br/>dead-refs · invocation · 3 conventions"]
+    V --> LOST["~74 found-but-lost<br/>tool-interact · triggers · casing"]
+    LIM(["session-token limit<br/>killed ~200 / 290 Opus agents"]) -.-> V
+    LIM -.-> S
+    CLS --> DOC["orchestration-audit.md<br/>salvaged deterministically"]
+    C15 --> DOC
+```
+
 **What that means for coverage:**
 
 | Dimension | Find | Verify (3-vote quorum) | In this report |
@@ -35,6 +51,31 @@ per-edge classification (finders' `edgeClassifications`) **did** survive in full
 so ~89 findings → ~267 verify agents. Both are fixed for any future run by pinning
 `model: 'haiku'` on finders/verify + `model: 'sonnet'` on synthesize, and batching verify
 (one agent reviews ~10 findings) — turning ~267 verify agents into ~9.
+
+**Why it didn't deadlock — the per-unit FSM (`runUnit`) that wrapped every agent.** A mass failure
+drove ~200 units to `TIMED_OUT`/`FAILED` → `ABANDONED`; because `runUnit` always reaches a terminal
+state and `quorumBarrier` proceeds on a *quorum of terminal states* (not all-`SUCCEEDED`), the run
+finished on the survivors instead of waiting forever. Captured `SUCCEEDED` values made abandoning
+non-lossy.
+
+```mermaid
+flowchart TD
+    P["PENDING"] --> R["RUNNING"]
+    R -->|"output"| VA["VALIDATING"]
+    R -->|"watchdog deadline"| TO["TIMED_OUT"]
+    R -->|"crash"| FA["FAILED"]
+    VA -->|"valid"| SU["SUCCEEDED"]
+    VA -->|"invalid (reason → repair ctx)"| RE["RETRYING"]
+    RE -->|"budget left"| R
+    TO -->|"budget left"| R
+    FA -->|"budget left"| R
+    TO -->|"budget spent"| AB["ABANDONED"]
+    FA -->|"budget spent"| AB
+    SU:::ok
+    AB:::gone
+    classDef ok fill:#d4edda,stroke:#28a745
+    classDef gone fill:#f8d7da,stroke:#dc3545
+```
 
 ## Subagent-hook verification (load-bearing — Phase 2 Task 1)
 
@@ -74,6 +115,16 @@ gates (hooks) are not gate-map edges at all. The regulation layer needs one unam
 *hard = hook-enforced; soft = markdown-interpreted; the explicit-vs-prose distinction is a separate,
 orthogonal axis.* The 32 "already"/17 "yes" hardenable edges are the **matured explicit-invocation
 edges** — the candidate set for hook-backed hardening, now feasible because hooks reach subagents.
+
+```mermaid
+flowchart TD
+    F["finder label:<br/>hard / soft / none-yet"] --> X{"collapses two<br/>orthogonal axes"}
+    X --> A1["ENFORCEMENT-hardness<br/>hard = hook-enforced<br/>soft = markdown-interpreted<br/><b>→ all 140 edges are soft</b><br/>(hooks aren't gate-map edges)"]
+    X --> A2["INVOCATION-explicitness<br/>explicit Skill / Agent call<br/>vs prose / registry reference<br/>→ what finders actually saw"]
+    A2 --> SY["56-edge label disagreement<br/>(the symptom)"]
+    A1 --> FX["regulation layer: ONE taxonomy<br/>hard = hook · soft = markdown<br/>explicit-vs-prose = separate axis"]
+    A2 --> FX
+```
 
 ### Edges with conflicting finder enforcement labels (56)
 
@@ -214,6 +265,18 @@ one casing (recommend `SKILL.md`, the 34-file majority).
 Routing v2 Tier 3). Nothing maps onto **Workflow Feedback Fixes** (#61/49/54/50/55/48/56/57). The
 two directly-relevant Backlog items ("Workflow orchestration for review agents"; "Post-execution
 code-review gate") are unaffected — this audit *is* an instance of the former's inversion pattern.
+
+```mermaid
+flowchart LR
+    A["A · allowed-tools missing Skill/Agent (8)"] -->|KEEP| NEW["new follow-on plans"]
+    C["C · plans/ gitignored vs 'commit design doc'"] -->|KEEP| NEW
+    D["D · ADR-dir skill vs rule"] -->|KEEP| NEW
+    E["E · 6× skill.md vs 34× SKILL.md"] -->|KEEP| NEW
+    G["G · caller-delegation edges mislabeled"] -->|"KEEP (info)"| NEW
+    B["B · plan-gate § Sub-Plan Mode missing"] -->|FOLD| OR2["Orchestrator Routing v2 · Tier 3"]
+    MM["meta · hard/soft conflation + hardenable"] -->|FOLD| REG["regulation-layer build · §9"]
+    NEW -.->|"0 findings fold here"| WFF["Workflow Feedback Fixes"]
+```
 
 ## Per-edge classification table (generated, 140 edges)
 
