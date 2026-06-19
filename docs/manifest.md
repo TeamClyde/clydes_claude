@@ -43,5 +43,7 @@
 ### Architecture Decision Records
 <!-- Immutable once Accepted; live under docs/explanation/adr/. -->
 - [x] `docs/explanation/adr/0001-unified-stack-hats-hat-system.md` — Accepted
+- [x] `docs/explanation/adr/0002-executor-spectrum-soft-vs-hard-gates.md` — Accepted (parent: orchestration-gating)
+- [x] `docs/explanation/adr/0003-generated-inventory-completeness-oracle.md` — Accepted (parent: doc-tools)
 
 <!-- Transient working reports (not aspirational doc targets): docs/_triage.md, docs/_coverage-audit.md -->
