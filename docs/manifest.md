@@ -24,6 +24,7 @@
 ## Explanation
 <!-- Understanding-oriented. Hybrid C1+C2+C3 layout per rules/doc-tools.md. -->
 - [x] `docs/explanation/architecture.md` — repo-level system overview (C1 + C2)
+- [x] `docs/explanation/orchestration-regulation-layer.md` — design dossier for the orchestration "third leg" (regulation layer); active draft, load-bearing for post-Phase-2 work
 
 ### Feature explainers (C3) — one per subsystem
 - [x] `docs/explanation/features/orchestration-gating.md` — soft/hard gates + executor spectrum
