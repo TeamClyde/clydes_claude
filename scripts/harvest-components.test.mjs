@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
+import { dirname, resolve, join } from 'node:path'
 import { harvest, buildGateMap } from './harvest-components.mjs'
 
 // Repo root resolved the portable way (matches existing .claude/hooks/*.mjs).
@@ -79,4 +80,10 @@ test('skill:/subagent_type: reference to a hyphen-extended name does not edge to
   // ...and must NOT spuriously edge to the shorter prefix `install-vetting`
   assert.ok(!edges.some(e => e.from === 'caller' && e.to === 'install-vetting'),
     'trailing (?![\\w-]) must prevent the shorter-prefix false positive')
+})
+
+test('committed inventory matches freshly harvested output (drift guard)', async () => {
+  const inv = await harvest({ repoRoot: REPO_ROOT })
+  const onDisk = JSON.parse(await readFile(join(REPO_ROOT, 'docs/reference/component-inventory.json'), 'utf8'))
+  assert.equal(onDisk.length, inv.length, 'inventory length drifted — run `npm run harvest`')
 })
