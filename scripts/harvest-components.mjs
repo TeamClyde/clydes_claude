@@ -74,3 +74,23 @@ export async function harvest({ repoRoot }) {
   }
   return all
 }
+
+export function buildGateMap(inventory) {
+  const names = inventory.map(c => c.name).filter(Boolean)
+  // longest-first so multi-word names match before any shorter prefix
+  const sorted = [...new Set(names)].sort((a, b) => b.length - a.length)
+  const edges = []
+  for (const c of inventory) {
+    const body = c.body || ''
+    for (const target of sorted) {
+      if (target === c.name) continue
+      const ref = new RegExp(`\`${escapeRe(target)}\`|(?:skill|subagent_type):\\s*['"\`]?${escapeRe(target)}(?![\\w-])`)
+      if (ref.test(body)) edges.push({ from: c.name, to: target })
+    }
+  }
+  const dependentsOf = name => edges.filter(e => e.to === name).map(e => e.from)
+  const dependenciesOf = name => edges.filter(e => e.from === name).map(e => e.to)
+  return { nodes: inventory.map(({ body, ...rest }) => rest), edges, dependentsOf, dependenciesOf }
+}
+
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
