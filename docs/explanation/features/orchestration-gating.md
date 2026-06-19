@@ -163,7 +163,7 @@ There is no per-hook disable mechanism other than the prefix marker for graph-to
 
 Backlinks to ADRs that govern this feature (status inline).
 
-_(No accepted ADRs yet — the executor-spectrum / soft-vs-hard-gate ADR is promoted at sub-plan close.)_
+- [ADR-0002](../adr/0002-executor-spectrum-soft-vs-hard-gates.md) — Executor spectrum — markdown vs code (soft vs hard gates) (Accepted)
 
 ## Known Issues & Gotchas
 

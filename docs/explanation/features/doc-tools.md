@@ -167,7 +167,7 @@ The audit runs in a fixed sequence:
 
 ## Decisions
 
-_(No accepted ADRs yet — the completeness-oracle ADR is promoted at sub-plan close.)_
+- [ADR-0003](../adr/0003-generated-inventory-completeness-oracle.md) — Generated inventory as documentation completeness oracle (Accepted)
 
 ## Known Issues & Gotchas
 
