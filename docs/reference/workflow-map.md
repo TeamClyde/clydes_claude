@@ -141,7 +141,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | `verification-before-completion` | Before claiming work is done | Verifies tests pass, no regressions |
 | `systematic-debugging` | Bug, test failure, unexpected behavior | Structured diagnosis before fixing |
 | `test-driven-development` | Feature or bugfix implementation | TDD cycle for code changes |
-| `feedback` | Friction or confusion mid-session | Captures workflow friction to workflow-feedback.md |
+| `feedback` | Friction or confusion mid-session | Captures workflow friction as a GitHub issue in `TeamClyde/clydes_claude` |
 | `review-workflow` | Open workflow-friction GitHub issues have accumulated | Explore scan + Phoenix analysis + multi-angle proposals + adversarial review |
 | `requesting-code-review` | Implementation complete | Opens PR with structured review request |
 | `receiving-code-review` | PR review feedback received | Processes and implements reviewer feedback |

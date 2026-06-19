@@ -113,7 +113,7 @@ Replaced by the two-source model defined in `rules/workflow-phases.md`. The plan
 The pre-completion gate skill. Runs after test-runner returns PASS, before claiming a task is done. Verifies no regressions in other features.
 
 **workflow-map**
-The canonical reference for how all components connect. Location: `docs/workflow-map.md`. Update it whenever a component is added, removed, or rewired.
+The canonical reference for how all components connect. Location: `docs/reference/workflow-map.md`. Update it whenever a component is added, removed, or rewired.
 
 **writing-plans**
 The skill that produces the implementation plan doc from a spec or design doc. Hands off to `plan-gate` automatically.
