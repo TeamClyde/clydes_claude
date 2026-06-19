@@ -123,8 +123,12 @@ const VERDICT_SCHEMA = {
   properties: { isReal: { type: 'boolean' }, reason: { type: 'string' } },
 };
 
-// args = { edges: [...140], components: [...76], hookFinding: '<Task-1 recorded answer + URL>', cap }
-const { edges, components, hookFinding } = args;
+// args = { hookFinding: '<Task-1 answer + URL>', cap }. Audit INPUTS live in the repo; the sandbox
+// can't read files, but the finder/synthesize subagents can — they read the canonical artifacts
+// themselves (single source of truth). The script only distributes slice rules.
+const { hookFinding } = args;
+const GATEMAP = 'docs/reference/gate-map.json';             // { nodes, edges:[{from,to}] } — 140 edges, sorted
+const INVENTORY = 'docs/reference/component-inventory.json'; // [{ type, name, file }] — 76 components
 
 // the six gate-map subsystem clusters (drives the conventions dimension + per-edge classification)
 const CLUSTERS = {
@@ -135,23 +139,31 @@ const CLUSTERS = {
   setup:    ['new-repo-setup','project-setup','infra-init','e2e-init','using-superpowers','creating-tools','writing-skills','writing-agents','writing-rules','stack-hats'],
   debug:    ['systematic-debugging','integration-test-constraints','dispatching-parallel-agents'],
 };
-const sliceInto = (arr, n) => Array.from({ length: n }, (_, i) => arr.filter((_, j) => j % n === i));
-
 function finderJobs() {
   const jobs = [];
   for (const d of DIMENSIONS) {
     if (d.sliceBy === 'clusters') {
       for (const [name, members] of Object.entries(CLUSTERS))
-        jobs.push({ dim: d, label: `find:${d.key}:${name}`, worklist: { cluster: name, members } });
-    } else if (d.sliceBy === 'edges') {
-      sliceInto(edges, d.batches).forEach((b, i) => jobs.push({ dim: d, label: `find:${d.key}:${i}`, worklist: { edges: b } }));
-    } else if (d.sliceBy === 'components') {
-      sliceInto(components, d.batches).forEach((b, i) => jobs.push({ dim: d, label: `find:${d.key}:${i}`, worklist: { components: b } }));
+        jobs.push({ dim: d, label: `find:${d.key}:${name}`, slice: { kind: 'cluster', name, members } });
+    } else if (d.sliceBy === 'edges' || d.sliceBy === 'components') {
+      for (let i = 0; i < d.batches; i++)
+        jobs.push({ dim: d, label: `find:${d.key}:${i}`, slice: { kind: d.sliceBy, i, n: d.batches } });
     } else {
-      jobs.push({ dim: d, label: `find:${d.key}`, worklist: {} });
+      jobs.push({ dim: d, label: `find:${d.key}`, slice: { kind: 'all' } });
     }
   }
   return jobs; // ~14–18 jobs — run in waves ≤ MAX_CONCURRENT
+}
+
+// Translate a slice rule into a concrete instruction the agent applies against the canonical file.
+function slicePrompt(slice) {
+  if (slice.kind === 'cluster')
+    return `Worklist = cluster "${slice.name}", members: ${slice.members.join(', ')}. Also classify every gate-map edge whose \`from\` is one of these members.`;
+  if (slice.kind === 'edges')
+    return `Read ${GATEMAP}; worklist = the \`edges\` entries at array indices where (index % ${slice.n} === ${slice.i}).`;
+  if (slice.kind === 'components')
+    return `Read ${INVENTORY}; worklist = the components at array indices where (index % ${slice.n} === ${slice.i}).`;
+  return `Worklist = the entire repo (global structural check).`;
 }
 
 // --- Stage 1: fan-out finders (batched ≤ cap; each wrapped in runUnit watchdog) ---
@@ -167,10 +179,11 @@ for (let i = 0; i < jobs.length; i += MAX_CONCURRENT) {
       validate: (v) => (v && Array.isArray(v.findings)) ? { ok: true } : { ok: false, reason: 'must return { findings: [...] }' },
       work: (repair) => agent(
         `Audit dimension "${job.dim.key}". ${job.dim.instruction}\n` +
-        `Worklist: ${JSON.stringify(job.worklist)}\n` +
-        `Inventory index (names only): ${components.map((c) => c.name).join(', ')}\n` +
+        `${slicePrompt(job.slice)}\n` +
+        `Read ${INVENTORY} for the component index, and the real component files ` +
+        `(skills/*/SKILL.md|skill.md, agents/*.md, rules/**/*.md, .claude/hooks/**) for file:line citations.\n` +
         (repair ? `\nPREVIOUS ATTEMPT REJECTED: ${repair}. Fix and resubmit.` : '') +
-        `\nRead the real component files for citations. Return the schema.`,
+        `\nReturn the schema.`,
         { label: job.label, phase: 'Find', schema: FINDINGS_SCHEMA },
       ),
     })),
@@ -182,19 +195,11 @@ for (let i = 0; i < jobs.length; i += MAX_CONCURRENT) {
 
 const allFindings = finderResults.flatMap((r) => r.findings ?? []);
 const finderClass = finderResults.flatMap((r) => r.edgeClassifications ?? []);
-// Default-fill: only the `conventions` dimension classifies edges, and each cluster finder sees
-// only its own members — so edges touching unclustered components (hooks, utility skills, some
-// agents) get no row. Stub every unclassified gate-map edge as none-yet/settling/low so the
-// per-edge table covers all 140 and the coverage gap is EXPLICIT, never a silent truncation.
-const classifiedSet = new Set(finderClass.map((c) => `${c.from}->${c.to}`));
-const allClassifications = [
-  ...finderClass,
-  ...edges.filter((e) => !classifiedSet.has(`${e.from}->${e.to}`)).map((e) => ({
-    from: e.from, to: e.to, enforcement: 'none-yet',
-    mechanism: 'unclassified (outside conventions-cluster scope)',
-    maturity: 'settling', hardenable: 'unknown', confidence: 'low',
-  })),
-];
+// Default-fill is performed by the synthesize agent (which reads gate-map.json's full 140-edge
+// list) rather than here — the sandbox can't read the file. Only the `conventions` cluster finders
+// classify edges, and each sees only its own members, so edges touching unclustered components
+// (hooks, utility skills, some agents) get no finder row; synthesize stubs those none-yet/low and
+// states the coverage gap explicitly (never a silent truncation).
 
 // --- Stage 2: adversarial verify — quorum of skeptics per finding; abandon stragglers ---
 phase('Verify');
@@ -227,12 +232,15 @@ phase('Synthesize');
 const report = await agent(
   `Synthesize the orchestration audit. Hook-verification result (authoritative): ${hookFinding}\n` +
   `Confirmed findings: ${JSON.stringify(confirmedFindings)}\n` +
-  `Per-edge classifications: ${JSON.stringify(allClassifications)}\n` +
-  `Produce: (1) findings grouped by dimension with file:line citations; (2) the full per-edge ` +
-  `classification table (enforcement/mechanism/maturity/hardenable — use the hook result to set ` +
-  `hardenable); (3) a triaged fix list where each item is tagged fold|supersede|keep against the ` +
-  `"Orchestrator Routing v2" and "Workflow Feedback Fixes" backlog items. Return markdown.`,
+  `Finder edge-classifications so far: ${JSON.stringify(finderClass)}\n` +
+  `Read ${GATEMAP} for the full 140-edge list. Produce, as markdown: (1) findings grouped by ` +
+  `dimension with file:line citations; (2) the FULL per-edge classification table covering ALL 140 ` +
+  `edges — use the finder classifications where present, and for every remaining edge emit ` +
+  `enforcement: none-yet / maturity: settling / confidence: low (set hardenable per the hook ` +
+  `result), stating this default-fill explicitly as a coverage note (never silent); (3) a triaged ` +
+  `fix list, each item tagged fold|supersede|keep against the "Orchestrator Routing v2" and ` +
+  `"Workflow Feedback Fixes" backlog items.`,
   { label: 'synthesize', phase: 'Synthesize' },
 );
 
-return { report, confirmedCount: confirmedFindings.length, classified: allClassifications.length, raw: { confirmedFindings, allClassifications } };
+return { report, confirmedCount: confirmedFindings.length, finderClassified: finderClass.length, raw: { confirmedFindings, finderClass } };
