@@ -58,3 +58,20 @@ export async function runUnit(spec) {
   history.push('ABANDONED');
   return { state: 'ABANDONED', history };
 }
+
+/**
+ * Run all units concurrently and proceed on a QUORUM of SUCCEEDED terminal
+ * states — not on all units reaching SUCCEEDED. Because runUnit always reaches a
+ * terminal state (SUCCEEDED or ABANDONED) within its watchdog budget, Promise.all
+ * here can neither hang nor reject: a straggler is bounded to ABANDONED, so it can
+ * never hold the barrier. SUCCEEDED values are captured, so abandoning is non-lossy.
+ * @param {Array<object>} units  - runUnit specs
+ * @param {number} threshold     - minimum SUCCEEDED count to consider the barrier healthy
+ * @returns {Promise<{confirmed:any[], abandoned:number, degraded:boolean}>}
+ */
+export async function quorumBarrier(units, threshold) {
+  const results = await Promise.all(units.map((u) => runUnit(u)));
+  const confirmed = results.filter((r) => r.state === 'SUCCEEDED').map((r) => r.value);
+  return { confirmed, abandoned: results.length - confirmed.length, degraded: confirmed.length < threshold };
+}
+

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { withWatchdog, runUnit } from './fail-successfully.mjs';
+import { withWatchdog, runUnit, quorumBarrier } from './fail-successfully.mjs';
 
 const tick = (ms, value) => new Promise((r) => setTimeout(() => r(value), ms));
 const hang = () => new Promise(() => {}); // never resolves
@@ -56,4 +56,27 @@ test('runUnit: malformed then valid on retry → RETRYING(repair) → SUCCEEDED 
   assert.equal(r.state, 'SUCCEEDED');
   assert.ok(r.history.includes('RETRYING'));
   assert.equal(r.value.sawRepair, 'missing ok'); // validation reason fed back as repair context
+});
+
+test('quorumBarrier: K of N hang, rest succeed → proceeds on survivors, non-lossy', async () => {
+  const units = [
+    { work: async () => 'a', timeoutMs: 30 },
+    { work: async () => 'b', timeoutMs: 30 },
+    { work: () => new Promise(() => {}), timeoutMs: 20, maxRetries: 0 }, // straggler
+  ];
+  const { confirmed, abandoned, degraded } = await quorumBarrier(units, 2);
+  assert.deepEqual([...confirmed].sort(), ['a', 'b']); // survivors' work preserved (non-lossiness)
+  assert.equal(abandoned, 1);
+  assert.equal(degraded, false); // 2 confirmed ≥ threshold 2
+});
+
+test('quorumBarrier: below threshold → degraded flagged but still returns (no deadlock)', async () => {
+  const units = [
+    { work: async () => 'a', timeoutMs: 30 },
+    { work: () => new Promise(() => {}), timeoutMs: 20, maxRetries: 0 },
+    { work: () => new Promise(() => {}), timeoutMs: 20, maxRetries: 0 },
+  ];
+  const { confirmed, degraded } = await quorumBarrier(units, 2);
+  assert.deepEqual(confirmed, ['a']);
+  assert.equal(degraded, true); // 1 < threshold 2 — reported, not thrown
 });
