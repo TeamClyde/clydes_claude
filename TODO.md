@@ -2,6 +2,14 @@
 
 ## In Progress
 
+- [ ] Orchestration Layer Foundation — Phase 1A: generated component inventory + gate-map (harvest scanner over skills/agents/rules/hooks), then doc + audit Form-A sub-plans. Gives the workflow system its missing "code graph" for drift resistance. — [plan doc](plans/orchestration-layer-foundation/orchestration-layer-foundation-plan.md)
+  - [x] Task 1 — Harvest scanner: component inventory from frontmatter
+  - [x] Task 2 — Gate-edge extraction: first-cut gate-map + reverse-dependency lookup
+  - [x] Task 3 — Emit + commit generated artifacts + drift-check test
+  - [x] Task 4 — Existing-doc cleanup triage (the ~17 flat docs/ files)
+  - [ ] Task 5 — Spawn Form-A sub-plan: Phase 1B (Docs)
+  - [ ] Task 6 — Spawn Form-A sub-plan: Phase 2 (Fan-out orchestration audit)
+
 ## Up Next
 
 - [ ] Workflow Feedback Fixes — six triaged workflow-friction fixes. Closes GitHub issues #61, #49, #54, #50, #55, #48, #56, #57. — [plan doc](plans/workflow-feedback-fixes/workflow-feedback-fixes-plan.md)
@@ -14,7 +22,7 @@
 
 - [ ] Orchestrator Routing v2 — mechanical enforcement of orchestrator routing decisions via Claude Code hooks + agent frontmatter pinning. Closes 8 GitHub workflow-friction issues (#14, #21, #28, #30, #31, #32, #33, #34). — [plan doc](plans/orchestrator-routing-v2/orchestrator-routing-v2-plan.md)
   - [ ] Tier 1 — Mechanical routing core: agent discovery + Haiku frontmatter pinning, PreToolUse Agent dispatch hook, SessionStart graph-tools directive + PreToolUse Grep/Glob enforcement, architect prompt expansion (symbol verification + callers query)
-  - [ ] Tier 3 — Focused fixes: UserPromptSubmit slash-command directive, brainstorming two-stage research bookends, project-name PostToolUse self-heal + root-cause fix, plan-gate parallel dispatch with soft-gate adherence-audit, [gate-complete] tag + plan-gate end-of-success :divergence
+  - [ ] Tier 3 — Focused fixes: UserPromptSubmit slash-command directive, brainstorming two-stage research bookends, project-name PostToolUse self-heal + root-cause fix, plan-gate parallel dispatch with soft-gate adherence-audit, [gate-complete] tag + plan-gate end-of-success :divergence — **NOTE (Phase 2 audit fold-in B):** `skills/plan-gate/SKILL.md` currently has NO `§ Sub-Plan Mode` section and never mentions `adherence-audit`, yet `rules/plan-docs.md` + `writing-plans` cite it; this Tier-3 item must add that section so the citations resolve.
   - [ ] Tier 2 — Sub-plan spawn: subagent-driven-development frontier rewrite (B1 tier-aware dispatch, B2 re-anchoring, B3 cache-stable prompt prefix, B4 executable-verification preference) — runs in sub-plan after parent Task 10
 
 ## Backlog
@@ -28,6 +36,7 @@
 - codebase-memory `delete_project` returns "Permission denied" on Windows (server holds the SQLite file open; no force flag) — workflow reset can't clear the external index without restarting the MCP server. Investigate a force/close option or document a reset recipe. [scope] [blocked]
 - Glob does not follow the `~/.claude/templates` symlink (Read/ls do) — audit skills that use Glob to verify file/template availability across symlinks; they can wrongly trip "not found" on a correctly-installed system. [debt]
 - No sanctioned abstraction for destructive `git clean` — git-manager covers commit/branch/push/PR but not working-tree cleaning, which dry runs and resets need. Decide whether git-manager gains a `clean` workflow or a rule sanctions direct use. [scope]
+- Phase 2 orchestration-audit fixes — diagnose+triage output of the fan-out audit; see [docs/reference/orchestration-audit.md](docs/reference/orchestration-audit.md). **KEEP** (each → scoped follow-on): (A) **allowed-tools hygiene** — 8 skills declare `Skill{}`/`Agent{}` invocations their frontmatter `allowed-tools` omits (review-workflow, systematic-debugging, plan-management, executing-plans, docs-refresh); FIRST confirm whether `allowed-tools` is enforced for skills-in-main-context (may be advisory). (C) **plan-doc commit contradiction** — `rules/planning.md` says `plans/` is gitignored/not-committed, but brainstorming Step 12 + writing-plans instruct committing design/plan docs (cf. `feedback_plan_commit_steps`). (D) **ADR-dir drift** — architecture-decision-records skill teaches `docs/adr/` vs `rules/doc-tools.md` `docs/explanation/adr/` (hierarchy-resolved; upstream text stale). (E) **casing** — 6 skills use `skill.md` vs 34 `SKILL.md`; standardize → `SKILL.md` (repairs latent case-sensitive-CI dead refs). (G) **gate-map labeling** — mark caller-delegation edges (doc-author→git-manager, test-builder→git-manager; explicit non-invocations) distinctly in orchestration-gating.md. **FOLD:** (B) plan-gate missing the cited `§ Sub-Plan Mode`/adherence-audit section → Orchestrator Routing v2 Tier 3 (below); (meta) 56-edge hard/soft conflation + hardenable-given-hooks-fire-for-subagents → regulation-layer build (`docs/explanation/orchestration-regulation-layer.md` §9). [scope] [debt]
 
 ## History
 
