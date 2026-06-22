@@ -514,6 +514,10 @@
       "to": "writing-skills"
     },
     {
+      "from": "dispatching-parallel-agents",
+      "to": "review-workflow"
+    },
+    {
       "from": "doc-author",
       "to": "architecture-decision-records"
     },
