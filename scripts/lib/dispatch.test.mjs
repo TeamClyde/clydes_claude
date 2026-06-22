@@ -92,3 +92,13 @@ test('sequentialChain: throws if perUnitTimeoutMs is omitted (fast-fail)', async
     /perUnitTimeoutMs is required/,
   );
 });
+
+test('dimensionalReview: flags verifyDegraded and keeps unverified findings when verify abandons', async () => {
+  const dims = [{ work: async () => ['a'] }, { work: async () => ['b'] }];
+  const r = await dimensionalReview(dims, {
+    perUnitTimeoutMs: 30, maxRetries: 0,
+    verify: async () => { throw new Error('verify boom'); },
+  });
+  assert.equal(r.verifyDegraded, true);
+  assert.deepEqual([...r.findings].sort(), ['a', 'b']); // unfiltered pre-verify findings retained
+});

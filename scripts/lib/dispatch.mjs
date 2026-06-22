@@ -72,6 +72,7 @@ export async function sequentialChain(steps, policy = {}) {
   let stoppedReason;
   for (const step of steps) {
     const prior = prev;
+    // bridge: runUnit calls work(repair, ctx); the consumer's step.work takes (prior, repair, ctx)
     const spec = withDefaults({ ...step, work: (repair, ctx) => step.work(prior, repair, ctx) }, p);
     const r = await runUnit(spec);
     results.push(r);
@@ -92,9 +93,13 @@ export async function dimensionalReview(dimensions, policy = {}) {
   if (p.perUnitTimeoutMs == null) throw new TypeError('perUnitTimeoutMs is required in DispatchPolicy');
   const review = await parallelFanout(dimensions, p);
   let findings = review.confirmed.flat();
+  let verifyDegraded = false;
   if (p.verify) {
+    // ONE batched verify (runs as a single runUnit → maxRetries+1 total calls on failure, never per-finding).
+    // Contract: p.verify(findings) resolves to the filtered findings array.
     const v = await runUnit(withDefaults({ work: () => p.verify(findings) }, p));
     if (v.state === 'SUCCEEDED') findings = v.value;
+    else verifyDegraded = true; // verify abandoned → findings are the UNVERIFIED pre-verify list; caller must check this flag
   }
-  return { findings, counts: review.counts, degraded: review.degraded };
+  return { findings, counts: review.counts, degraded: review.degraded, verifyDegraded };
 }
