@@ -52,142 +52,66 @@ digraph when_to_use {
 
 ## Fan-Out Shapes
 
-Three distinct dispatch patterns live in `scripts/lib/dispatch.mjs`. Choose the shape that matches the work structure; they all share the same `DispatchPolicy`.
+Three distinct dispatch patterns live in `scripts/lib/dispatch.mjs`. All share the same `DispatchPolicy`.
+
+> Full `DispatchPolicy` schema, per-shape return contracts, token-budget mechanics, and non-preemption details: see [`references/dispatch-policy.md`](references/dispatch-policy.md).
 
 ---
 
-### Shape 1 — Parallel Fan-Out: `parallelFanout(units, policy)`
+### Shape 1 — `parallelFanout(units, policy)`
 
-Best for: N independent units where order does not matter and most must succeed.
+**When:** N independent units where order doesn't matter and most must succeed.
 
 ```js
 import { parallelFanout } from './lib/dispatch.mjs';
-
 const { confirmed, abandoned, degraded, counts, stoppedReason } =
-  await parallelFanout(units, {
-    perUnitTimeoutMs: 30_000,
-    maxInFlight: 8,
-    quorum: Math.ceil(units.length / 2),
-  });
+  await parallelFanout(units, { perUnitTimeoutMs: 30_000, maxInFlight: 8,
+    quorum: Math.ceil(units.length / 2) });
 ```
 
-**Return shape:** `{ confirmed, abandoned, degraded, counts, stoppedReason }`
-
-- `confirmed` — array of values from SUCCEEDED units.
-- `abandoned` — count of ABANDONED units.
-- `degraded` — `true` when `confirmed.length < quorum`.
-- `counts` — per-state counts aggregated across all batches.
-- `stoppedReason` — `'token-budget'` if an early-stop fired; otherwise `undefined`.
-
-**Important:** Read `degraded` together with `stoppedReason`. A `'token-budget'` early-stop can produce `degraded: true` even when every unit that actually ran succeeded — the quorum simply wasn't reachable because batches were skipped, not because units failed.
-
-**How it works internally:** Units are chunked into `maxInFlight`-sized batches and passed through `quorumBarrier`. A post-hoc reactive token gate runs *between* batches (not before each unit).
+Returns: `{ confirmed[], abandoned, degraded, counts, stoppedReason }`.  
+Check `stoppedReason` alongside `degraded` — a `'token-budget'` stop can set `degraded: true` even when all completed units succeeded.
 
 ---
 
-### Shape 2 — Sequential Agent Chain: `sequentialChain(steps, policy)`
+### Shape 2 — `sequentialChain(steps, policy)`
 
-Best for: Pipeline stages where each step's output is the next step's input.
+**When:** Pipeline stages where each step's output feeds the next.
 
 ```js
 import { sequentialChain } from './lib/dispatch.mjs';
-
 const { results, completed, stoppedReason } =
-  await sequentialChain(
-    [
-      { work: (_prior, _repair, _ctx) => fetchData() },
-      { work: (prior, _repair, _ctx) => transform(prior) },
-      { work: (prior, _repair, _ctx) => persist(prior) },
-    ],
-    { perUnitTimeoutMs: 60_000 }
-  );
+  await sequentialChain(steps, { perUnitTimeoutMs: 60_000 });
 ```
 
-**Return shape:** `{ results, completed, stoppedReason }`
-
-- `results` — array of `runUnit` result objects for each step (even partial runs).
-- `completed` — number of steps that reached SUCCEEDED.
-- `stoppedReason` — `'abandoned'` if any step was ABANDONED (chain halted); otherwise `undefined`.
-
-**How it works:** Each step's `work(prior, repair, ctx)` receives the *previous* step's SUCCEEDED value as `prior`. Validation-as-feedback applies per step (governed by `maxValidationRetries`). The chain halts immediately on the first ABANDONED — no further steps run.
+Returns: `{ results[], completed, stoppedReason }`.  
+Chain halts on first ABANDONED — no further steps run.
 
 ---
 
-### Shape 3 — Monolith→Fan-Out Review: `dimensionalReview(dimensions, policy)`
+### Shape 3 — `dimensionalReview(dimensions, policy)`
 
-Best for: Code review, analysis, or quality sweeps where multiple lenses run in parallel and findings are collected and optionally verified once.
+**When:** Multiple review lenses run in parallel, findings collected and optionally verified once.
 
 ```js
 import { dimensionalReview } from './lib/dispatch.mjs';
-
 const { findings, counts, degraded, verifyDegraded } =
-  await dimensionalReview(dimensions, {
-    perUnitTimeoutMs: 45_000,
-    verify: async (allFindings) => deduplicate(allFindings),
-  });
+  await dimensionalReview(dimensions, { perUnitTimeoutMs: 45_000,
+    verify: async (all) => deduplicate(all) });
 ```
 
-**Return shape:** `{ findings, counts, degraded, verifyDegraded }`
-
-- `findings` — the final finding list (post-verify if verify succeeded; pre-verify if it abandoned).
-- `counts` — per-state counts from the fan-out phase.
-- `degraded` — `true` if the fan-out phase didn't reach quorum.
-- `verifyDegraded` — `true` if the verify step was ABANDONED; when this is `true`, `findings` are **UNVERIFIED** — the caller must check this flag before trusting results.
-
-**Cost decision — ONE batched verify, not 3-votes-per-finding:** `policy.verify` is called once over all findings. This is a deliberate cost choice: per-finding multi-vote verification burned ~290 agents / 6.4 M tokens in a prior session. Do not reintroduce per-finding verification.
+Returns: `{ findings[], counts, degraded, verifyDegraded }`.  
+When `verifyDegraded: true`, treat `findings` as unverified before presenting.
 
 ---
 
-## DispatchPolicy Calling Convention
+## Key Rules
 
-Every helper accepts a `policy` object merged over `DEFAULT_POLICY`. These are the real defaults in `dispatch.mjs`:
-
-| Key | Default | Notes |
-|---|---|---|
-| `maxInFlight` | `8` | Keep `≤ min(16, cores−2)` so nothing queues behind the runtime cap. NOT a magic 20. |
-| `perUnitTimeoutMs` | **required** | No default — omitting throws `TypeError`. Watchdog → fast detect-and-abandon. |
-| `maxRetries` | `1` | Crash/timeout retries. |
-| `maxValidationRetries` | `1` | Validation-repair retries. Split budget from `maxRetries` so validation oscillation can't drain the crash budget. |
-| `quorum` | `Math.ceil(units.length / 2)` | Override for stricter or relaxed consensus. |
-| `modelTier` | `null` | Pin Haiku or Sonnet — **never Opus**. Threaded into the consumer's `agent({ model })`. |
-| `tokenBudget` | `null` | Max output tokens for this fan-out. `null` = no limit. |
-| `estimatedTokensPerUnit` | `0` | Coarse fallback only — output tokens are unknowable pre-call (`count_tokens` is input-only). If `0` AND no `getRemainingBudget`, the projection gate is inert. |
-| `budgetReserve` | `0.9` | Stop at 90% of budget to bound non-preemptable in-flight overshoot. |
-| `getRemainingBudget` | `null` | `() => number` — live remaining tokens. **Inside a Workflow: `() => budget.remaining()`** |
-| `onOverloadBackoff` | `'exponential'` | Passthrough convention. The consumer's `work()` honors it on 529 / API-overload responses. The lib does not act on it. |
-
-### Token-Budget Rule
-
-**Inside a Workflow, pass `() => budget.remaining()` as `getRemainingBudget`.** The gate is post-hoc reactive: it reads real remaining tokens between batches (after each batch completes). This is the accurate signal.
-
-`estimatedTokensPerUnit` is a coarse fallback projection because output tokens are unknowable before a call (`count_tokens` only counts input tokens). If `tokenBudget` is set but `estimatedTokensPerUnit` is `0` and `getRemainingBudget` is `null`, the projection gate is inert — no gating will occur.
-
-```js
-// Inside a Workflow — correct pattern
-const { confirmed } = await parallelFanout(units, {
-  perUnitTimeoutMs: 30_000,
-  tokenBudget: budget.total(),
-  getRemainingBudget: () => budget.remaining(),  // ← live signal between batches
-});
-```
-
----
-
-## Non-Preemption Honesty Note
-
-**A script-level watchdog stops *waiting* on a rogue agent — it cannot kill it.**
-
-Claude Code subagents have no abort surface (GitHub: anthropics/claude-code #61405, open). "Kill rogues fast" means abandon-and-proceed at the orchestration level; the rogue agent continues running until it naturally completes or the outer session ends.
-
-Practical implications:
-
-- **`maxInFlight` is your real rogue-containment.** Small batches bound how many agents can be rogue simultaneously.
-- **The token gate gates new *spawns* only.** In-flight units always finish — the gate cannot reach back and cancel them.
-- **`AbortSignal` is the right tool only when `work` is local-abortable async** (fetch/fs operations), not for agent units. Do not pass `AbortSignal` to `runUnit` expecting agent termination.
-
-When a unit times out, the watchdog fires ABANDONED and the chain/fan-out continues without that unit's result. The agent itself is unaffected.
-
----
+- **Model pinning:** Set `modelTier` to Haiku or Sonnet — **never Opus**. Unthrottled Opus burns the session budget 10–50× faster.
+- **`maxInFlight`:** Keep `≤ min(16, cores−2)`. This is your real rogue-containment — not a magic 20.
+- **`perUnitTimeoutMs`:** Always set. Omitting throws `TypeError`.
+- **Token budget (inside a Workflow):** Pass `getRemainingBudget: () => budget.remaining()`. The gate is post-hoc reactive (runs between batches). Full mechanics in `references/dispatch-policy.md`.
+- **Non-preemption:** A watchdog abandons a timed-out unit but cannot kill its agent (GitHub anthropics/claude-code #61405). The agent runs to natural completion. Full note in `references/dispatch-policy.md`.
 
 ## P1 Routing Rule
 
@@ -195,14 +119,12 @@ When a unit times out, the watchdog fires ABANDONED and the chain/fan-out contin
 
 `review-workflow` and `deep-research` consume `parallelFanout` / `sequentialChain` / `dimensionalReview` in Wave 3 rather than each implementing its own fan-out. This is the cross-family de-duplication decision. If you are building a new workflow that fans out work to multiple agents, use these helpers — do not write a new batching loop.
 
----
-
 ## Agent Prompt Structure
 
 Good agent prompts are:
-1. **Focused** - One clear problem domain
-2. **Self-contained** - All context needed to understand the problem
-3. **Specific about output** - What should the agent return?
+1. **Focused** — one clear problem domain
+2. **Self-contained** — all context needed to understand the problem
+3. **Specific about output** — what should the agent return?
 
 ```markdown
 Fix the 3 failing tests in src/agents/agent-tool-abort.test.ts:
@@ -227,25 +149,22 @@ Return: Summary of what you found and what you fixed.
 
 ## Common Mistakes
 
-**❌ Too broad:** "Fix all the tests" - agent gets lost
-**✅ Specific:** "Fix agent-tool-abort.test.ts" - focused scope
+**❌ Too broad:** "Fix all the tests" — agent gets lost  
+**✅ Specific:** "Fix agent-tool-abort.test.ts" — focused scope
 
-**❌ No context:** "Fix the race condition" - agent doesn't know where
+**❌ No context:** "Fix the race condition" — agent doesn't know where  
 **✅ Context:** Paste the error messages and test names
 
-**❌ No constraints:** Agent might refactor everything
+**❌ No constraints:** Agent might refactor everything  
 **✅ Constraints:** "Do NOT change production code" or "Fix tests only"
 
-**❌ Vague output:** "Fix it" - you don't know what changed
-**✅ Specific:** "Return summary of root cause and changes"
-
-**❌ Omitting `perUnitTimeoutMs`:** Throws `TypeError` at dispatch time
+**❌ Omitting `perUnitTimeoutMs`:** Throws `TypeError` at dispatch time  
 **✅ Always set:** `perUnitTimeoutMs: 30_000` (or appropriate bound for the work)
 
-**❌ Opus for leaf agents:** Token budget burns 10–50× faster than Sonnet/Haiku
+**❌ Opus for leaf agents:** Token budget burns 10–50× faster than Sonnet/Haiku  
 **✅ Set `modelTier`:** Pin to Haiku or Sonnet via the consumer's `agent({ model })`
 
-**❌ Per-finding verification loops:** Re-introduced ~290-agent / 6.4M-token sessions
+**❌ Per-finding verification loops:** Re-introduced ~290-agent / 6.4M-token sessions  
 **✅ `dimensionalReview` with one `policy.verify`:** ONE batched verify over all findings
 
 ## Gotchas
