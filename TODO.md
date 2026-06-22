@@ -10,13 +10,13 @@
   - [ ] Task 5 — Spawn Form-A sub-plan: Phase 1B (Docs)
   - [ ] Task 6 — Spawn Form-A sub-plan: Phase 2 (Fan-out orchestration audit)
 
-## Up Next
-
 - [ ] Orchestration & Regulation Campaign — Epic: clean up the audited workflow defects, de-duplicate cross-family capability reimplementations into canonical homes, complete the `fail-successfully` primitive (§9 items 5–7) + fault-injection harness + `dispatching-parallel-agents` front-door, upgrade every fan-out-capable skill to the regulated primitive, and harden matured edges. Four sequential Form-A sub-plan waves. Executes the triaged Phase 2 orchestration-audit fixes (KEEP A/C/D/E/G + FOLD B/meta). Follow-on to Orchestration Layer Foundation. — [plan doc](plans/orchestration-regulation-campaign/orchestration-regulation-campaign-plan.md)
-  - [ ] Wave 1 — Cleanup (audit debt + cross-family de-dup)
+  - [x] Wave 1 — Cleanup (audit debt + cross-family de-dup) — CLOSED 2026-06-22 (8 commits; 9 de-dup proposals)
   - [ ] Wave 2 — Engine & harness (§9 items 5–7 + fault-injection harness + front-door)
   - [ ] Wave 3 — Upgrade sweep (three upgrade shapes; per-component loop)
   - [ ] Wave 4 — Harden & capstone (enforcement taxonomy + hook-hardening + operating-model skill)
+
+## Up Next
 
 - [ ] Workflow Feedback Fixes — six triaged workflow-friction fixes. Closes GitHub issues #61, #49, #54, #50, #55, #48, #56, #57. — [plan doc](plans/workflow-feedback-fixes/workflow-feedback-fixes-plan.md)
   - [ ] Architect external-behavior assumption sweep (#61, #49)
