@@ -132,6 +132,30 @@ Fill in the actual round number from Step 1. If architect review was skipped (`w
 
 ---
 
+## Sub-Plan Mode
+
+When plan-gate is invoked on a **Form-A sub-plan**, a reduced gate runs: the parent plan already owns ticketing, registration, and the Testing Plan, so the sub-plan gate exists only to keep the sub-plan's design sound and drift-free.
+
+**Detection:** the target plan doc lives at `plans/<parent>/<child>/<child>-plan.md`. Apply the `plan-management` walk-up algorithm — walk up one directory from the plan's folder; if that parent directory contains a `*-plan.md`, this is a sub-plan. (Otherwise it is a top-level plan and the standard Gate Sequence above applies.)
+
+**Sequence in sub-plan mode:**
+
+| Step | Standard mode | Sub-plan mode |
+|------|---------------|---------------|
+| 1 — Architect | run | **run** — hard-gate on BLOCKING, 3-round cap (identical to standard) |
+| Adherence soft-gate | — | **run** — after architect APPROVED, dispatch `Skill { skill: "adherence-audit", args: "plan-doc: plans/<parent>/<child>/<child>-plan.md" }`. Its Phase 9 surfaces drift the sub-plan would introduce. `[Plan-Introduced]` BLOCKING is surfaced and resolved before execution; WARNING/INFO are informational. **Soft-gate — never deadlocks the gate.** |
+| 2 — Test strategy | run | **skip** — the parent plan owns the `## Testing Plan` |
+| 3 — Test builder | run | **skip** |
+| 4 — Jira | run | **skip** — the parent Epic owns tickets |
+| 5 — TODO.md registration | run | **skip** — the parent is already registered |
+| 6 — Gate-complete record | run | **fold into the sub-plan close** (`plan-management:close-subplan`) rather than a separate `[gate-complete]` entry, to avoid top-level-journal noise |
+
+**`mode: minimal`** (for trivial sub-plan refinements): run **architect only** — skip the adherence-audit soft-gate as well.
+
+**Boundary:** the adherence-audit dispatch here is a plain sequential soft-gate (one `Skill` call, scoped to the plan doc). Re-architecting adherence-audit into a parallel dimension-reviewer fan-out is a separate, later concern — it does not live in this section.
+
+---
+
 ## Handoff
 
 After all steps complete successfully:
@@ -160,6 +184,7 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 
 **Calls:**
 - `architect` agent (subagent_type: architect) — Step 1 (skipped if architect-review: false)
+- `adherence-audit` skill — Sub-Plan Mode soft-gate, sub-plan invocations only (see § Sub-Plan Mode); not in the standard top-level sequence
 - `test-strategy` agent (subagent_type: test-strategy) — Step 2
 - `test-builder` agent (subagent_type: test-builder) — Step 3 (skipped if tdd: false)
 - `jira-workflow-manager` agent (subagent_type: jira-workflow-manager) — Step 4 (skipped if jira.enabled: false)
