@@ -1,6 +1,6 @@
 ---
 name: subagent-driven-development
-description: Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with two-stage review (spec compliance, then code quality) after each task.
+description: Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with two-stage review (spec compliance, then code quality) after each task. For single-context step-by-step execution with checkpoints instead, use executing-plans.
 allowed-tools: Agent, Read, Skill, Write
 ---
 

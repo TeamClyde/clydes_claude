@@ -2,9 +2,10 @@
 name: review-workflow
 description: >
   Use when workflow friction issues have accumulated in TeamClyde/clydes_claude and you want
-  to act on them — scanning the workflow system for context, proposing multi-angle fixes, and
-  routing improvements to the right component. Run periodically or after several friction
-  issues accumulate.
+  to act on them — scanning the meta-workflow system for context, proposing multi-angle fixes,
+  and routing improvements to the right component. This is about the WORKFLOW SYSTEM itself,
+  not reviewing code changes — for code review, use requesting-code-review. Run periodically
+  or after several friction issues accumulate.
 argument-hint: "(no arguments needed — reads open workflow-friction GitHub issues)"
 allowed-tools: Read, Write, Edit, Glob, Agent
 ---

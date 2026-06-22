@@ -1,6 +1,6 @@
 ---
 name: requesting-code-review
-description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
+description: Use when you want to request a code review — after completing a task, implementing a major feature, or before merging/opening a PR to verify work meets requirements. Owns the "submit work for review" direction. For acting on feedback you already received, use receiving-code-review.
 allowed-tools: Bash, Read
 ---
 
