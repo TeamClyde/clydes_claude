@@ -107,3 +107,20 @@ test('runUnit: validation budget is separate from crash budget', async () => {
   assert.equal(r.state, 'ABANDONED');
   assert.equal(valCalls, 3); // initial + 2 validation retries — crash budget of 0 did not limit it
 });
+
+test('runUnit: onEvent fires for each transition in order', async () => {
+  const events = [];
+  await runUnit({ work: async () => 'ok', timeoutMs: 50, onEvent: (e) => events.push(e.state) });
+  assert.deepEqual(events, ['RUNNING', 'VALIDATING', 'SUCCEEDED']);
+});
+
+test('quorumBarrier: returns per-state counts across the fan-out', async () => {
+  const units = [
+    { work: async () => 'a', timeoutMs: 30 },
+    { work: () => new Promise(() => {}), timeoutMs: 20, maxRetries: 0 },
+  ];
+  const { counts } = await quorumBarrier(units, 1);
+  assert.equal(counts.SUCCEEDED, 1);
+  assert.equal(counts.ABANDONED, 1);
+  assert.equal(counts.TIMED_OUT, 1);
+});

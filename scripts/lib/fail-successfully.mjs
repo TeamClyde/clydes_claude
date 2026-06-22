@@ -51,34 +51,36 @@ export async function runUnit(spec) {
     timeoutMs,
     maxRetries = 1,
     maxValidationRetries = maxRetries, // default preserves prior single-budget behavior
+    onEvent,
   } = spec;
   const history = [];
+  const emit = (state, extra = {}) => { history.push(state); if (onEvent) onEvent({ state, ...extra }); };
   let crashRetriesLeft = maxRetries;
   let validationRetriesLeft = maxValidationRetries;
   let repair = null; // reason string (backward-compatible 1st arg to work)
   let ctx = null;    // structured { reason, value, attempt }
   let attempt = 0;   // counts ALL loop iterations (crash + validation retries), not validation retries alone
   while (true) {
-    history.push('RUNNING');
+    emit('RUNNING', { attempt });
     const res = await withWatchdog(() => work(repair, ctx), timeoutMs);
     if (res.outcome === 'timeout' || res.outcome === 'error') {
-      history.push(res.outcome === 'timeout' ? 'TIMED_OUT' : 'FAILED');
+      emit(res.outcome === 'timeout' ? 'TIMED_OUT' : 'FAILED', { attempt });
       if (crashRetriesLeft > 0) { crashRetriesLeft--; attempt++; continue; }
       break;
     }
-    history.push('VALIDATING');
+    emit('VALIDATING', { attempt });
     const verdict = await validate(res.value); // may be sync or async
-    if (verdict.ok) { history.push('SUCCEEDED'); return { state: 'SUCCEEDED', value: res.value, history }; }
+    if (verdict.ok) { emit('SUCCEEDED', { attempt }); return { state: 'SUCCEEDED', value: res.value, history }; }
     if (validationRetriesLeft > 0) {
       validationRetriesLeft--; attempt++;
       repair = verdict.reason ?? 'validation failed';
       ctx = { reason: repair, value: res.value, attempt };
-      history.push('RETRYING');
+      emit('RETRYING', { attempt, reason: repair });
       continue;
     }
     break; // validation budget exhausted
   }
-  history.push('ABANDONED');
+  emit('ABANDONED', {});
   return { state: 'ABANDONED', history };
 }
 
@@ -95,6 +97,8 @@ export async function runUnit(spec) {
 export async function quorumBarrier(units, threshold) {
   const results = await Promise.all(units.map((u) => runUnit(u)));
   const confirmed = results.filter((r) => r.state === 'SUCCEEDED').map((r) => r.value);
-  return { confirmed, abandoned: results.length - confirmed.length, degraded: confirmed.length < threshold };
+  const counts = {};
+  for (const r of results) for (const s of r.history) counts[s] = (counts[s] ?? 0) + 1;
+  return { confirmed, abandoned: results.length - confirmed.length, degraded: confirmed.length < threshold, counts };
 }
 
