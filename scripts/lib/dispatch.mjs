@@ -12,7 +12,7 @@ export const DEFAULT_POLICY = {
   quorum: undefined,              // default computed: ceil(units.length / 2)
   modelTier: null,                // pin Haiku/Sonnet; threaded into the consumer's agent({model})
   tokenBudget: null,              // max output tokens for this fan-out (null = no limit)
-  estimatedTokensPerUnit: 0,      // coarse fallback projection only
+  estimatedTokensPerUnit: 0,      // coarse fallback projection only; if 0 AND no getRemainingBudget, the projection gate is inert — use getRemainingBudget for real gating
   budgetReserve: 0.9,             // stop at 90% to bound non-preemptable in-flight overshoot
   getRemainingBudget: null,       // () => live remaining tokens (Workflow: () => budget.remaining())
   onOverloadBackoff: 'exponential', // passthrough convention; the consumer's work() honors it on 529/API-overload — the lib does not act on it
@@ -28,6 +28,12 @@ function withDefaults(u, p) {
   return { timeoutMs: p.perUnitTimeoutMs, maxRetries: p.maxRetries, maxValidationRetries: p.maxValidationRetries, ...u };
 }
 
+/**
+ * Batch `units` (chunks of maxInFlight) through quorumBarrier; a post-hoc reactive token gate
+ * runs between batches. Returns { confirmed, abandoned, degraded, counts, stoppedReason }.
+ * NOTE: read `degraded` together with `stoppedReason` — a 'token-budget' early-stop can leave
+ * confirmed < quorum (degraded=true) even when every unit that actually RAN succeeded.
+ */
 export async function parallelFanout(units, policy = {}) {
   const p = { ...DEFAULT_POLICY, ...policy };
   if (p.perUnitTimeoutMs == null) throw new TypeError('perUnitTimeoutMs is required in DispatchPolicy');

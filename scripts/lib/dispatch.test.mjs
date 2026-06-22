@@ -27,6 +27,7 @@ test('parallelFanout: confirms survivors and reports counts', async () => {
   assert.deepEqual([...r.confirmed].sort(), ['a', 'b']);
   assert.equal(r.degraded, false);
   assert.equal(r.counts.ABANDONED, 1);
+  assert.equal(r.abandoned, 1); // numeric abandoned field agrees with the counts aggregate
 });
 
 test('parallelFanout: post-hoc token gate stops launching new batches', async () => {
@@ -47,6 +48,7 @@ test('parallelFanout: getRemainingBudget drives the live gate', async () => {
     budgetReserve: 1, getRemainingBudget: () => remaining,
   });
   assert.equal(r.stoppedReason, 'token-budget');
+  assert.equal(r.confirmed.length, 1); // only the first unit ran before the live gate fired
 });
 
 test('parallelFanout: throws if perUnitTimeoutMs is omitted (fast-fail, not silent timeout)', async () => {
