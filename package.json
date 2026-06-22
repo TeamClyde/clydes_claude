@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test scripts/ .claude/hooks/",
+    "harness": "node scripts/run-harness.mjs",
     "harvest": "node scripts/harvest-components.mjs --emit",
     "harvest:check": "node scripts/harvest-components.mjs --emit && git diff --exit-code docs/reference/"
   }

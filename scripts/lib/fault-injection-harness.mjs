@@ -31,7 +31,23 @@ export function checkInvariants(result, { expectProgress = true } = {}) {
   const completes = result != null;
   const validShape = completes && Array.isArray(result.confirmed) && typeof result.degraded === 'boolean';
   const makesProgress = !expectProgress || (validShape && result.confirmed.length > 0);
-  const degradesGracefully = validShape; // returned a structured result instead of throwing/hanging
+  const degradesGracefully = validShape && typeof result.abandoned === 'number'; // structured result that ACCOUNTS for its abandoned units (not just confirmed/degraded)
   const allHold = completes && validShape && makesProgress && degradesGracefully;
   return { completes, validShape, makesProgress, degradesGracefully, allHold };
+}
+
+/**
+ * Run scenarioFn(trialIndex) k times; invariants must hold every trial.
+ * passedAllK === "invariants held across all k distinct fault patterns"
+ * (an FSM fault-coverage / determinism guarantee — NOT a real-LLM reliability claim).
+ */
+export async function passK(scenarioFn, k, invariantOpts = {}) {
+  let passes = 0;
+  for (let t = 0; t < k; t++) {
+    let result;
+    try { result = await scenarioFn(t); }
+    catch { result = null; } // a throw is an invariant violation (no graceful degrade)
+    if (checkInvariants(result, invariantOpts).allHold) passes++;
+  }
+  return { k, passes, passRate: passes / k, passedAllK: passes === k };
 }
