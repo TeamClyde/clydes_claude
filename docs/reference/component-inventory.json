@@ -246,7 +246,7 @@
     "type": "skill",
     "name": "adherence-audit",
     "description": "Use when adding new workflow components, after modifying rules or skills, or periodically to check for drift. Audits semantic consistency across all skills, agents, rules, and CLAUDE.md: finds dead references, invocation mismatches, convention conflicts, priority conflicts, orphaned components, trigger gaps, and workflow gaps. Triggers on \"audit workflow\", \"check consistency\", \"adherence audit\", \"find conflicts\", \"workflow audit\", \"check for drift\".",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\adherence-audit\\skill.md"
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\adherence-audit\\SKILL.md"
   },
   {
     "type": "skill",
@@ -270,25 +270,25 @@
     "type": "skill",
     "name": "creating-tools",
     "description": "Use when creating any workflow component — skill, agent, rule, hook, command, or plugin. Routes to the correct specialist skill based on artifact type.",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\creating-tools\\skill.md"
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\creating-tools\\SKILL.md"
   },
   {
     "type": "skill",
     "name": "different-viewpoint",
     "description": "Thinking tool — full CIA Phoenix Checklist sweep on a problem. Takes a problem statement and an optional hypothesis. Without a hypothesis, runs in problem-definition mode: surfaces what the unknown actually is before solutions are considered. With a hypothesis, runs the checklist with the hypothesis as context and flags answers that contradict or challenge it. The mechanism is answering ALL questions in order, including ones that seem irrelevant — those are often the ones that shift framing. Triggers on \"different viewpoint\", \"phoenix checklist\", \"challenge my thinking\", \"am I solving the right problem\", \"stress test this solution\", \"full sweep\".",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\different-viewpoint\\skill.md"
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\different-viewpoint\\SKILL.md"
   },
   {
     "type": "skill",
     "name": "different-viewpoints-lite",
     "description": "Thinking tool — adversarial 5-question Phoenix Checklist challenge against a problem and optional hypothesis. Unlike different-viewpoint (full sweep in order), this selects the 5 questions most likely to falsify or expose flaws in current thinking. Without a hypothesis, selects questions most likely to surface what the real problem actually is. Selection is adversarial: most threatening questions, not most topically related. Triggers on \"different viewpoints lite\", \"quick adversarial check\", \"challenge this hypothesis\", \"find the flaw\", \"stress test lite\".",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\different-viewpoints-lite\\skill.md"
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\different-viewpoints-lite\\SKILL.md"
   },
   {
     "type": "skill",
     "name": "dispatching-parallel-agents",
     "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\dispatching-parallel-agents\\skill.md"
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\dispatching-parallel-agents\\SKILL.md"
   },
   {
     "type": "skill",
@@ -305,7 +305,7 @@
   {
     "type": "skill",
     "name": "docs-refresh",
-    "description": "Use when generating or refreshing doc content for a specific Diátaxis quadrant or artifact type — routes to the right wshobson doc agent or skill (tutorial-engineer / docs-architect / reference-builder / architecture-decision-records / changelog-automation / openapi-spec-generation / mermaid-expert). Multi-domain aware. Does not commit (user reviews specialist output). Triggers on \"docs refresh\", \"generate tutorial\", \"draft ADR\", \"refresh changelog\", \"/docs-refresh\".",
+    "description": "Use when generating or refreshing doc content for a specific Diátaxis quadrant or artifact type — routes to the right bundled doc specialist agent or skill (tutorial-engineer / docs-architect / reference-builder / architecture-decision-records / changelog-automation / openapi-spec-generation / mermaid-expert). Multi-domain aware. Does not commit (user reviews specialist output). Triggers on \"docs refresh\", \"generate tutorial\", \"draft ADR\", \"refresh changelog\", \"/docs-refresh\".",
     "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\docs-refresh\\SKILL.md"
   },
   {
@@ -323,7 +323,7 @@
   {
     "type": "skill",
     "name": "executing-plans",
-    "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+    "description": "Use when you have a written implementation plan to execute yourself — runs all tasks in a single continuing context with review checkpoints between steps. For isolated fresh-subagent-per-task execution instead, use subagent-driven-development.",
     "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\executing-plans\\SKILL.md"
   },
   {
@@ -383,25 +383,25 @@
   {
     "type": "skill",
     "name": "receiving-code-review",
-    "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\receiving-code-review\\skill.md"
+    "description": "Use when you have RECEIVED code review feedback and need to act on it — evaluating, verifying, and implementing reviewer suggestions with technical rigor, not performative agreement. Owns the \"respond to feedback\" direction. For submitting work to be reviewed, use requesting-code-review.",
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\receiving-code-review\\SKILL.md"
   },
   {
     "type": "skill",
     "name": "requesting-code-review",
-    "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\requesting-code-review\\skill.md"
+    "description": "Use when you want to request a code review — after completing a task, implementing a major feature, or before merging/opening a PR to verify work meets requirements. Owns the \"submit work for review\" direction. For acting on feedback you already received, use receiving-code-review.",
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\requesting-code-review\\SKILL.md"
   },
   {
     "type": "skill",
     "name": "review-workflow",
-    "description": "Use when workflow friction issues have accumulated in TeamClyde/clydes_claude and you want to act on them — scanning the workflow system for context, proposing multi-angle fixes, and routing improvements to the right component. Run periodically or after several friction issues accumulate.",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\review-workflow\\skill.md"
+    "description": "Use when workflow friction issues have accumulated in TeamClyde/clydes_claude and you want to act on them — scanning the meta-workflow system for context, proposing multi-angle fixes, and routing improvements to the right component. This is about the WORKFLOW SYSTEM itself, not reviewing code changes — for code review, use requesting-code-review. Run periodically or after several friction issues accumulate.",
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\review-workflow\\SKILL.md"
   },
   {
     "type": "skill",
     "name": "subagent-driven-development",
-    "description": "Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with two-stage review (spec compliance, then code quality) after each task.",
+    "description": "Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with two-stage review (spec compliance, then code quality) after each task. For single-context step-by-step execution with checkpoints instead, use executing-plans.",
     "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\subagent-driven-development\\SKILL.md"
   },
   {
@@ -414,7 +414,7 @@
     "type": "skill",
     "name": "test-driven-development",
     "description": "Use when implementing any feature or bugfix, before writing implementation code — requires a failing test first, then minimum code to pass, then refactor. No implementation without a red test.",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\test-driven-development\\skill.md"
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\test-driven-development\\SKILL.md"
   },
   {
     "type": "skill",
@@ -432,7 +432,7 @@
     "type": "skill",
     "name": "verification-before-completion",
     "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\verification-before-completion\\skill.md"
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\verification-before-completion\\SKILL.md"
   },
   {
     "type": "skill",
@@ -462,7 +462,7 @@
     "type": "skill",
     "name": "writing-agents",
     "description": "Use when creating a new agent, editing an existing agent's system prompt, or determining agent frontmatter conventions and testing approach.",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-agents\\skill.md"
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-agents\\SKILL.md"
   },
   {
     "type": "skill",
@@ -474,7 +474,7 @@
     "type": "skill",
     "name": "writing-rules",
     "description": "Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped.",
-    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-rules\\skill.md"
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-rules\\SKILL.md"
   },
   {
     "type": "skill",

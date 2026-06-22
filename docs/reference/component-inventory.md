@@ -53,7 +53,7 @@
 | skill | docs-refresh |  | Use when generating or refreshing doc content for a specific Diátaxis quadrant or artifact type — ro |
 | skill | docs-status |  | Use when auditing a repo's documentation against its docs/manifest.md — checks what's missing, stale |
 | skill | e2e-init |  | Use when a repo's test suite needs to be established or audited — inventorying existing tests, ident |
-| skill | executing-plans |  | Use when you have a written implementation plan to execute in a separate session with review checkpo |
+| skill | executing-plans |  | Use when you have a written implementation plan to execute yourself — runs all tasks in a single con |
 | skill | feedback |  | Use when experiencing friction, confusion, or a gap mid-session — a skill that didn't trigger, a rul |
 | skill | finishing-a-development-branch |  | Use when implementation is complete, all tests pass, and you need to decide how to integrate the wor |
 | skill | git-manager |  | Use when committing files, creating a branch, pushing to remote, syncing with main, opening a pull r |
@@ -63,8 +63,8 @@
 | skill | plan-gate |  | Triggers on writing-plans completion. Gates the plan through architect review, test-strategy, test-b |
 | skill | plan-management |  | Use when Jira tickets are created or change status (in_progress, done), when adding items to the bac |
 | skill | project-setup |  | Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUD |
-| skill | receiving-code-review |  | Use when receiving code review feedback, before implementing suggestions, especially if feedback see |
-| skill | requesting-code-review |  | Use when completing tasks, implementing major features, or before merging to verify work meets requi |
+| skill | receiving-code-review |  | Use when you have RECEIVED code review feedback and need to act on it — evaluating, verifying, and i |
+| skill | requesting-code-review |  | Use when you want to request a code review — after completing a task, implementing a major feature,  |
 | skill | review-workflow |  | Use when workflow friction issues have accumulated in TeamClyde/clydes_claude and you want to act on |
 | skill | subagent-driven-development |  | Use when executing implementation plans with independent tasks — dispatches a fresh subagent per tas |
 | skill | systematic-debugging |  | Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes — requir |

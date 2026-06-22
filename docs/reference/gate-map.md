@@ -64,6 +64,7 @@ flowchart LR
   plan_docs --> plan_management
   plan_docs --> systematic_debugging
   plan_docs --> writing_plans
+  plan_gate --> adherence_audit
   plan_gate --> architect
   plan_gate --> executing_plans
   plan_gate --> jira_workflow_manager
@@ -210,6 +211,7 @@ flowchart LR
 | plan-docs | plan-management |
 | plan-docs | systematic-debugging |
 | plan-docs | writing-plans |
+| plan-gate | adherence-audit |
 | plan-gate | architect |
 | plan-gate | executing-plans |
 | plan-gate | jira-workflow-manager |
