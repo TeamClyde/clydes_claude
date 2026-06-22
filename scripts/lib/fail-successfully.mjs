@@ -34,10 +34,14 @@ export function withWatchdog(workFn, ms) {
  * runUnit ALWAYS resolves to a terminal state — it never rejects and never hangs
  * (the watchdog guarantees termination). This is what lets quorumBarrier be safe.
  * @param {object} spec
- * @param {(repairContext: string|null) => Promise<any>} spec.work
- * @param {(value:any) => {ok:boolean, reason?:string}} [spec.validate] default: non-null ⇒ ok
+ * @param {(repair: string|null, ctx: {reason:string, value:any, attempt:number}|null) => Promise<any>} spec.work
+ *   repair = validation reason string (backward-compat 1st arg); ctx = structured repair context
+ *   (null on first attempt; ctx.attempt counts ALL loop iterations — crash + validation retries).
+ * @param {(value:any) => ({ok:boolean, reason?:string} | Promise<{ok:boolean, reason?:string}>)} [spec.validate]
+ *   default: non-null ⇒ ok. May be sync or async (the verdict is awaited).
  * @param {number} spec.timeoutMs
- * @param {number} [spec.maxRetries=1]
+ * @param {number} [spec.maxRetries=1] crash/timeout retry budget
+ * @param {number} [spec.maxValidationRetries=maxRetries] separate validation-repair retry budget
  * @returns {Promise<{state:'SUCCEEDED', value:any, history:string[]} | {state:'ABANDONED', history:string[]}>}
  */
 export async function runUnit(spec) {
