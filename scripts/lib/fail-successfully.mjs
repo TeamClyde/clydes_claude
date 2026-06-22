@@ -52,9 +52,15 @@ export async function runUnit(spec) {
     maxRetries = 1,
     maxValidationRetries = maxRetries, // default preserves prior single-budget behavior
     onEvent,
+    store,
+    stepId,
   } = spec;
   const history = [];
   const emit = (state, extra = {}) => { history.push(state); if (onEvent) onEvent({ state, ...extra }); };
+  if (store && stepId != null && store.has(stepId)) {
+    emit('MEMOIZED', { stepId, memoized: true });
+    return { state: 'SUCCEEDED', value: store.get(stepId), history, memoized: true };
+  }
   let crashRetriesLeft = maxRetries;
   let validationRetriesLeft = maxValidationRetries;
   let repair = null; // reason string (backward-compatible 1st arg to work)
@@ -70,7 +76,11 @@ export async function runUnit(spec) {
     }
     emit('VALIDATING', { attempt });
     const verdict = await validate(res.value); // may be sync or async
-    if (verdict.ok) { emit('SUCCEEDED', { attempt }); return { state: 'SUCCEEDED', value: res.value, history }; }
+    if (verdict.ok) {
+      emit('SUCCEEDED', { attempt });
+      if (store && stepId != null) store.set(stepId, res.value);
+      return { state: 'SUCCEEDED', value: res.value, history };
+    }
     if (validationRetriesLeft > 0) {
       validationRetriesLeft--; attempt++;
       repair = verdict.reason ?? 'validation failed';

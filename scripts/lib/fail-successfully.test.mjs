@@ -124,3 +124,33 @@ test('quorumBarrier: returns per-state counts across the fan-out', async () => {
   assert.equal(counts.ABANDONED, 1);
   assert.equal(counts.TIMED_OUT, 1);
 });
+
+test('runUnit: memo-miss runs work and persists the result', async () => {
+  const store = new Map();
+  let calls = 0;
+  const r = await runUnit({ work: async () => { calls++; return 'v'; }, timeoutMs: 50, store, stepId: 's1' });
+  assert.equal(r.state, 'SUCCEEDED');
+  assert.equal(calls, 1);
+  assert.equal(store.get('s1'), 'v');
+});
+
+test('runUnit: memo-hit returns the stored value without running work', async () => {
+  const store = new Map([['s1', 'cached']]);
+  let calls = 0;
+  const r = await runUnit({ work: async () => { calls++; return 'fresh'; }, timeoutMs: 50, store, stepId: 's1' });
+  assert.equal(r.value, 'cached');
+  assert.equal(r.memoized, true);
+  assert.equal(calls, 0);
+});
+
+test('runUnit: a store with no stepId never memoizes', async () => {
+  const store = new Map();
+  await runUnit({ work: async () => 'v', timeoutMs: 50, store });
+  assert.equal(store.size, 0);
+});
+
+test('runUnit: an ABANDONED result is not cached', async () => {
+  const store = new Map();
+  await runUnit({ work: async () => { throw new Error('x'); }, timeoutMs: 50, maxRetries: 0, store, stepId: 's1' });
+  assert.equal(store.has('s1'), false);
+});
