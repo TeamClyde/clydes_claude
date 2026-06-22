@@ -57,7 +57,12 @@ ACTIVE_PLAN_FILE="$REPO_ROOT/.claude/active-plan"
 if [ -f "$ACTIVE_PLAN_FILE" ]; then
   ACTIVE_PLAN_PATH=$(head -n1 "$ACTIVE_PLAN_FILE" | tr -d '[:space:]\r')
   PLAN_MD="$REPO_ROOT/$ACTIVE_PLAN_PATH"
-  if [ -n "$ACTIVE_PLAN_PATH" ] && [ -f "$PLAN_MD" ]; then
+  # Skip the in-scope check when the active plan is gitignored: a gitignored
+  # plan can never appear in the staged set (without `git add -f`, which would
+  # commit a session-only artifact), so the "stage the plan too" requirement is
+  # a false-positive. `git check-ignore -q` exits 0 when the path is ignored.
+  if [ -n "$ACTIVE_PLAN_PATH" ] && [ -f "$PLAN_MD" ] \
+     && ! git -C "$REPO_ROOT" check-ignore -q "$ACTIVE_PLAN_PATH"; then
     # Extract backtick-quoted paths (must contain a slash), drop placeholders
     PLAN_PATHS=$(grep -oE '`[a-zA-Z0-9_./-]+/[a-zA-Z0-9_.-]+`' "$PLAN_MD" 2>/dev/null \
       | tr -d '`' \
