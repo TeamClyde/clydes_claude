@@ -377,8 +377,8 @@ This directory contains Architecture Decision Records (ADRs) for [Project Name].
 # Install adr-tools
 brew install adr-tools
 
-# Initialize ADR directory
-adr init docs/adr
+# Initialize ADR directory (this workflow keeps ADRs under docs/explanation/adr/ per rules/doc-tools.md)
+adr init docs/explanation/adr
 
 # Create new ADR
 adr new "Use PostgreSQL as Primary Database"
@@ -387,7 +387,7 @@ adr new "Use PostgreSQL as Primary Database"
 adr new -s 3 "Deprecate MongoDB in Favor of PostgreSQL"
 
 # Generate table of contents
-adr generate toc > docs/adr/README.md
+adr generate toc > docs/explanation/adr/README.md
 
 # Link related ADRs
 adr link 2 "Complements" 1 "Is complemented by"
