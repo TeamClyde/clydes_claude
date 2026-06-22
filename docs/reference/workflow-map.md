@@ -254,7 +254,7 @@ When instructions conflict, this order determines which wins:
 
 1. `CLAUDE.md` (global, highest)
 2. `rules/*.md` (rules override skills)
-3. `skills/*/skill.md` (lowest, but primary driver of behavior)
+3. `skills/*/SKILL.md` (lowest, but primary driver of behavior)
 
 **Implication:** If a rule says to do X and a skill says to do Y, X wins — even if Y is more
 recently written. Audit with `adherence-audit` skill to find active conflicts.

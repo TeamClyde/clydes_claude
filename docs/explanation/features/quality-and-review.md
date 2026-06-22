@@ -7,10 +7,10 @@
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
 **Related ADRs:** _(none)_
 **Key files:**
-  - `skills/requesting-code-review/skill.md`, `skills/receiving-code-review/skill.md` — the review exchange
-  - `skills/verification-before-completion/skill.md` — evidence-before-claims gate
-  - `skills/systematic-debugging/skill.md` — mandatory pre-fix debugging discipline
-  - `skills/review-workflow/skill.md` — acts on accumulated workflow friction
+  - `skills/requesting-code-review/SKILL.md`, `skills/receiving-code-review/SKILL.md` — the review exchange
+  - `skills/verification-before-completion/SKILL.md` — evidence-before-claims gate
+  - `skills/systematic-debugging/SKILL.md` — mandatory pre-fix debugging discipline
+  - `skills/review-workflow/SKILL.md` — acts on accumulated workflow friction
 ---
 
 # Quality & Review
@@ -33,23 +33,23 @@ These skills share a single concern: substituting evidence and structured proces
 
 Full descriptions, trigger conditions, and allowed tools for each skill are listed in `docs/reference/component-inventory.md`. The following summarizes each component's structural role.
 
-**`systematic-debugging`** (`skills/systematic-debugging/skill.md`)
+**`systematic-debugging`** (`skills/systematic-debugging/SKILL.md`)
 
 A four-phase process skill: Phase 1 (root-cause investigation — reproduce, gather evidence, enumerate all hypotheses as a table), Phase 2 (pattern analysis — working vs. broken comparison), Phase 3 (hypothesis validation — confirm/deny each hypothesis before any fix), Phase 4 (implementation — fix all confirmed root causes in one pass, then invoke `plan-management:divergence` at the mandatory exit gate). The skill integrates with `dispatching-parallel-agents` when three or more hypotheses need simultaneous investigation. It integrates with `query_graph` / `trace_path` from the codebase-memory MCP for call-chain analysis when a codebase graph is present. Phase 4's exit gate requires a `plan-management:divergence` call tagged `[bug]` or `[debug-cascade]` before the session may declare debugging complete.
 
-**`verification-before-completion`** (`skills/verification-before-completion/skill.md`)
+**`verification-before-completion`** (`skills/verification-before-completion/SKILL.md`)
 
 A gate function, not a process: identify the command that proves the claim, run it fresh, read the full output, then and only then make the claim. The skill defines a table of claim types (tests pass, linter clean, build succeeds, bug fixed, agent completed, requirements met) and what constitutes sufficient vs. insufficient evidence for each. It applies before any commit, PR, task completion mark, or verbal assertion of success.
 
-**`requesting-code-review`** (`skills/requesting-code-review/skill.md`)
+**`requesting-code-review`** (`skills/requesting-code-review/SKILL.md`)
 
 Structures a review request: obtain `BASE_SHA` / `HEAD_SHA`, populate a templated prompt with implementation context and plan reference, and dispatch a code-reviewer subagent. The subagent receives precisely crafted context — not the session's history — to keep the reviewer focused on the work product. Mandatory after each task in subagent-driven development, after major features, and before merge to main. Requires tests passing before submission.
 
-**`receiving-code-review`** (`skills/receiving-code-review/skill.md`)
+**`receiving-code-review`** (`skills/receiving-code-review/SKILL.md`)
 
 Governs the response pattern once review feedback arrives: read completely before reacting, restate the requirement in own words (or ask), verify the suggestion against codebase reality, evaluate technical soundness for this codebase, then respond or implement. Distinguishes trusted (human partner) from external reviewer feedback. Defines when to push back (suggestion breaks functionality, YAGNI, reviewer lacks context) and how (technical reasoning, not defensiveness). Forbids performative agreement ("You're absolutely right!"). Requires clarifying all unclear items before implementing any. Requires committing after all items from a single reviewer are addressed, not item by item.
 
-**`review-workflow`** (`skills/review-workflow/skill.md`)
+**`review-workflow`** (`skills/review-workflow/SKILL.md`)
 
 Periodic meta-skill that operates on accumulated `workflow-friction` GitHub issues in `TeamClyde/clydes_claude`. Multi-step process: load issues, group and surface merge candidates, run Explore scans per high-signal item (capped at three dispatches), size the fix (M-sized triggers `different-viewpoint`, minor tweaks do not), propose three angles (targeted / root-cause / structural), execute approved fixes via the correct routing table, run an adversarial review, commit via `git-manager`. Fixes are routed to `writing-skills`, `creating-tools`, or direct edits depending on the component type.
 

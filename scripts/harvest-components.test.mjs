@@ -15,7 +15,8 @@ test('harvest finds skills, agents, rules, and hooks by type', async () => {
 
   // skill with uppercase SKILL.md
   assert.equal(byName['skill:git-manager']?.type, 'skill')
-  // skill with lowercase skill.md — proves case-insensitive discovery
+  // adherence-audit — entry file is SKILL.md (all skills standardized); discovered by name.
+  // The scanner's /^skill\.md$/i match stays case-insensitive defensively, even with no lowercase fixture.
   assert.equal(byName['skill:adherence-audit']?.type, 'skill')
   // agent carries its pinned model from frontmatter
   assert.equal(byName['agent:architect']?.model, 'claude-sonnet-4-6')

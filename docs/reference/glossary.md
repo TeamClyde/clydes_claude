@@ -74,7 +74,7 @@ A Markdown file in `rules/` that loads with higher priority than skills. Rules o
 A test-runner result class. `.claude/testing-plan.md` not found. Returned immediately — no test run attempted. Resolution: run `e2e-init`.
 
 **skill**
-A prompt template that runs in the main context, invoked via `Skill { skill: "<name>", args: "..." }`. Skills are the primary behavioral driver of the workflow. Located in `~/.claude/skills/<name>/`. Entry point is always `skill.md`.
+A prompt template that runs in the main context, invoked via `Skill { skill: "<name>", args: "..." }`. Skills are the primary behavioral driver of the workflow. Located in `~/.claude/skills/<name>/`. Entry point is always `SKILL.md`.
 
 **subagent-driven-development**
 The parallel execution skill. Dispatches a fresh subagent per task; the orchestrator (not the subagent) runs `test-runner` after each task.

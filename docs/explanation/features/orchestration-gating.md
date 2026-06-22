@@ -8,7 +8,7 @@
 **Related ADRs:** _(none yet — executor-spectrum ADR promoted at sub-plan close)_
 **Key files:**
   - `.claude/hooks/` — deterministic runtime gates (sessionStart, preToolUse, postToolUse, userPromptSubmit, pre-commit)
-  - `skills/plan-gate/skill.md` — the canonical soft-gate sequence
+  - `skills/plan-gate/SKILL.md` — the canonical soft-gate sequence
   - `docs/reference/gate-map.md` — generated 140-edge gate/dependency map
 ---
 
@@ -99,7 +99,7 @@ The skill file (`/deep-research`) is a markdown pointer — its trigger descript
 | `.claude/hooks/preToolUse/install-vetting-advisory.mjs` | Advisory nudge before install commands |
 | `.claude/hooks/postToolUse/graph-tools-self-heal.mjs` | Catch "project not found" on codebase-memory-mcp; auto-repair CLAUDE.md |
 | `.claude/hooks/userPromptSubmit/slash-command-enforcement.mjs` | Inject context when user types a slash-command |
-| `skills/plan-gate/skill.md` | Canonical soft-gate sequence: architect → test-strategy → test-builder → Jira → TODO |
+| `skills/plan-gate/SKILL.md` | Canonical soft-gate sequence: architect → test-strategy → test-builder → Jira → TODO |
 | `docs/reference/gate-map.md` | Generated 140-edge dependency map (first-cut: explicit references only) |
 
 The gate-map (`docs/reference/gate-map.md`) is the authoritative record of inter-component edges in the workflow. It is generated and drift-checked — consult it for concrete gate edges rather than deriving them from source. For example, it records the `plan-gate → architect`, `plan-gate → test-strategy`, `plan-gate → test-builder`, `plan-gate → jira-workflow-manager`, and `plan-gate → plan-management` edges that define the canonical soft-gate sequence, as well as `executing-plans → systematic-debugging` (the debugging pre-condition gate) and `git-manager → secrets-handling` (the credential-safety gate).
@@ -155,7 +155,7 @@ There is no per-hook disable mechanism other than the prefix marker for graph-to
 **Internal features this depends on:**
 - **Codebase knowledge graph** (`features/codebase-graph.md`) — `graph-tools-directive.mjs` and `graph-tools-enforcement.mjs` both check for `.claude-init/CODEBASE.md`; behavior degrades gracefully to silent pass when the graph is absent.
 - **Stack hats** (`features/stack-hats.md`) — `stack-hat-directive.mjs` reads `project.json` `stacks` and `~/.claude/stacks/<stack>.md`; absent stacks or missing catalog entries produce a one-line note rather than an error.
-- **Plan gate** (`skills/plan-gate/skill.md`) — the canonical soft-gate sequence; consumed by `writing-plans` to enforce the architect → test-strategy → test-builder → Jira → TODO ordering.
+- **Plan gate** (`skills/plan-gate/SKILL.md`) — the canonical soft-gate sequence; consumed by `writing-plans` to enforce the architect → test-strategy → test-builder → Jira → TODO ordering.
 - **Install vetting** (`features/install-vetting.md`) — `install-vetting-advisory.mjs` surfaces the `vet-install` funnel; the hook delegates reputation and security analysis to the three-gate skill chain.
 - **Git manager** (`skills/git-manager/`) — the pre-commit hard gate (`preToolUse` on Bash for `git commit`) enforces the secrets-handling rule; `git-manager → secrets-handling` is a gate edge in `docs/reference/gate-map.md`.
 
@@ -211,7 +211,7 @@ Backlinks to ADRs that govern this feature (status inline).
 
 **Workflow** — a deterministic JavaScript orchestration script that implements a multi-step process as a fixed skeleton of phases, delegating each phase to LLM subagents via `agent()` calls. Provides guaranteed phase order and fan-out mechanics that prose instructions cannot.
 
-**`plan-gate`** — the canonical soft-gate skill. Invoked after `writing-plans`; enforces the architect → test-strategy → test-builder → Jira → TODO sequence before `executing-plans` begins. See `skills/plan-gate/skill.md` and `docs/reference/gate-map.md` for its outbound edges.
+**`plan-gate`** — the canonical soft-gate skill. Invoked after `writing-plans`; enforces the architect → test-strategy → test-builder → Jira → TODO sequence before `executing-plans` begins. See `skills/plan-gate/SKILL.md` and `docs/reference/gate-map.md` for its outbound edges.
 
 **Gate map** — the generated, drift-checked graph of inter-component dependency edges in the workflow (`docs/reference/gate-map.md`). 140 edges across 76 components as of Phase 1A. First-cut: explicit references only; enforcement tiers (which edges are hard vs soft) live in this explainer.
 

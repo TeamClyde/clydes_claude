@@ -7,10 +7,10 @@
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
 **Related ADRs:** _(none)_
 **Key files:**
-  - `skills/creating-tools/skill.md` — the component-creation router
+  - `skills/creating-tools/SKILL.md` — the component-creation router
   - `skills/creating-tools/routing-table.md` — per-artifact routing details
-  - `skills/writing-skills/skill.md`, `skills/writing-agents/skill.md`, `skills/writing-rules/skill.md` — the specialist authoring skills
-  - `skills/pulser/skill.md`, `skills/adherence-audit/skill.md` — structural + semantic quality checks
+  - `skills/writing-skills/SKILL.md`, `skills/writing-agents/SKILL.md`, `skills/writing-rules/SKILL.md` — the specialist authoring skills
+  - `skills/pulser/SKILL.md`, `skills/adherence-audit/SKILL.md` — structural + semantic quality checks
   - `rules/plugin-lifecycle.md` — creating-tools routing + plugin conflict suppression
 ---
 
@@ -36,21 +36,21 @@ Five components participate, grouped into two layers.
 
 **Orchestration layer (one component)**
 
-`creating-tools` (`skills/creating-tools/skill.md`) — the sole entry point for any component-creation intent. Reads the user's request, determines artifact type via a mandatory clarification gate, and delegates to exactly one specialist per request. It produces zero content itself.
+`creating-tools` (`skills/creating-tools/SKILL.md`) — the sole entry point for any component-creation intent. Reads the user's request, determines artifact type via a mandatory clarification gate, and delegates to exactly one specialist per request. It produces zero content itself.
 
 **Specialist authoring layer (three skills)**
 
-`writing-skills` (`skills/writing-skills/skill.md`) — handles skill creation. Applies TDD adapted to process documentation: baseline pressure test (RED), write the skill (GREEN), close loopholes (REFACTOR), then Pulser structural eval. Internally delegates structural conventions to `plugin-dev:skill-development`.
+`writing-skills` (`skills/writing-skills/SKILL.md`) — handles skill creation. Applies TDD adapted to process documentation: baseline pressure test (RED), write the skill (GREEN), close loopholes (REFACTOR), then Pulser structural eval. Internally delegates structural conventions to `plugin-dev:skill-development`.
 
-`writing-agents` (`skills/writing-agents/skill.md`) — handles agent creation. Requires a bare baseline invocation (no system prompt) before any content is written. Documents actual failures verbatim, then writes the system prompt to address them. Delegates structural field conventions to `plugin-dev:agent-development`. Requires explicit `model:` selection; agents must describe their inputs and outputs, not triggering conditions.
+`writing-agents` (`skills/writing-agents/SKILL.md`) — handles agent creation. Requires a bare baseline invocation (no system prompt) before any content is written. Documents actual failures verbatim, then writes the system prompt to address them. Delegates structural field conventions to `plugin-dev:agent-development`. Requires explicit `model:` selection; agents must describe their inputs and outputs, not triggering conditions.
 
-`writing-rules` (`skills/writing-rules/skill.md`) — handles rule creation. Rules are always-on context injections, not on-demand skills. Authoring principle: short, scannable, single-concern, with decision tables over prose. No Pulser eval; testing is observational (2–3 live sessions). Supports two rule types: global (no frontmatter) and path-scoped (`paths:` frontmatter).
+`writing-rules` (`skills/writing-rules/SKILL.md`) — handles rule creation. Rules are always-on context injections, not on-demand skills. Authoring principle: short, scannable, single-concern, with decision tables over prose. No Pulser eval; testing is observational (2–3 live sessions). Supports two rule types: global (no frontmatter) and path-scoped (`paths:` frontmatter).
 
 **Quality gate layer (two skills)**
 
-`pulser` (`skills/pulser/skill.md`) — structural quality diagnostics. Evaluates a skill against Anthropic's 7 principles for effective skill authoring: description field format, CSO (Claude Search Optimization) compliance, token efficiency, keyword coverage, naming conventions, cross-reference hygiene, and example quality. Pulser is a floor check — a passing result means the skill is structurally correct, not that it works.
+`pulser` (`skills/pulser/SKILL.md`) — structural quality diagnostics. Evaluates a skill against Anthropic's 7 principles for effective skill authoring: description field format, CSO (Claude Search Optimization) compliance, token efficiency, keyword coverage, naming conventions, cross-reference hygiene, and example quality. Pulser is a floor check — a passing result means the skill is structurally correct, not that it works.
 
-`adherence-audit` (`skills/adherence-audit/skill.md`) — semantic consistency checker. Audits all skills, agents, rules, and CLAUDE.md as a corpus. Finds: dead references, invocation mismatches (wrong tool for the component type), convention conflicts, priority conflicts (rule overrides skill silently), orphaned components, trigger gaps, and workflow gaps. Can also be scoped to a plan doc (Phase 9) to surface drift a proposed plan would introduce before execution begins.
+`adherence-audit` (`skills/adherence-audit/SKILL.md`) — semantic consistency checker. Audits all skills, agents, rules, and CLAUDE.md as a corpus. Finds: dead references, invocation mismatches (wrong tool for the component type), convention conflicts, priority conflicts (rule overrides skill silently), orphaned components, trigger gaps, and workflow gaps. Can also be scoped to a plan doc (Phase 9) to surface drift a proposed plan would introduce before execution begins.
 
 ```mermaid
 graph TD
@@ -88,7 +88,7 @@ For agents, step 4 is a bare `Agent` tool dispatch (no agent definition file loa
 
 - `plugin-dev` plugin (Integrated state) — provides structural guidance for skills (`plugin-dev:skill-development`), agents (`plugin-dev:agent-development`), hooks, commands, and full plugins. Invoked internally by `writing-skills` and `writing-agents`; never invoked directly by the user when `plugin-dev` is in Integrated state.
 - `pulser` CLI — external tool for static structural evaluation of skill files. Invoked by `writing-skills`. Requires `pulser` to be installed and accessible on `$PATH`.
-- `rules/plugin-lifecycle.md` — always-on global rule that suppresses direct invocation of Integrated plugin skills. Both this rule file and `skills/creating-tools/skill.md` must be symlinked into `~/.claude/rules/` and `~/.claude/skills/` respectively for conflict suppression to be active.
+- `rules/plugin-lifecycle.md` — always-on global rule that suppresses direct invocation of Integrated plugin skills. Both this rule file and `skills/creating-tools/SKILL.md` must be symlinked into `~/.claude/rules/` and `~/.claude/skills/` respectively for conflict suppression to be active.
 - `skills/creating-tools/routing-table.md` — the per-artifact detail table consumed by `creating-tools` at decision time. Lists process skill, structure skill, eval mechanism, and notes for each artifact type.
 
 ## Decisions

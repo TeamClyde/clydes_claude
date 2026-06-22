@@ -7,9 +7,9 @@
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
 **Related ADRs:** _(none)_
 **Key files:**
-  - `skills/git-manager/skill.md` — all git operations (commit / branch / push / PR / sync)
+  - `skills/git-manager/SKILL.md` — all git operations (commit / branch / push / PR / sync)
   - `agents/jira-workflow-manager.md` — all Jira operations (ticket create / transition / comment)
-  - `skills/finishing-a-development-branch/skill.md` — branch completion flow
+  - `skills/finishing-a-development-branch/SKILL.md` — branch completion flow
   - `rules/workflow-phases.md` — the Jira + git phase sequence
 ---
 
@@ -38,7 +38,7 @@ This explainer covers the two abstraction layers that govern how code changes an
 
 ### `git-manager` (Skill)
 
-**File:** `skills/git-manager/skill.md`
+**File:** `skills/git-manager/SKILL.md`
 
 The git abstraction layer. Receives structured intent from the main context (what files to stage, what the message says, what workflow to run) and owns safe, consistent execution. The main context owns decisions; this skill owns mechanics.
 
@@ -78,7 +78,7 @@ The agent's first action on any call is a `project.json` check. If `jira.enabled
 
 ### `finishing-a-development-branch` (Skill)
 
-**File:** `skills/finishing-a-development-branch/skill.md`
+**File:** `skills/finishing-a-development-branch/SKILL.md`
 
 Guides branch completion once implementation is done. Called by `subagent-driven-development` and `executing-plans` after all tasks complete. The skill verifies tests first, determines the base branch, optionally runs `/docs-status`, presents four structured options (merge locally, push and create PR, keep as-is, discard), executes the chosen option, and handles worktree cleanup.
 

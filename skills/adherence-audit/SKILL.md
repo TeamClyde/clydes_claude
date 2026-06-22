@@ -45,7 +45,7 @@ Read every component file and extract structured data:
 Read: CLAUDE.md
 Read: rules/*.md (all rule files)
 Read: rules/filesystem/*.md
-Read: skills/*/skill.md (all skill files)
+Read: skills/*/SKILL.md (all skill files)
 Read: agents/*.md (all agent files)
 ```
 
@@ -181,7 +181,7 @@ Impact: callers following this rule will fail to update TODO.md
 
 **[Convention Conflict]** plan doc location
 rules/planning.md says: `plans/<slug>/<slug>-plan.md`
-skills/some-skill/skill.md says: `plans/<slug>/PLAN.md`
+skills/some-skill/SKILL.md says: `plans/<slug>/PLAN.md`
 Rule wins by priority — skill is silently wrong.
 
 ---

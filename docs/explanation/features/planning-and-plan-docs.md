@@ -7,9 +7,9 @@
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
 **Related ADRs:** _(none)_
 **Key files:**
-  - `skills/brainstorming/skill.md`, `skills/writing-plans/skill.md`, `skills/plan-gate/skill.md` — plan creation + gating
-  - `skills/executing-plans/skill.md`, `skills/subagent-driven-development/skill.md` — execution
-  - `skills/plan-management/skill.md` — TODO.md + plan-doc state (divergence / spawn-subplan / close-subplan)
+  - `skills/brainstorming/SKILL.md`, `skills/writing-plans/SKILL.md`, `skills/plan-gate/SKILL.md` — plan creation + gating
+  - `skills/executing-plans/SKILL.md`, `skills/subagent-driven-development/SKILL.md` — execution
+  - `skills/plan-management/SKILL.md` — TODO.md + plan-doc state (divergence / spawn-subplan / close-subplan)
   - `rules/plan-docs.md`, `rules/planning.md` — four-file tree + research-first protocol
 ---
 

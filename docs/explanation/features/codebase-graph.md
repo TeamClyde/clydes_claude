@@ -7,7 +7,7 @@
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
 **Related ADRs:** _(none)_
 **Key files:**
-  - `skills/infra-init/skill.md` — 3-phase graph generation orchestrator
+  - `skills/infra-init/SKILL.md` — 3-phase graph generation orchestrator
   - `.claude-init/CODEBASE.md`, `.claude-init/enrichments.json` — generated knowledge artifacts (per repo)
   - `rules/filesystem/efficiency.md` — graph-tools-as-default navigation rule
 ---
