@@ -80,3 +80,30 @@ test('quorumBarrier: below threshold → degraded flagged but still returns (no 
   assert.deepEqual(confirmed, ['a']);
   assert.equal(degraded, true); // 1 < threshold 2 — reported, not thrown
 });
+
+test('runUnit: async validate is awaited', async () => {
+  const r = await runUnit({ work: async () => 'v', validate: async (v) => ({ ok: v === 'v' }), timeoutMs: 50 });
+  assert.equal(r.state, 'SUCCEEDED');
+});
+
+test('runUnit: structured ctx delivered on validation retry with attempt number', async () => {
+  let seen;
+  const r = await runUnit({
+    work: async (repair, ctx) => { seen = ctx; return ctx ? 'good' : 'bad'; },
+    validate: (v) => (v === 'good' ? { ok: true } : { ok: false, reason: 'need good' }),
+    timeoutMs: 50, maxValidationRetries: 1,
+  });
+  assert.equal(r.state, 'SUCCEEDED');
+  assert.deepEqual(seen, { reason: 'need good', value: 'bad', attempt: 1 });
+});
+
+test('runUnit: validation budget is separate from crash budget', async () => {
+  let valCalls = 0;
+  const r = await runUnit({
+    work: async () => 'x',
+    validate: () => { valCalls++; return { ok: false, reason: 'nope' }; },
+    timeoutMs: 50, maxRetries: 0, maxValidationRetries: 2,
+  });
+  assert.equal(r.state, 'ABANDONED');
+  assert.equal(valCalls, 3); // initial + 2 validation retries — crash budget of 0 did not limit it
+});

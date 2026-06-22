@@ -41,19 +41,38 @@ export function withWatchdog(workFn, ms) {
  * @returns {Promise<{state:'SUCCEEDED', value:any, history:string[]} | {state:'ABANDONED', history:string[]}>}
  */
 export async function runUnit(spec) {
-  const { work, validate = (v) => ({ ok: v != null }), timeoutMs, maxRetries = 1 } = spec;
+  const {
+    work,
+    validate = (v) => ({ ok: v != null }),
+    timeoutMs,
+    maxRetries = 1,
+    maxValidationRetries = maxRetries, // default preserves prior single-budget behavior
+  } = spec;
   const history = [];
-  let repair = null;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  let crashRetriesLeft = maxRetries;
+  let validationRetriesLeft = maxValidationRetries;
+  let repair = null; // reason string (backward-compatible 1st arg to work)
+  let ctx = null;    // structured { reason, value, attempt }
+  let attempt = 0;   // counts ALL loop iterations (crash + validation retries), not validation retries alone
+  while (true) {
     history.push('RUNNING');
-    const res = await withWatchdog(() => work(repair), timeoutMs);
-    if (res.outcome === 'timeout') { history.push('TIMED_OUT'); continue; }
-    if (res.outcome === 'error') { history.push('FAILED'); continue; }
+    const res = await withWatchdog(() => work(repair, ctx), timeoutMs);
+    if (res.outcome === 'timeout' || res.outcome === 'error') {
+      history.push(res.outcome === 'timeout' ? 'TIMED_OUT' : 'FAILED');
+      if (crashRetriesLeft > 0) { crashRetriesLeft--; attempt++; continue; }
+      break;
+    }
     history.push('VALIDATING');
-    const verdict = validate(res.value);
+    const verdict = await validate(res.value); // may be sync or async
     if (verdict.ok) { history.push('SUCCEEDED'); return { state: 'SUCCEEDED', value: res.value, history }; }
-    repair = verdict.reason ?? 'validation failed';
-    history.push('RETRYING');
+    if (validationRetriesLeft > 0) {
+      validationRetriesLeft--; attempt++;
+      repair = verdict.reason ?? 'validation failed';
+      ctx = { reason: repair, value: res.value, attempt };
+      history.push('RETRYING');
+      continue;
+    }
+    break; // validation budget exhausted
   }
   history.push('ABANDONED');
   return { state: 'ABANDONED', history };
