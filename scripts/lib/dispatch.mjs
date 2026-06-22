@@ -58,3 +58,43 @@ export async function parallelFanout(units, policy = {}) {
   }
   return { confirmed, abandoned, degraded: confirmed.length < quorum, counts, stoppedReason };
 }
+
+/**
+ * Run steps in order; each step's SUCCEEDED value feeds the next step's work(prior, repair, ctx).
+ * Validation-as-feedback applies per step. Halts on the first ABANDONED.
+ */
+export async function sequentialChain(steps, policy = {}) {
+  const p = { ...DEFAULT_POLICY, ...policy };
+  if (p.perUnitTimeoutMs == null) throw new TypeError('perUnitTimeoutMs is required in DispatchPolicy');
+  const results = [];
+  let prev;
+  let completed = 0;
+  let stoppedReason;
+  for (const step of steps) {
+    const prior = prev;
+    const spec = withDefaults({ ...step, work: (repair, ctx) => step.work(prior, repair, ctx) }, p);
+    const r = await runUnit(spec);
+    results.push(r);
+    if (r.state !== 'SUCCEEDED') { stoppedReason = 'abandoned'; break; }
+    prev = r.value;
+    completed++;
+  }
+  return { results, completed, stoppedReason };
+}
+
+/**
+ * Monolith→fan-out reviewer path: fan out review lenses, then ONE batched verify over all
+ * findings (NOT 3-votes-per-finding — see feedback_workflow_model_pinning). policy.verify
+ * is an optional async (findings) => findings.
+ */
+export async function dimensionalReview(dimensions, policy = {}) {
+  const p = { ...DEFAULT_POLICY, ...policy };
+  if (p.perUnitTimeoutMs == null) throw new TypeError('perUnitTimeoutMs is required in DispatchPolicy');
+  const review = await parallelFanout(dimensions, p);
+  let findings = review.confirmed.flat();
+  if (p.verify) {
+    const v = await runUnit(withDefaults({ work: () => p.verify(findings) }, p));
+    if (v.state === 'SUCCEEDED') findings = v.value;
+  }
+  return { findings, counts: review.counts, degraded: review.degraded };
+}

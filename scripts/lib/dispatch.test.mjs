@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parallelFanout, DEFAULT_POLICY } from './dispatch.mjs';
+import { parallelFanout, sequentialChain, dimensionalReview, DEFAULT_POLICY } from './dispatch.mjs';
 
 const tick = (ms, value) => new Promise((r) => setTimeout(() => r(value), ms));
 
@@ -54,6 +54,41 @@ test('parallelFanout: getRemainingBudget drives the live gate', async () => {
 test('parallelFanout: throws if perUnitTimeoutMs is omitted (fast-fail, not silent timeout)', async () => {
   await assert.rejects(
     () => parallelFanout([{ work: async () => 'x' }], { maxInFlight: 1 }),
+    /perUnitTimeoutMs is required/,
+  );
+});
+
+test('sequentialChain: chains prior output and halts on abandon', async () => {
+  const steps = [
+    { work: async (prior) => (prior ?? 0) + 1 },          // undefined → 1
+    { work: async (prior) => prior + 10 },                // 1 → 11
+    { work: async () => { throw new Error('boom'); }, maxRetries: 0 }, // abandons
+    { work: async (prior) => prior + 100 },               // never runs
+  ];
+  const r = await sequentialChain(steps, { perUnitTimeoutMs: 50 });
+  assert.equal(r.completed, 2);
+  assert.equal(r.stoppedReason, 'abandoned');
+  assert.equal(r.results[1].value, 11);
+  assert.equal(r.results.length, 3); // 2 succeeded + 1 abandoned; 4th not run
+});
+
+test('dimensionalReview: fans out lenses and runs a single batched verify', async () => {
+  let verifyCalls = 0;
+  const dims = [
+    { work: async () => ['a', 'b'] },
+    { work: async () => ['c'] },
+  ];
+  const r = await dimensionalReview(dims, {
+    perUnitTimeoutMs: 50,
+    verify: async (findings) => { verifyCalls++; return findings.filter((f) => f !== 'b'); },
+  });
+  assert.equal(verifyCalls, 1); // batched: ONE verify over all findings (not per-finding)
+  assert.deepEqual([...r.findings].sort(), ['a', 'c']);
+});
+
+test('sequentialChain: throws if perUnitTimeoutMs is omitted (fast-fail)', async () => {
+  await assert.rejects(
+    () => sequentialChain([{ work: async () => 'x' }], {}),
     /perUnitTimeoutMs is required/,
   );
 });
