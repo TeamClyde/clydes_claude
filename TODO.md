@@ -12,6 +12,12 @@
 
 ## Up Next
 
+- [ ] Orchestration & Regulation Campaign — Epic: clean up the audited workflow defects, de-duplicate cross-family capability reimplementations into canonical homes, complete the `fail-successfully` primitive (§9 items 5–7) + fault-injection harness + `dispatching-parallel-agents` front-door, upgrade every fan-out-capable skill to the regulated primitive, and harden matured edges. Four sequential Form-A sub-plan waves. Executes the triaged Phase 2 orchestration-audit fixes (KEEP A/C/D/E/G + FOLD B/meta). Follow-on to Orchestration Layer Foundation. — [plan doc](plans/orchestration-regulation-campaign/orchestration-regulation-campaign-plan.md)
+  - [ ] Wave 1 — Cleanup (audit debt + cross-family de-dup)
+  - [ ] Wave 2 — Engine & harness (§9 items 5–7 + fault-injection harness + front-door)
+  - [ ] Wave 3 — Upgrade sweep (three upgrade shapes; per-component loop)
+  - [ ] Wave 4 — Harden & capstone (enforcement taxonomy + hook-hardening + operating-model skill)
+
 - [ ] Workflow Feedback Fixes — six triaged workflow-friction fixes. Closes GitHub issues #61, #49, #54, #50, #55, #48, #56, #57. — [plan doc](plans/workflow-feedback-fixes/workflow-feedback-fixes-plan.md)
   - [ ] Architect external-behavior assumption sweep (#61, #49)
   - [ ] git-manager Bitbucket via API token, MCP removed (#54, #50)
@@ -36,7 +42,6 @@
 - codebase-memory `delete_project` returns "Permission denied" on Windows (server holds the SQLite file open; no force flag) — workflow reset can't clear the external index without restarting the MCP server. Investigate a force/close option or document a reset recipe. [scope] [blocked]
 - Glob does not follow the `~/.claude/templates` symlink (Read/ls do) — audit skills that use Glob to verify file/template availability across symlinks; they can wrongly trip "not found" on a correctly-installed system. [debt]
 - No sanctioned abstraction for destructive `git clean` — git-manager covers commit/branch/push/PR but not working-tree cleaning, which dry runs and resets need. Decide whether git-manager gains a `clean` workflow or a rule sanctions direct use. [scope]
-- Phase 2 orchestration-audit fixes — diagnose+triage output of the fan-out audit; see [docs/reference/orchestration-audit.md](docs/reference/orchestration-audit.md). **KEEP** (each → scoped follow-on): (A) **allowed-tools hygiene** — 8 skills declare `Skill{}`/`Agent{}` invocations their frontmatter `allowed-tools` omits (review-workflow, systematic-debugging, plan-management, executing-plans, docs-refresh); FIRST confirm whether `allowed-tools` is enforced for skills-in-main-context (may be advisory). (C) **plan-doc commit contradiction** — `rules/planning.md` says `plans/` is gitignored/not-committed, but brainstorming Step 12 + writing-plans instruct committing design/plan docs (cf. `feedback_plan_commit_steps`). (D) **ADR-dir drift** — architecture-decision-records skill teaches `docs/adr/` vs `rules/doc-tools.md` `docs/explanation/adr/` (hierarchy-resolved; upstream text stale). (E) **casing** — 6 skills use `skill.md` vs 34 `SKILL.md`; standardize → `SKILL.md` (repairs latent case-sensitive-CI dead refs). (G) **gate-map labeling** — mark caller-delegation edges (doc-author→git-manager, test-builder→git-manager; explicit non-invocations) distinctly in orchestration-gating.md. **FOLD:** (B) plan-gate missing the cited `§ Sub-Plan Mode`/adherence-audit section → Orchestrator Routing v2 Tier 3 (below); (meta) 56-edge hard/soft conflation + hardenable-given-hooks-fire-for-subagents → regulation-layer build (`docs/explanation/orchestration-regulation-layer.md` §9). [scope] [debt]
 
 ## History
 
