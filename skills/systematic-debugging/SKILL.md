@@ -1,7 +1,7 @@
 ---
 name: systematic-debugging
 description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes — requires reproducing the issue, isolating root cause, and validating the fix rather than guessing.
-allowed-tools: Read, Bash, Grep, Glob, WebSearch, WebFetch
+allowed-tools: Read, Bash, Grep, Glob, WebSearch, WebFetch, Skill
 ---
 
 # Systematic Debugging

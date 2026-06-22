@@ -7,7 +7,7 @@ description: >
   not reviewing code changes — for code review, use requesting-code-review. Run periodically
   or after several friction issues accumulate.
 argument-hint: "(no arguments needed — reads open workflow-friction GitHub issues)"
-allowed-tools: Read, Write, Edit, Glob, Agent
+allowed-tools: Read, Write, Edit, Glob, Agent, Skill
 ---
 
 # review-workflow
