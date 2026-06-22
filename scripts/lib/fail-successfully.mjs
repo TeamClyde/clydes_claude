@@ -29,6 +29,8 @@ export function withWatchdog(workFn, ms) {
 /**
  * Drive one work unit through the lifecycle FSM:
  *   PENDING → RUNNING → VALIDATING → { SUCCEEDED | RETRYING(repair) | TIMED_OUT | FAILED } → ABANDONED
+ * A memo-hit (spec.store + spec.stepId present and cached) short-circuits to MEMOIZED → SUCCEEDED
+ * without running work.
  * Validation failure is a CONTROL SIGNAL: the reason is fed back as repair
  * context and the work retried, reaching ABANDONED only after the retry budget.
  * runUnit ALWAYS resolves to a terminal state — it never rejects and never hangs
@@ -42,7 +44,9 @@ export function withWatchdog(workFn, ms) {
  * @param {number} spec.timeoutMs
  * @param {number} [spec.maxRetries=1] crash/timeout retry budget
  * @param {number} [spec.maxValidationRetries=maxRetries] separate validation-repair retry budget
- * @returns {Promise<{state:'SUCCEEDED', value:any, history:string[]} | {state:'ABANDONED', history:string[]}>}
+ * @param {{has(k):boolean, get(k):any, set(k,v):void}} [spec.store] opt-in step-result cache (e.g. a Map); intra-run only
+ * @param {*} [spec.stepId] consumer-owned cache key — stable across resume, unique per distinct invocation, NEVER shared across quorum/best-of-N members. Memoization is OFF unless BOTH store and stepId are present.
+ * @returns {Promise<{state:'SUCCEEDED', value:any, history:string[], memoized?:true} | {state:'ABANDONED', history:string[]}>}
  */
 export async function runUnit(spec) {
   const {
@@ -78,7 +82,7 @@ export async function runUnit(spec) {
     const verdict = await validate(res.value); // may be sync or async
     if (verdict.ok) {
       emit('SUCCEEDED', { attempt });
-      if (store && stepId != null) store.set(stepId, res.value);
+      if (store && stepId != null) store.set(stepId, res.value); // only SUCCEEDED writes — every terminal-fail path reaches ABANDONED below, never here
       return { state: 'SUCCEEDED', value: res.value, history };
     }
     if (validationRetriesLeft > 0) {

@@ -154,3 +154,11 @@ test('runUnit: an ABANDONED result is not cached', async () => {
   await runUnit({ work: async () => { throw new Error('x'); }, timeoutMs: 50, maxRetries: 0, store, stepId: 's1' });
   assert.equal(store.has('s1'), false);
 });
+
+test('runUnit: onEvent fires MEMOIZED with payload on a cache hit', async () => {
+  const store = new Map([['s1', 'cached']]);
+  const events = [];
+  const r = await runUnit({ work: async () => 'fresh', timeoutMs: 50, store, stepId: 's1', onEvent: (e) => events.push(e) });
+  assert.equal(r.memoized, true);
+  assert.deepEqual(events, [{ state: 'MEMOIZED', stepId: 's1', memoized: true }]);
+});
