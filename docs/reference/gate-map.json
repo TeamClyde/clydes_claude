@@ -99,6 +99,12 @@
     },
     {
       "type": "hook",
+      "name": "git-prohibitions",
+      "event": "preToolUse",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\preToolUse\\git-prohibitions.mjs"
+    },
+    {
+      "type": "hook",
       "name": "graph-tools-directive",
       "event": "sessionStart",
       "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\sessionStart\\graph-tools-directive.mjs"

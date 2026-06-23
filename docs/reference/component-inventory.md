@@ -18,6 +18,7 @@
 | agent | test-strategy | claude-sonnet-4-6 | Per-plan validation checkpoint. Invoked after architect review returns an APPROVED verdict, before E |
 | agent | tutorial-engineer | sonnet | Creates step-by-step tutorials and educational content from code. Transforms complex concepts into p |
 | hook | agent-model-pinning | preToolUse |  |
+| hook | git-prohibitions | preToolUse |  |
 | hook | graph-tools-directive | sessionStart |  |
 | hook | graph-tools-enforcement | preToolUse |  |
 | hook | graph-tools-self-heal | postToolUse |  |

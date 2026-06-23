@@ -168,7 +168,7 @@ A hard gate fires as follows:
 1. Claude's main session decides to call a tool (e.g., `Grep` with a code-symbol pattern).
 2. The harness fires `PreToolUse` before executing the tool call.
 3. The matching hook script (`graph-tools-enforcement.mjs`) reads the tool input from stdin, classifies the pattern, and determines whether graph tools are available (checks for `.claude-init/CODEBASE.md`).
-4. If blocking: the hook exits 0 and writes `{"permissionDecision": "deny", "permissionDecisionReason": "..."}` to stdout. The harness **does not execute the tool call** — the block is unconditional.
+4. If blocking: the hook exits 0 and writes `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"..."}}` to stdout. The harness **does not execute the tool call** — the block is unconditional.
 5. If passing: the hook exits 0 with no deny field. The tool call proceeds.
 
 Exit code non-zero from a hook signals a hook error (not an advisory block) — the harness surfaces this as a system error. Hook authors use exit 0 on all paths, including blocks; the block signal is the `permissionDecision: deny` field, not the exit code.
@@ -261,3 +261,36 @@ Backlinks to ADRs that govern this feature (status inline).
 **`CLAUDE_DISABLE_WORKFLOW_HOOKS=1`** — environment variable that disables all workflow hooks globally. Each hook checks this variable as its first action and exits 0 (pass-through) immediately if set. Emergency rollback mechanism.
 
 **Sub-plan mode** — the variant of `plan-gate` that runs for Form-A sub-plans. Invokes architect and adherence-audit; skips test-strategy, test-builder, Jira creation, and TODO registration. The `mode: minimal` variant runs architect only.
+
+---
+
+## Hook-Hardening Status
+
+This section records which git-compliance checks have been hardened into code, which are deferred candidates, and which are explicitly not hardenable. Source for the candidate/hardenable classification: `docs/reference/orchestration-audit.md`.
+
+**Threat model:** These hooks are a compliance safety-net against the assistant's own drift (honest-mistake interception), NOT a security boundary. Command-string interception is trivially evadable and deliberate evasion is explicitly out of the threat model.
+
+### Hardened now
+
+| Hook | File | Prohibitions |
+|---|---|---|
+| `git-prohibitions` | `.claude/hooks/preToolUse/git-prohibitions.mjs` | Stage-all (`git add -A` / `git add --all` / `git add .`) and hook-skip (`--no-verify` as a standalone flag in any git command). Registered under the `"Bash"` matcher in `.claude/settings.json`. |
+
+Bypass options (in order of preference):
+1. Prefix the command with `[git-allowed]` for a single deliberate override.
+2. Set `CLAUDE_DISABLE_WORKFLOW_HOOKS=1` for a full emergency rollback (disables all hooks).
+
+### Future candidates — gated by matured × high-stakes × tool-observable
+
+The following edges meet the criterion but are deferred:
+
+| Candidate | Mechanism | Deferral reason |
+|---|---|---|
+| `mcp-governance` — no direct Jira MCP / no direct git-MCP calls | `PreToolUse` hook on `mcp__*` tools | Jira is disabled in this repo (`project.json` `jira.enabled: false`), so present enforcement value is low. Revisit when Jira is re-enabled. |
+
+### Explicitly NOT hardenable — not tool-observable
+
+The following controls are **soft by design**, not as a gap. There is no tool-call signature to intercept, so hardening is not possible regardless of maturity or stakes:
+
+- **Architect-before-Done** — the obligation to invoke the `architect` agent before a task transitions to Done is a planning-sequencing rule the LLM follows. No single tool call marks a "transition to Done" that a `PreToolUse` hook could intercept.
+- **test-FAILURE → systematic-debugging** — the requirement to invoke `systematic-debugging` before any fix attempt when a test runner returns FAILURE is a behavioral constraint on the LLM's response to tool output. `PostToolUse` could observe test output, but reliably classifying "this output is a test failure that warrants systematic-debugging" requires cognition the deterministic hook layer cannot provide.
