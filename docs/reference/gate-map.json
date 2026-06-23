@@ -492,6 +492,10 @@
   ],
   "edges": [
     {
+      "from": "adherence-audit",
+      "to": "dispatching-parallel-agents"
+    },
+    {
       "from": "ai-tool-security-reviewer",
       "to": "vet-security"
     },

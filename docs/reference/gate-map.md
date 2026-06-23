@@ -4,6 +4,7 @@
 
 ```mermaid
 flowchart LR
+  adherence_audit --> dispatching_parallel_agents
   ai_tool_security_reviewer --> vet_security
   architect --> researcher
   brainstorming --> researcher
@@ -155,6 +156,7 @@ flowchart LR
 
 | From | To |
 |------|----|
+| adherence-audit | dispatching-parallel-agents |
 | ai-tool-security-reviewer | vet-security |
 | architect | researcher |
 | brainstorming | researcher |
