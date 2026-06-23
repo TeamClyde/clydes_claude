@@ -1,7 +1,7 @@
 // Deterministic fault-injection INVARIANT harness for the fail-successfully engine.
 // Proves the FSM upholds its deterministic invariants under injected faults.
 // NO real LLM — measures fault-handling / coverage, NOT real-LLM semantic reliability.
-// See wave-2-engine-harness-design.md §B (the adversarial-research reframe).
+// See docs/explanation/orchestration-regulation-layer.md (§9 — the regulation-layer build spec).
 
 const faulted = (trialIndex, unitIndex, period) => (trialIndex + unitIndex) % period === 0;
 

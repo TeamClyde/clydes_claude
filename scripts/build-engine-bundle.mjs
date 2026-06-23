@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const LIB = new URL('./lib/', import.meta.url);
-const TARGETS = ['./phase-2-audit.workflow.mjs', './librarian.workflow.mjs'];
+const TARGETS = ['./orchestration-audit.workflow.mjs', './librarian.workflow.mjs'];
 const START = '// <ENGINE-BUNDLE:start>';
 const END = '// <ENGINE-BUNDLE:end>';
 

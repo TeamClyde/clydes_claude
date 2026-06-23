@@ -1,4 +1,4 @@
-// scripts/phase-2-audit.workflow.mjs — Claude Code Workflow-tool script (SANDBOX-ONLY).
+// scripts/orchestration-audit.workflow.mjs — Claude Code Workflow-tool script (SANDBOX-ONLY).
 //
 // This file runs ONLY inside the Workflow tool sandbox, where agent() / parallel() /
 // pipeline() / log() / phase() / args are injected globals and setTimeout is available.
@@ -22,7 +22,7 @@ export const meta = {
 // first building block). Pure: no LLM, no network, no filesystem — parameterized
 // by an async `work` function so it is deterministically testable.
 // See docs/explanation/orchestration-regulation-layer.md §5 (per-unit FSM) and §6.3
-// (validation-as-feedback). Used inlined by scripts/phase-2-audit.workflow.mjs.
+// (validation-as-feedback). Used inlined by scripts/orchestration-audit.workflow.mjs and scripts/librarian.workflow.mjs.
 
 /**
  * Race an async work function against a deadline.
@@ -140,7 +140,7 @@ async function quorumBarrier(units, threshold) {
 // The fan-out front-door. Node module (imports fail-successfully.mjs); Workflow scripts consume it via the INLINED engine bundle (scripts/build-engine-bundle.mjs) — the sandbox has no module system.
 // Wraps the fail-successfully engine; enforces DispatchPolicy (maxInFlight batching +
 // post-hoc reactive token gate). NON-PREEMPTIVE: gates new spawns; in-flight units finish.
-// See wave-2-engine-harness-design.md §C.
+// See docs/explanation/orchestration-regulation-layer.md (§9 — the regulation-layer build spec).
 
 const DEFAULT_POLICY = {
   maxInFlight: 8,                 // keep ≤ runtime cap min(16, cores−2) so nothing queues

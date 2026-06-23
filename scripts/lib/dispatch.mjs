@@ -1,7 +1,7 @@
 // The fan-out front-door. Node module (imports fail-successfully.mjs); Workflow scripts consume it via the INLINED engine bundle (scripts/build-engine-bundle.mjs) — the sandbox has no module system.
 // Wraps the fail-successfully engine; enforces DispatchPolicy (maxInFlight batching +
 // post-hoc reactive token gate). NON-PREEMPTIVE: gates new spawns; in-flight units finish.
-// See wave-2-engine-harness-design.md §C.
+// See docs/explanation/orchestration-regulation-layer.md (§9 — the regulation-layer build spec).
 import { runUnit, quorumBarrier } from './fail-successfully.mjs';
 
 export const DEFAULT_POLICY = {

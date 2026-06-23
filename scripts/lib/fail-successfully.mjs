@@ -2,7 +2,7 @@
 // first building block). Pure: no LLM, no network, no filesystem — parameterized
 // by an async `work` function so it is deterministically testable.
 // See docs/explanation/orchestration-regulation-layer.md §5 (per-unit FSM) and §6.3
-// (validation-as-feedback). Used inlined by scripts/phase-2-audit.workflow.mjs.
+// (validation-as-feedback). Used inlined by scripts/orchestration-audit.workflow.mjs and scripts/librarian.workflow.mjs.
 
 /**
  * Race an async work function against a deadline.
