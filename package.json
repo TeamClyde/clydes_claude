@@ -7,6 +7,8 @@
     "test": "node --test scripts/ .claude/hooks/",
     "harness": "node scripts/run-harness.mjs",
     "harvest": "node scripts/harvest-components.mjs --emit",
-    "harvest:check": "node scripts/harvest-components.mjs --emit && git diff --exit-code docs/reference/"
+    "harvest:check": "node scripts/harvest-components.mjs --emit && git diff --exit-code docs/reference/",
+    "build:engine": "node scripts/build-engine-bundle.mjs --emit",
+    "engine:check": "node scripts/build-engine-bundle.mjs --emit && git diff --exit-code scripts/phase-2-audit.workflow.mjs scripts/librarian.workflow.mjs"
   }
 }
