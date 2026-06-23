@@ -59,6 +59,7 @@
 | skill | git-manager |  | Use when committing files, creating a branch, pushing to remote, syncing with main, opening a pull r |
 | skill | handoff |  | Use when you are mid-work and want to start a fresh, clean session that continues the current work — |
 | skill | infra-init |  | Use when starting a new repo session, before exploring an unfamiliar codebase, or when code structur |
+| skill | librarian |  | Use when the user wants a thorough, multi-aspect analysis or research synthesis of a brief or a sour |
 | skill | openapi-spec-generation |  | Generate and maintain OpenAPI 3.1 specifications from code, design-first specs, and validation patte |
 | skill | plan-gate |  | Triggers on writing-plans completion. Gates the plan through architect review, test-strategy, test-b |
 | skill | plan-management |  | Use when Jira tickets are created or change status (in_progress, done), when adding items to the bac |

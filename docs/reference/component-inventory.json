@@ -358,6 +358,12 @@
   },
   {
     "type": "skill",
+    "name": "librarian",
+    "description": "Use when the user wants a thorough, multi-aspect analysis or research synthesis of a brief or a source document — a prose description, a local file, or a .docx — produced by a regulated parallel fan-out (not a single pass). Triggers on requests for multi-aspect research, structured source document analysis, regulated fan-out synthesis, or parallel analysis across multiple lenses. Does NOT trigger on quick single-pass summaries or when a single agent pass is sufficient.",
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\librarian\\SKILL.md"
+  },
+  {
+    "type": "skill",
     "name": "openapi-spec-generation",
     "description": "Generate and maintain OpenAPI 3.1 specifications from code, design-first specs, and validation patterns. Use when creating API documentation, generating SDKs, or ensuring API contract compliance.",
     "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\openapi-spec-generation\\SKILL.md"

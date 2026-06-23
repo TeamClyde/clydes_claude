@@ -44,6 +44,7 @@ flowchart LR
   install_vetting --> vet_security
   integration_test_constraints --> systematic_debugging
   jira_workflow_manager --> researcher
+  librarian --> dispatching_parallel_agents
   mcp_governance --> git_manager
   mcp_governance --> jira_workflow_manager
   new_repo_setup --> architect
@@ -192,6 +193,7 @@ flowchart LR
 | install-vetting | vet-security |
 | integration-test-constraints | systematic-debugging |
 | jira-workflow-manager | researcher |
+| librarian | dispatching-parallel-agents |
 | mcp-governance | git-manager |
 | mcp-governance | jira-workflow-manager |
 | new-repo-setup | architect |
