@@ -16,7 +16,7 @@ All agents and skills are global — they live in `~/.claude/` and are available
 
 | Agent | Role |
 |-------|------|
-| `architect` | Plan reviewer — returns BLOCKING / MINOR / APPROVED before ExitPlanMode |
+| `architect` | Plan reviewer — returns `error` / `warning` findings + an `APPROVED` / `NEEDS REVISION` verdict before ExitPlanMode |
 | `jira-workflow-manager` | All Jira operations: ticket creation, status transitions, updates |
 | `researcher` | Codebase and infrastructure lookups — keeps search out of main context window |
 | `test-strategy` | Derives per-plan validation criteria before implementation begins |

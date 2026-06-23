@@ -68,7 +68,7 @@ Step 1 dispatches a **6-criterion architect panel** (Shape A — Dimensional-rev
 
 **Synthesis:** after the batched verify, produce the SINGLE `APPROVED` / `NEEDS REVISION` verdict for this round.
 
-**Hard-gate:** on BLOCKING findings, fix or surface, then re-dispatch the full panel. 3-round cap — after round 3 with BLOCKING remaining, surface to user and stop. MINOR / LOOKS-GOOD findings are informational only; plan-gate proceeds.
+**Hard-gate:** on `error` findings, fix or surface, then re-dispatch the full panel. 3-round cap — after round 3 with `error` findings remaining, surface to user and stop. `warning` / `Strengths` findings are informational only; plan-gate proceeds.
 
 **On APPROVED** → proceed to Step 2.
 
@@ -152,7 +152,7 @@ Fill in the actual round number from Step 1. If architect review was skipped (`w
 
 **Placement rationale:** This call fires after Step 5 (TODO.md registration) so it represents the true end of plan-gate's work. The gate checkboxes and journal entry are only written once everything else has succeeded.
 
-**Failure mode — mid-gate failure:** If plan-gate fails before reaching Step 6 (e.g., architect BLOCKING persists after 3 rounds), the `:divergence` call is not invoked. The plan doc gate-checkbox section and journal remain in their pre-gate state. Resuming or re-running plan-gate from the beginning is fully idempotent — when it eventually succeeds it fires `:divergence` once with the final stage outcomes.
+**Failure mode — mid-gate failure:** If plan-gate fails before reaching Step 6 (e.g., architect `error` findings persist after 3 rounds), the `:divergence` call is not invoked. The plan doc gate-checkbox section and journal remain in their pre-gate state. Resuming or re-running plan-gate from the beginning is fully idempotent — when it eventually succeeds it fires `:divergence` once with the final stage outcomes.
 
 **Idempotency — re-running plan-gate after success:** The `:divergence` mode performs three independent idempotency checks before writing: (1) journal — skips append if a dated entry with matching summary already exists; (2) plan section — skips edit if the section already reflects the new state; (3) handoff — skips refresh if `Last Updated` is already today and the divergence is already reflected. Re-running plan-gate on an already-gated plan is therefore safe: all three writes are no-ops.
 
@@ -168,8 +168,8 @@ When plan-gate is invoked on a **Form-A sub-plan**, a reduced gate runs: the par
 
 | Step | Standard mode | Sub-plan mode |
 |------|---------------|---------------|
-| 1 — Architect | run | **run** — hard-gate on BLOCKING, 3-round cap (identical to standard) |
-| Adherence soft-gate | — | **run** — after architect APPROVED, dispatch `Skill { skill: "adherence-audit", args: "plan-doc: plans/<parent>/<child>/<child>-plan.md" }`. Its Phase 9 surfaces drift the sub-plan would introduce. `[Plan-Introduced]` BLOCKING is surfaced and resolved before execution; WARNING/INFO are informational. **Soft-gate — never deadlocks the gate.** |
+| 1 — Architect | run | **run** — hard-gate on `error` findings, 3-round cap (identical to standard) |
+| Adherence soft-gate | — | **run** — after architect APPROVED, dispatch `Skill { skill: "adherence-audit", args: "plan-doc: plans/<parent>/<child>/<child>-plan.md" }`. Its Phase 9 surfaces drift the sub-plan would introduce. `[Plan-Introduced]` `error` findings are surfaced and resolved before execution; `warning`/`note` are informational. **Soft-gate — never deadlocks the gate.** |
 | 2 — Test strategy | run | **skip** — the parent plan owns the `## Testing Plan` |
 | 3 — Test builder | run | **skip** |
 | 4 — Jira | run | **skip** — the parent Epic owns tickets |
@@ -224,7 +224,7 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 
 1. This skill fires automatically after `writing-plans` — do not invoke it manually in Case A.
 2. If architect returns NEEDS REVISION, update the plan doc and re-invoke architect — do not proceed to test-strategy until APPROVED.
-3. Maximum 3 architect iterations — surface remaining BLOCKING issues to the user after the third pass.
+3. Maximum 3 architect iterations — surface remaining `error`-severity issues to the user after the third pass.
 4. `jira.enabled: false` and `workflow.tdd: false` are silent skips — no user-facing warning or confirmation prompt.
 5. On the Jira-disabled path, omit `jira-key` from the `plan-management:created` call entirely — do not pass an empty string.
 6. Step 6 (`:divergence` call) fires exactly once at the end of the successful path — never per-stage. Mid-gate failures leave the plan doc in its pre-gate state; re-running plan-gate is idempotent.

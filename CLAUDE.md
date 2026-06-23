@@ -78,7 +78,7 @@ Invoke `architect` before:
 
 **Form A sub-plans require architect review identically to top-level plans.** When `writing-plans` runs for a sub-plan, plan-gate enters sub-plan mode and still runs architect (+ adherence-audit by default; architect-only with `mode: minimal`). See `skills/plan-gate/SKILL.md` § Sub-Plan Mode.
 
-Skip for S-sized mechanical tasks (renaming, config-only, single-line fixes). Maximum 3 review iterations — surface BLOCKING issues to user after the third pass.
+Skip for S-sized mechanical tasks (renaming, config-only, single-line fixes). Maximum 3 review iterations — surface remaining `error`-severity issues to user after the third pass.
 
 ## Hard Prohibitions
 
