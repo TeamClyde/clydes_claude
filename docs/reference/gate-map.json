@@ -852,6 +852,10 @@
       "to": "vet-reputation"
     },
     {
+      "from": "requesting-code-review",
+      "to": "dispatching-parallel-agents"
+    },
+    {
       "from": "review-workflow",
       "to": "creating-tools"
     },

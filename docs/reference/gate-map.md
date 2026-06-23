@@ -94,6 +94,7 @@ flowchart LR
   project_setup --> infra_init
   project_setup --> vet_install
   project_setup --> vet_reputation
+  requesting_code_review --> dispatching_parallel_agents
   review_workflow --> creating_tools
   review_workflow --> different_viewpoint
   review_workflow --> git_manager
@@ -243,6 +244,7 @@ flowchart LR
 | project-setup | infra-init |
 | project-setup | vet-install |
 | project-setup | vet-reputation |
+| requesting-code-review | dispatching-parallel-agents |
 | review-workflow | creating-tools |
 | review-workflow | different-viewpoint |
 | review-workflow | git-manager |
