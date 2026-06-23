@@ -106,24 +106,24 @@ Full lens-agent prompt templates and per-dimension `TASK:` blocks are in
 `skills/adherence-audit/references/lens-prompts.md`. Use the template there; substitute the
 appropriate `TASK:` block for each of the 7 dimensions listed below.
 
-**Severity mapping for lens agents:**
-- `BLOCKING` — actionable failures: broken references, invocation type mismatches, blocking
+**Severity mapping for lens agents** (canonical vocabulary — see `docs/explanation/features/orchestration-gating.md` §"Severity, Verdict & Enforcement — the one taxonomy"):
+- `error` — actionable failures: broken references, invocation type mismatches, blocking
   convention conflicts, blocking plan-introduced drift
-- `WARNING` — drift signals: priority conflicts, ambiguous convention disagreements, latent risk
-- `INFO` — informational: orphans with plausible user-invocation, minor trigger wording
+- `warning` — drift signals: priority conflicts, ambiguous convention disagreements, latent risk
+- `note` — informational: orphans with plausible user-invocation, minor trigger wording
   gaps, workflow-map staleness
 
 **The 7 lens dimensions (dispatch all in one parallel block):**
 
 | # | Dimension | Severity on hit |
 |---|-----------|-----------------|
-| 1 | **Dead References** — missing names in invokes[], stale file paths | BLOCKING |
-| 2 | **Invocation Mismatches** — wrong tool type, casing/hyphen mismatch | BLOCKING |
-| 3 | **Convention Conflicts** — path, status value, naming pattern disagreements | BLOCKING (rule vs skill) / WARNING |
-| 4 | **Priority Conflicts** — rule overrides skill silently | WARNING / BLOCKING |
-| 5 | **Orphaned Components** — unreferenced, no clear standalone purpose | INFO |
-| 6 | **Trigger Gaps** — auto-trigger description mismatches | WARNING / BLOCKING |
-| 7 | **Workflow Gaps** — CLAUDE.md steps with no handler; stale workflow-map entries | BLOCKING / WARNING / INFO |
+| 1 | **Dead References** — missing names in invokes[], stale file paths | error |
+| 2 | **Invocation Mismatches** — wrong tool type, casing/hyphen mismatch | error |
+| 3 | **Convention Conflicts** — path, status value, naming pattern disagreements | error (rule vs skill) / warning |
+| 4 | **Priority Conflicts** — rule overrides skill silently | warning / error |
+| 5 | **Orphaned Components** — unreferenced, no clear standalone purpose | note |
+| 6 | **Trigger Gaps** — auto-trigger description mismatches | warning / error |
+| 7 | **Workflow Gaps** — CLAUDE.md steps with no handler; stale workflow-map entries | error / warning / note |
 
 See `references/lens-prompts.md` for the full `TASK:` instruction text for each dimension.
 
@@ -145,10 +145,10 @@ Complete within 90 seconds or return deduplicated findings collected so far.
 Below are raw findings from 7 semantic-consistency lens agents. Your tasks:
 1. Deduplicate: merge findings that describe the same issue (same source file + same root cause).
    Keep the most specific description. Note how many lenses flagged it.
-2. Re-rank within each severity tier (BLOCKING / WARNING / INFO) by impact.
+2. Re-rank within each severity tier (error / warning / note) by impact.
 3. Preserve severity — do not promote or demote between tiers.
 4. Return the deduplicated, ranked list in the same format:
-   SEVERITY: BLOCKING|WARNING|INFO
+   SEVERITY: error|warning|note
    FINDING: <source file> — <description>
    IMPACT: <one sentence>
    FLAGGED_BY: <lens numbers, e.g. "Lens 1, Lens 3">
@@ -169,7 +169,7 @@ Using the verified (or raw) findings, emit the final report:
 ```
 ## Adherence Audit Report
 
-### BLOCKING (actionable failures)
+### error (actionable failures)
 
 **[Dead Reference]** rules/workflow-phases.md
 Line 32: invokes `todo-manager` — no agent with this name exists in agents/
@@ -177,7 +177,7 @@ Impact: callers following this rule will fail to update TODO.md
 
 ---
 
-### WARNING (drift signals / latent risk)
+### warning (drift signals / latent risk)
 
 **[Convention Conflict]** plan doc location
 rules/planning.md says: `plans/<slug>/<slug>-plan.md`
@@ -186,7 +186,7 @@ Rule wins by priority — skill is silently wrong.
 
 ---
 
-### INFO (aspirational / informational)
+### note (aspirational / informational)
 
 **[Orphaned Component]** skills/some-skill/SKILL.md
 No other component invokes this skill and description doesn't explain standalone use.
@@ -194,7 +194,7 @@ No other component invokes this skill and description doesn't explain standalone
 ---
 
 ### SUMMARY
-X findings: Y blocking, Z warnings, W info
+X findings: Y errors, Z warnings, W notes
 Lenses: 7 dispatched, N completed, M abandoned
 Verify: COMPLETED | PARTIAL | ABANDONED (unverified)
 ```
@@ -217,33 +217,33 @@ inventory. This phase runs in the main context (no additional agents needed — 
 already loaded).
 
 **For each component the plan proposes to CREATE:**
-- Does the proposed name conflict with an existing component name? → **BLOCKING**
+- Does the proposed name conflict with an existing component name? → **error**
 - Does the proposed invocation pattern (tool, method, frontmatter name) match what the workflow
-  expects? → mismatch is **WARNING**
+  expects? → mismatch is **warning**
 - Does the proposed component introduce a new convention (file path, status value, naming
-  pattern) that conflicts with existing conventions? → **BLOCKING** (convention conflict) or
-  **WARNING** (ambiguous)
+  pattern) that conflicts with existing conventions? → **error** (convention conflict) or
+  **warning** (ambiguous)
 - Is the proposed component never referenced by any existing component and has no auto-trigger
-  description? → **INFO** (potential orphan)
+  description? → **note** (potential orphan)
 
 **For each component the plan proposes to MODIFY:**
 - Would the modification break existing callers that depend on the current interface? (e.g.,
-  changing a frontmatter `name:`, removing a parameter, changing output format) → **BLOCKING**
+  changing a frontmatter `name:`, removing a parameter, changing output format) → **error**
 - Would the modification introduce a convention that disagrees with existing convention
-  statements in other files? → **WARNING**
+  statements in other files? → **warning**
 - Would the modification cause a priority conflict (rule vs. skill disagree on same action)?
-  → **WARNING**
+  → **warning**
 
 **For names and paths referenced in the plan:**
 - Do all referenced skill/agent names exist in the current inventory? Missing names are
-  **BLOCKING** (dead reference the plan would introduce)
-- Do all referenced file paths follow existing conventions? Deviations are **WARNING**
+  **error** (dead reference the plan would introduce)
+- Do all referenced file paths follow existing conventions? Deviations are **warning**
 
-Report findings under the same tier headings (BLOCKING / WARNING / INFO), prefixed with
+Report findings under the same tier headings (error / warning / note), prefixed with
 `[Plan-Introduced]` to distinguish from findings about existing components.
 
 If the plan does not propose creating or modifying any workflow components (skills, agents,
-rules, hooks), or if all proposed changes are purely conventional, output one INFO
+rules, hooks), or if all proposed changes are purely conventional, output one note
 entry: "No plan-introduced drift detected."
 
 ---
@@ -268,4 +268,4 @@ entry: "No plan-introduced drift detected."
    cannot read files themselves without Read in their allowed-tools. Serialize compactly (JSON
    or condensed markdown) to stay within each agent's context budget.
 9. If fewer than 4 lenses complete (degraded), note it prominently at the top of the report
-   before BLOCKING — the audit coverage is incomplete.
+   before error — the audit coverage is incomplete.
