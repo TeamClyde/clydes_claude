@@ -44,15 +44,11 @@ Apply these overrides:
 
 **If `workflow.architect-review: false`:** skip this step and proceed directly to Step 2.
 
-Dispatch the architect agent (`subagent_type: architect`) with the plan doc path.
+Step 1 dispatches a **6-criterion architect panel** (Shape A — Dimensional-review panel, per `dispatching-parallel-agents` §"Dispatching in prose") — one `subagent_type: architect` agent per criterion, all in parallel. See `references/architect-panel.md` for the full dispatch detail: example Agent block, per-criterion enumeration, the 5 dispatch rules, and the batched-verify step.
 
-**Hard-gate behavior (architect BLOCKING):** fix or surface, re-invoke architect, max 3 rounds.
+**Synthesis:** after the batched verify, produce the SINGLE `APPROVED` / `NEEDS REVISION` verdict for this round.
 
-**MINOR / WARNING / INFO:** informational only — plan-gate proceeds.
-
-#### Iteration
-
-Re-dispatch on each architect-BLOCKING revision. 3-round cap. After round 3 with BLOCKING remaining, surface to user and stop.
+**Hard-gate:** on BLOCKING findings, fix or surface, then re-dispatch the full panel. 3-round cap — after round 3 with BLOCKING remaining, surface to user and stop. MINOR / LOOKS-GOOD findings are informational only; plan-gate proceeds.
 
 **On APPROVED** → proceed to Step 2.
 
@@ -183,7 +179,7 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 - `writing-plans` — automatically at end of skill
 
 **Calls:**
-- `architect` agent (subagent_type: architect) — Step 1 (skipped if architect-review: false)
+- `architect` agent (subagent_type: architect) — Step 1: 6-criterion parallel dimension panel + 1 batched verify (skipped if architect-review: false)
 - `adherence-audit` skill — Sub-Plan Mode soft-gate, sub-plan invocations only (see § Sub-Plan Mode); not in the standard top-level sequence
 - `test-strategy` agent (subagent_type: test-strategy) — Step 2
 - `test-builder` agent (subagent_type: test-builder) — Step 3 (skipped if tdd: false)

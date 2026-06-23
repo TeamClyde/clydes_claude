@@ -69,6 +69,7 @@ flowchart LR
   plan_docs --> writing_plans
   plan_gate --> adherence_audit
   plan_gate --> architect
+  plan_gate --> dispatching_parallel_agents
   plan_gate --> executing_plans
   plan_gate --> jira_workflow_manager
   plan_gate --> plan_management
@@ -84,6 +85,7 @@ flowchart LR
   plan_management --> systematic_debugging
   plan_management --> writing_plans
   planning --> architect
+  planning --> dispatching_parallel_agents
   planning --> integration_engineer
   planning --> plan_management
   planning --> researcher
@@ -221,6 +223,7 @@ flowchart LR
 | plan-docs | writing-plans |
 | plan-gate | adherence-audit |
 | plan-gate | architect |
+| plan-gate | dispatching-parallel-agents |
 | plan-gate | executing-plans |
 | plan-gate | jira-workflow-manager |
 | plan-gate | plan-management |
@@ -236,6 +239,7 @@ flowchart LR
 | plan-management | systematic-debugging |
 | plan-management | writing-plans |
 | planning | architect |
+| planning | dispatching-parallel-agents |
 | planning | integration-engineer |
 | planning | plan-management |
 | planning | researcher |

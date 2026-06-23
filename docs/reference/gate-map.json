@@ -753,6 +753,10 @@
     },
     {
       "from": "plan-gate",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "plan-gate",
       "to": "executing-plans"
     },
     {
@@ -810,6 +814,10 @@
     {
       "from": "planning",
       "to": "architect"
+    },
+    {
+      "from": "planning",
+      "to": "dispatching-parallel-agents"
     },
     {
       "from": "planning",

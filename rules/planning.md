@@ -113,26 +113,43 @@ During execution, divergences (architecture changes, scope shifts, discovered bu
 
 ## Architect Gate
 
-Invoke the `architect` agent in `plan` mode before ExitPlanMode. The gate sequence is:
+Invoke the architect **per-criterion dimension panel** in `plan` mode before ExitPlanMode (Shape A — Dimensional-review panel, per `dispatching-parallel-agents` §"Dispatching in prose"). The gate sequence is:
 
 ```
-draft plan → architect → test-strategy → ExitPlanMode
+draft plan → architect panel → test-strategy → ExitPlanMode
 ```
 
 Architect runs first — it reviews the plan for design soundness and self-containment. Test-strategy runs after architect approval — it appends the Testing section.
 
+Dispatch one `subagent_type: architect` agent **per criterion**, all in parallel. The 6 criteria come from `agents/architect.md`: (1) design soundness, (2) logic completeness, (3) contradictions, (4) foreseeable issues, (5) self-containment, (6) stack-hat adherence. Each agent receives the plan doc path and an `instructions` field narrowing its dispatch to its single criterion. Model-pin each agent to Sonnet.
+
+**Five dispatch rules (Shape A):**
+1. Model-pin each agent to Sonnet (`model: "claude-sonnet-4-6"`) — architect is a judgment role; do not use Haiku or Opus.
+2. Cap concurrency at ≤ min(16, cores−2) — 6 agents is well within bounds.
+3. Per-agent watchdog: if a dimension agent exceeds its timeout, abandon it and record its criterion as unreviewed (surface to user; do not silently drop).
+4. ONE batched adversarial verify over the collected BLOCKING findings — not per-finding voting.
+5. Cite this front-door: dispatching-parallel-agents §"Dispatching in prose" Shape A.
+
+**Example dispatch (repeat for each of the 6 criteria):**
 ```
-Agent { subagent_type: "architect", prompt: "plan\n\nPlan doc: plans/<slug>/<slug>-plan.md" }
+Agent {
+  subagent_type: "architect",
+  model: "claude-sonnet-4-6",
+  prompt: "plan\n\nPlan doc: plans/<slug>/<slug>-plan.md",
+  instructions: "Review criterion 1 only: design soundness — do the design decisions make sense given the stated goal? Is the approach coherent? Narrow your BLOCKING/MINOR/LOOKS-GOOD findings to this criterion."
+}
 ```
+
+After all 6 agents return: collect every BLOCKING finding into a single list and run **one batched adversarial verify** (one additional `subagent_type: architect` call) asking it to confirm whether each BLOCKING item is a genuine blocking concern or a false positive. Merge the verify result into the finding set. Synthesize the full finding set into the SINGLE `APPROVED` / `NEEDS REVISION` verdict for this round.
 
 **Iteration rules (max 3 rounds):**
 
 | BLOCKING item type | Handling |
 |---|---|
-| User-judgment question (not researchable) | Surface to the user verbatim. Do not resolve with assumptions. Update plan after user responds. Re-invoke architect. |
-| Design flaw resolvable from available context | Resolve from context. Update plan. Re-invoke architect. |
+| User-judgment question (not researchable) | Surface to the user verbatim. Do not resolve with assumptions. Update plan after user responds. Re-invoke the full panel. |
+| Design flaw resolvable from available context | Resolve from context. Update plan. Re-invoke the full panel. |
 
-Each re-invocation is a fresh pass — no memory of prior rounds. If BLOCKING issues remain after 3 rounds, surface them to the user; do not attempt a fourth round. ExitPlanMode only after APPROVED verdict.
+Each re-invocation dispatches the full 6-agent panel as a fresh pass — no memory of prior rounds. MINOR and LOOKS-GOOD findings are informational only. If BLOCKING issues remain after 3 rounds, surface them to the user; do not attempt a fourth round. ExitPlanMode only after APPROVED verdict.
 
 ---
 
