@@ -113,6 +113,66 @@ When `verifyDegraded: true`, treat `findings` as unverified before presenting.
 - **Token budget (inside a Workflow):** Pass `getRemainingBudget: () => budget.remaining()`. The gate is post-hoc reactive (runs between batches). Full mechanics in `references/dispatch-policy.md`.
 - **Non-preemption:** A watchdog abandons a timed-out unit but cannot kill its agent (GitHub anthropics/claude-code #61405). The agent runs to natural completion. Full note in `references/dispatch-policy.md`.
 
+## Dispatching in prose (main-context Agent tool)
+
+When you are in a prose skill or agent — not inside a Workflow script — you apply the same three shapes through the `Agent` tool directly. There are no JS helpers to call; the helpers are the *embodiment* of these recipes, inlined into Workflow scripts via the engine bundle (`scripts/build-engine-bundle.mjs`). Prose consumers follow the markdown recipe below; executable consumers inline the helpers.
+
+The five rules apply identically regardless of surface:
+
+| Rule | Prose translation |
+|---|---|
+| 1. Model-pin leaves | Pass `model: "claude-haiku-4-5-20251001"` (or Sonnet) in every `Agent` call. Never Opus. |
+| 2. Cap concurrency | Dispatch at most `min(16, cores−2)` agents in a single parallel block (≤ ~16–20). Batch the rest. |
+| 3. Per-agent timeout | State an explicit time bound in the agent prompt ("complete within 60 s or surface what you have"). Mark any non-responding agent ABANDONED and proceed. |
+| 4. One batched verify | After collecting all findings, run ONE verify/dedup agent. Never a verification loop per finding. |
+| 5. This section IS the citation target | Link here from consuming prose skills; link to [`references/dispatch-policy.md`](references/dispatch-policy.md) for schema depth. |
+
+---
+
+### Shape A — Dimensional-review panel
+
+Dispatch N lens-prompt agents in parallel (one per review dimension). After all return (or are abandoned), run ONE batched verify/dedup agent over all findings, then synthesize.
+
+```
+1. Identify N independent review lenses (security, performance, correctness, …).
+2. Dispatch all N via Agent tool in one parallel block, model-pinned to Haiku/Sonnet.
+3. Collect all results. Mark non-responding agents ABANDONED.
+4. If confirmed.length < quorum (default: ceil(N/2)), surface degraded state to caller.
+5. Run ONE verify agent: "Deduplicate and rank these findings: <all findings>."
+   If the verify agent hangs → surface findings as unverified (verifyDegraded).
+6. Synthesize and return.
+```
+
+---
+
+### Shape B — Parallel fan-out
+
+Dispatch N independent unit agents in parallel. Collect results. Apply quorum / health check.
+
+```
+1. Partition work into N independent units (no shared state).
+2. Dispatch all N via Agent tool, model-pinned, in batches of ≤ min(16, cores−2).
+3. Collect results. ABANDONED units do not count toward quorum.
+4. If confirmed.length < ceil(N/2), set degraded: true and surface to caller.
+5. Return confirmed results. Do not synthesize before quorum check.
+```
+
+---
+
+### Shape C — Sequential chain
+
+Each step feeds the next. Set a per-step expectation; abandon-and-surface on a hang.
+
+```
+1. Define ordered steps [S1, S2, …, Sn]; each step's prompt includes the prior step's output.
+2. Dispatch S1 via Agent tool, model-pinned.
+3. If S1 is ABANDONED (hung past your stated bound) → halt, surface partial results.
+4. Pass S1 output into S2 prompt. Repeat through Sn.
+5. Chain halts on the first ABANDONED step — do not skip ahead.
+```
+
+---
+
 ## P1 Routing Rule
 
 **All workflow fan-out routes through this skill's helpers as the canonical front-door.**
