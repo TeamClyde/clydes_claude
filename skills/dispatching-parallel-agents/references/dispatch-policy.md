@@ -15,10 +15,10 @@ Every helper (`parallelFanout`, `sequentialChain`, `dimensionalReview`) accepts 
 | `perUnitTimeoutMs` | **required** | No default — omitting throws `TypeError`. Watchdog fires ABANDONED on timeout → fast detect-and-abandon. |
 | `maxRetries` | `1` | Crash/timeout retries per unit. |
 | `maxValidationRetries` | `1` | Validation-repair retries. Split budget from `maxRetries` so validation oscillation can't drain the crash budget. |
-| `quorum` | `Math.ceil(units.length / 2)` | Minimum confirmed units to avoid `degraded: true`. Override for stricter or relaxed consensus. |
+| `quorum` | `undefined → Math.ceil(units.length / 2)` (computed at dispatch) | Minimum confirmed units to avoid `degraded: true`. Override for stricter or relaxed consensus. |
 | `modelTier` | `null` | Pin Haiku or Sonnet — **never Opus**. Threaded into the consumer's `agent({ model })`. |
 | `tokenBudget` | `null` | Max output tokens for this fan-out. `null` = no limit. |
-| `estimatedTokensPerUnit` | `0` | Coarse fallback projection only — output tokens are unknowable pre-call (`count_tokens` is input-only). If `0` AND no `getRemainingBudget`, the projection gate is inert. |
+| `estimatedTokensPerUnit` | `0` | Coarse fallback projection only — output tokens are unknowable pre-call (`count_tokens` is input-only). If `0`, the right-hand side of the token gate comparison is 0, so the gate is inert regardless of `getRemainingBudget`. |
 | `budgetReserve` | `0.9` | Stop at 90% of budget to bound non-preemptable in-flight overshoot. |
 | `getRemainingBudget` | `null` | `() => number` — live remaining tokens. **Inside a Workflow: `() => budget.remaining()`** |
 | `onOverloadBackoff` | `'exponential'` | Passthrough convention. The consumer's `work()` honors it on 529 / API-overload responses. The lib does not act on it directly. |
@@ -66,6 +66,8 @@ Every helper (`parallelFanout`, `sequentialChain`, `dimensionalReview`) accepts 
 
 **Cost decision — ONE batched verify, not 3-votes-per-finding:** `policy.verify` is called once over all findings. This is a deliberate cost choice: per-finding multi-vote verification burned ~290 agents / 6.4 M tokens in a prior session. Do not reintroduce per-finding verification.
 
+**Verify-step timeout:** The batched verify runs as a `runUnit` via `withDefaults`, so it inherits `perUnitTimeoutMs` — the same bound as an individual lens. A slow batched verify over many findings can be abandoned at that timeout → `verifyDegraded: true`, with unverified findings returned. Set `perUnitTimeoutMs` generously when passing many findings to `policy.verify`, or pre-trim findings before the verify step.
+
 ---
 
 ## Token-Budget Mechanics
@@ -83,7 +85,7 @@ const { confirmed } = await parallelFanout(units, {
 });
 ```
 
-`estimatedTokensPerUnit` is a coarse fallback projection because output tokens are unknowable before a call (`count_tokens` only counts input tokens). If `tokenBudget` is set but `estimatedTokensPerUnit` is `0` and `getRemainingBudget` is `null`, the projection gate is **inert** — no gating will occur.
+The gate fires only when BOTH a live `getRemainingBudget` (or a projection) gives `remaining`, AND `estimatedTokensPerUnit > 0` — it is the right-hand side of the comparison `remaining × budgetReserve < batch.length × estimatedTokensPerUnit`. Setting `getRemainingBudget` while leaving `estimatedTokensPerUnit` at its default `0` leaves the gate inert — no gating occurs.
 
 `budgetReserve` (default `0.9`) stops new batches at 90% of budget consumed, bounding overshoot from non-preemptable in-flight units.
 

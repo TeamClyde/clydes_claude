@@ -47,7 +47,7 @@
 | skill | creating-tools |  | Use when creating any workflow component — skill, agent, rule, hook, command, or plugin. Routes to t |
 | skill | different-viewpoint |  | Thinking tool — full CIA Phoenix Checklist sweep on a problem. Takes a problem statement and an opti |
 | skill | different-viewpoints-lite |  | Thinking tool — adversarial 5-question Phoenix Checklist challenge against a problem and optional hy |
-| skill | dispatching-parallel-agents |  | Use when facing 2+ independent tasks that can be worked on without shared state or sequential depend |
+| skill | dispatching-parallel-agents |  | Use when dispatching 2+ agent tasks as a regulated fan-out — parallel independent work, a sequential |
 | skill | doc-author |  | Use when authoring or updating a feature-doc (docs/explanation/features/<slug>.md) or docs/explanati |
 | skill | doc-backfill |  | Use when bringing an existing repo's code up to the hybrid Explanation layout (docs/explanation/arch |
 | skill | docs-refresh |  | Use when generating or refreshing doc content for a specific Diátaxis quadrant or artifact type — ro |
