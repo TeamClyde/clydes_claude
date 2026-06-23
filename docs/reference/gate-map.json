@@ -408,7 +408,7 @@
     {
       "type": "skill",
       "name": "subagent-driven-development",
-      "description": "Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with two-stage review (spec compliance, then code quality) after each task. For single-context step-by-step execution with checkpoints instead, use executing-plans.",
+      "description": "Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with a parallel two-lens review (spec compliance + code quality run simultaneously) after each task. For single-context step-by-step execution with checkpoints instead, use executing-plans.",
       "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\subagent-driven-development\\SKILL.md"
     },
     {
@@ -902,6 +902,10 @@
     {
       "from": "stack-hats",
       "to": "subagent-driven-development"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "dispatching-parallel-agents"
     },
     {
       "from": "subagent-driven-development",

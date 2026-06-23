@@ -107,6 +107,7 @@ flowchart LR
   stack_hats --> executing_plans
   stack_hats --> project_setup
   stack_hats --> subagent_driven_development
+  subagent_driven_development --> dispatching_parallel_agents
   subagent_driven_development --> jira_workflow_manager
   subagent_driven_development --> plan_management
   subagent_driven_development --> researcher
@@ -261,6 +262,7 @@ flowchart LR
 | stack-hats | executing-plans |
 | stack-hats | project-setup |
 | stack-hats | subagent-driven-development |
+| subagent-driven-development | dispatching-parallel-agents |
 | subagent-driven-development | jira-workflow-manager |
 | subagent-driven-development | plan-management |
 | subagent-driven-development | researcher |
