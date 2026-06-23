@@ -97,6 +97,7 @@ flowchart LR
   requesting_code_review --> dispatching_parallel_agents
   review_workflow --> creating_tools
   review_workflow --> different_viewpoint
+  review_workflow --> dispatching_parallel_agents
   review_workflow --> git_manager
   review_workflow --> writing_skills
   stack_hats --> architect
@@ -247,6 +248,7 @@ flowchart LR
 | requesting-code-review | dispatching-parallel-agents |
 | review-workflow | creating-tools |
 | review-workflow | different-viewpoint |
+| review-workflow | dispatching-parallel-agents |
 | review-workflow | git-manager |
 | review-workflow | writing-skills |
 | stack-hats | architect |

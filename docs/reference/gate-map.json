@@ -865,6 +865,10 @@
     },
     {
       "from": "review-workflow",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "review-workflow",
       "to": "git-manager"
     },
     {
