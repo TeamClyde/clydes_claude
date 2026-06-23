@@ -3,9 +3,9 @@
 **C4 Layer:** C3 Component
 **Status:** Active
 **Owner:** solo
-**Last updated:** 2026-06-18
+**Last updated:** 2026-06-23
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
-**Related ADRs:** _(none yet — executor-spectrum ADR promoted at sub-plan close)_
+**Related ADRs:** [ADR-0002](../adr/0002-executor-spectrum-soft-vs-hard-gates.md) (executor spectrum — Accepted), [ADR-0004](../adr/0004-fail-successfully-fanout-primitive.md) (fail-successfully fan-out primitive — Accepted; informational reference, parented to `orchestration-regulation-layer.md`). ADR-0005 (repo-wide orchestration-regulation standard) is pending promotion at campaign close — it will be parented to this file.
 **Key files:**
   - `.claude/hooks/` — deterministic runtime gates (sessionStart, preToolUse, postToolUse, userPromptSubmit, pre-commit)
   - `skills/plan-gate/SKILL.md` — the canonical soft-gate sequence
@@ -42,6 +42,45 @@ The conceptual spine of this feature is the **executor spectrum**:
 > - **Code (hooks / workflows)** is run by a **deterministic runtime** — exact sequencing, fan-out, retries — but rigid (no judgment) and subject to ordinary programming bugs. This is the substrate of **hard gates**.
 >
 > Design principle: **put cognition in markdown, put control flow in code.** A *workflow* is the hybrid — a deterministic code skeleton whose steps each delegate back to an LLM via `agent()` calls. Hardening a gate from prose to code trades "the model might skip it" for "the code might deadlock"; it moves risk from *compliance* to *engineering*, so only mature, high-stakes edges are worth hardening.
+
+## Severity, Verdict & Enforcement — the one taxonomy
+
+The workflow's review components — `architect`, `adherence-audit`, `docs-status`, and the `plan-gate` soft-gate sequence — historically each invented their own severity words: `BLOCKING`/`MINOR`/`LOOKS-GOOD`, `BLOCKING`/`WARNING`/`INFO`, `ERRORS`/`WARNINGS`/`SUGGESTIONS`. This section is the **single source of truth** that reconciles them. It separates three concepts at two granularities, and keeps them deliberately distinct: conflating *how bad a finding is* with *whether a gate passes* with *whether a gate is code or prose* is exactly what produced the drift.
+
+### Three concepts, two granularities
+
+| Concept | Granularity | Values | Meaning |
+|---|---|---|---|
+| **Severity** | per **finding** | `error` / `warning` / `note` | How serious one individual finding is. Industry-verbatim (SARIF `error/warning/note`, ESLint `error/warn`, GCC/Clang/Rust `error/warning/note`). Labels *problems* only — a finding that is not a problem carries no severity. |
+| **Verdict** | per **gate** | `RED` / `GREEN` | Whether a gate passes. **Computed, not stored:** `RED` iff the gate produced ≥1 `error`-severity finding; `GREEN` otherwise. "Green = no red." `warning`/`note` findings never flip a verdict to `RED` on their own — the escalation knob (à la ESLint `--max-warnings`) is available if a gate ever needs it, but no gate uses it today. |
+| **Enforcement-hardness** | per **gate / edge** | `hard` / `soft` | Whether the gate is executed by code or read by the LLM. `hard` = a hook (deterministic runtime; `permissionDecision`/exit-code enforced); `soft` = markdown (rules/skills/agents the LLM follows with judgment). This is [ADR-0002](../adr/0002-executor-spectrum-soft-vs-hard-gates.md)'s axis — the executor spectrum. |
+
+Severity describes a *finding*; verdict is a *roll-up of a gate's findings*; enforcement-hardness is a property of the *gate itself*, independent of either. A `soft` gate (e.g. the architect review) still produces `error`-severity findings and computes a `RED` verdict — "soft" refers to how the gate is enforced, not to how serious its findings can be.
+
+### Mapping table — each component's surface labels → the canonical tiers
+
+| Component | Its label | Canonical | Axis |
+|---|---|---|---|
+| `architect` | `BLOCKING` | `error` | severity (per finding) |
+| `architect` | `MINOR` | `warning` | severity (per finding) |
+| `architect` | `LOOKS GOOD` / "things to preserve" | **Strengths** — positive findings, *no* severity assigned | verdict-adjacent |
+| `architect` | `APPROVED` / `NEEDS REVISION` | retained words; map to `GREEN` / `RED` | verdict (per gate) |
+| `adherence-audit` | `BLOCKING` | `error` | severity (per finding) |
+| `adherence-audit` | `WARNING` | `warning` | severity (per finding) |
+| `adherence-audit` | `INFO` | `note` | severity (per finding) |
+| `docs-status` | `ERRORS` / `WARNINGS` / `SUGGESTIONS` | **kept unchanged** (`rules/doc-tools.md` mandates these doc-domain surface labels); documented as mapping to `error` / `warning` / `note` | severity surface labels (docs domain) |
+
+`architect`'s `LOOKS GOOD` was never a severity — it labels findings worth *preserving*, which carry no problem-severity. It collapses into a **Strengths** section and the `GREEN` verdict, not into a tier. The action-bearing verdict *words* `APPROVED` / `NEEDS REVISION` are retained (callers key on them) and live on the verdict axis, mapping to `GREEN` / `RED`.
+
+**Why the rename is safe (and why it waited until now):** renaming an externally-consumed severity enum is the GCC-14 `-Werror` / Clippy breakage class — but that hazard only bites when *downstream parsers are external*. Here every consumer is **in-repo markdown read by an LLM** (`plan-gate`, `rules/planning.md`), not an external parser, so all producers and consumers are renamed **atomically in one wave**. Doing it earlier would have broken a consumer in isolation; doing it together does not.
+
+### The explicit-invocation-vs-prose axis is separate and orthogonal
+
+Enforcement-hardness (`hard`/`soft`) is *not* the same question as whether a gate is invoked via an explicit edge or merely referenced in prose. The generated gate-map (`docs/reference/gate-map.md`) records every inter-component reference edge — and **every one of them is `soft`**: they are markdown references the LLM follows. **True hard gates (hooks) are not gate-map edges at all** — they live in `.claude/settings.json` and fire in the runtime, outside the component-reference graph the gate-map harvests. So "is there a gate-map edge?" answers *explicit-vs-prose*, while "is it a hook?" answers *hard-vs-soft*; reading one as the other is the audit's central meta-finding (see `docs/reference/orchestration-audit.md`).
+
+### Caller-delegation edges are not invocations
+
+Some gate-map edges are **caller-delegation**, not direct calls: `doc-author → git-manager` and `test-builder → git-manager` mean *"this component does NOT commit its own work; the caller commits on its behalf."* They are recorded so the dependency is visible, but must not be misread as "doc-author invokes git-manager." The delegation runs the other way — the caller owns the commit. (Audit finding G.)
 
 ## Building Block View
 
