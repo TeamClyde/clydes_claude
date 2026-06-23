@@ -61,6 +61,7 @@ flowchart LR
   new_repo_setup --> test_strategy
   new_repo_setup --> writing_agents
   new_repo_setup --> writing_rules
+  operating_model --> dispatching_parallel_agents
   plan_docs --> brainstorming
   plan_docs --> finishing_a_development_branch
   plan_docs --> plan_gate
@@ -216,6 +217,7 @@ flowchart LR
 | new-repo-setup | test-strategy |
 | new-repo-setup | writing-agents |
 | new-repo-setup | writing-rules |
+| operating-model | dispatching-parallel-agents |
 | plan-docs | brainstorming |
 | plan-docs | finishing-a-development-branch |
 | plan-docs | plan-gate |

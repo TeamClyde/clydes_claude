@@ -62,6 +62,7 @@
 | skill | infra-init |  | Use when starting a new repo session, before exploring an unfamiliar codebase, or when code structur |
 | skill | librarian |  | Use when the user wants a thorough, multi-aspect analysis or research synthesis of a brief or a sour |
 | skill | openapi-spec-generation |  | Generate and maintain OpenAPI 3.1 specifications from code, design-first specs, and validation patte |
+| skill | operating-model |  | Use when deciding whether to fan out work at all, which executor surface to use (inline / single sub |
 | skill | plan-gate |  | Triggers on writing-plans completion. Gates the plan through architect review, test-strategy, test-b |
 | skill | plan-management |  | Use when Jira tickets are created or change status (in_progress, done), when adding items to the bac |
 | skill | project-setup |  | Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUD |

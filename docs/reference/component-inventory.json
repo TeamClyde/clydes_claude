@@ -376,6 +376,12 @@
   },
   {
     "type": "skill",
+    "name": "operating-model",
+    "description": "Use when deciding whether to fan out work at all, which executor surface to use (inline / single subagent / parallel batch / Agent Teams / Dynamic Workflow), or how to size a fan-out — the whether/when/which-executor decision layer. For how to run one fan-out once the decision is made, use dispatching-parallel-agents.",
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\operating-model\\SKILL.md"
+  },
+  {
+    "type": "skill",
     "name": "plan-gate",
     "description": "Triggers on writing-plans completion. Gates the plan through architect review, test-strategy, test-builder, Jira ticket creation, and TODO.md registration before execution begins. Can also be invoked manually against any plan doc at plans/<slug>/<slug>-plan.md.",
     "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\plan-gate\\SKILL.md"
