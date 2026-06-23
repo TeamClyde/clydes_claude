@@ -16,7 +16,7 @@
   {
     "type": "agent",
     "name": "architect",
-    "description": "Independent plan reviewer invoked at the end of planning, before ExitPlanMode or before a task transitions from In Progress to Testing/Done. Reads the plan doc cold — with no access to the conversation that produced it — and evaluates design soundness, logic completeness, internal consistency, cross-plan accuracy, and self-containment. Returns structured BLOCKING / MINOR / LOOKS GOOD findings and a VERDICT of APPROVED or NEEDS REVISION. Invoke with a plan_doc_path and an optional instructions field to narrow the review focus.",
+    "description": "Independent plan reviewer invoked at the end of planning, before ExitPlanMode or before a task transitions from In Progress to Testing/Done. Reads the plan doc cold — with no access to the conversation that produced it — and evaluates design soundness, logic completeness, internal consistency, cross-plan accuracy, and self-containment. Returns structured findings at severity `error` / `warning` / Strengths and a VERDICT of APPROVED or NEEDS REVISION. Invoke with a plan_doc_path and an optional instructions field to narrow the review focus.",
     "model": "claude-sonnet-4-6",
     "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\architect.md"
   },
