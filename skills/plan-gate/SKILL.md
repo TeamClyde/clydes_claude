@@ -38,11 +38,31 @@ Apply these overrides:
 
 ---
 
+## Gate Chain — Watchdog Wrapper
+
+The gate chain (Steps 1 → 2 → Checkpoint → 3 → 4 → 5 → 6) runs as a **Shape C — Sequential chain** (per `dispatching-parallel-agents` §"Dispatching in prose" Shape C — Sequential chain). The chain halts on the first ABANDONED step.
+
+**Per-step watchdog rule:** Every Agent/Skill dispatch in the gate chain carries a bounded per-step expectation. If a step does not complete within that bound it is declared **ABANDONED**: halt the chain immediately and surface the partial gate state to the user (which steps completed, which step timed out). Do not skip ahead. Do not silently drop the hang.
+
+**What each step's watchdog surfaces:**
+- Which gate steps completed (✅) before the hang.
+- Which step timed out (ABANDONED) and its label.
+- The partial plan doc state so the user can decide whether to retry or intervene.
+
+**Preserved by this wrapper:**
+- Step order is unchanged.
+- The human checkpoint (after Step 2) is unchanged — it is a deliberate pause, not a watchdog event.
+- Re-entrancy/idempotency is unchanged — resuming after a hang re-runs only the ABANDONED step onward; already-completed steps are skipped per their existing idempotency checks.
+
+---
+
 ## Gate Sequence
 
 ### Step 1 — Architect Review
 
 **If `workflow.architect-review: false`:** skip this step and proceed directly to Step 2.
+
+**Watchdog:** if the architect panel (or its batched-verify call) does not complete within the stated bound, declare it ABANDONED — halt the chain and surface partial gate state to the user. Do not silently retry or skip to Step 2.
 
 Step 1 dispatches a **6-criterion architect panel** (Shape A — Dimensional-review panel, per `dispatching-parallel-agents` §"Dispatching in prose") — one `subagent_type: architect` agent per criterion, all in parallel. See `references/architect-panel.md` for the full dispatch detail: example Agent block, per-criterion enumeration, the 5 dispatch rules, and the batched-verify step.
 
@@ -55,6 +75,8 @@ Step 1 dispatches a **6-criterion architect panel** (Shape A — Dimensional-rev
 ---
 
 ### Step 2 — Test Strategy
+
+**Watchdog:** if `test-strategy` does not complete within the stated bound, declare it ABANDONED — halt the chain and surface partial gate state to the user.
 
 Dispatch the `test-strategy` agent with the plan doc path.
 
@@ -76,6 +98,8 @@ After Step 2 completes, surface the Testing Plan to the user:
 
 **TDD-disabled check:** if `project.json` has `workflow.tdd: false`, skip this step entirely and proceed directly to Step 4. No warning, no error.
 
+**Watchdog:** if `test-builder` does not complete within the stated bound, declare it ABANDONED — halt the chain and surface partial gate state to the user.
+
 Otherwise: dispatch the `test-builder` agent with the plan doc path.
 
 The agent reads the `## Testing Plan` section and writes failing tests to disk. Tests exist on disk before any implementation begins.
@@ -87,6 +111,8 @@ Proceed to Step 4 when the agent completes.
 ### Step 4 — Jira Ticket Creation
 
 **Jira-disabled check:** if `project.json` has `jira.enabled: false` (or the file is absent), skip this step entirely and proceed directly to Step 5. No warning, no error. The Task Reference table's "Jira Key" column remains blank.
+
+**Watchdog:** if `jira-workflow-manager` does not complete within the stated bound, declare it ABANDONED — halt the chain and surface partial gate state to the user.
 
 Otherwise: invoke the `jira-workflow-manager` agent to create the Epic and Tasks from the Task Reference table in the plan doc.
 
@@ -100,6 +126,8 @@ The agent assigns Jira keys and writes them back into the Task Reference table r
 
 ### Step 5 — TODO.md Registration
 
+**Watchdog:** if `plan-management` (TODO.md registration) does not complete within the stated bound, declare it ABANDONED — halt the chain and surface partial gate state to the user.
+
 Invoke the `plan-management` skill:
 - `plan-doc`: `plans/<slug>/<slug>-plan.md`
 - `status`: `created`
@@ -108,6 +136,8 @@ Invoke the `plan-management` skill:
 ---
 
 ### Step 6 — Gate-Complete Divergence Record
+
+**Watchdog:** if `plan-management:divergence` does not complete within the stated bound, declare it ABANDONED — surface to the user that all prior gate steps completed but the final record was not written. The plan doc remains in its pre-gate state; re-running plan-gate is idempotent.
 
 After Step 5 completes, invoke `plan-management:divergence` to atomically tick the plan doc's gate-checkbox section, append a `[gate-complete]` journal entry, and refresh the handoff:
 
