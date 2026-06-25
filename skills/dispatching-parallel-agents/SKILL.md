@@ -10,7 +10,7 @@ allowed-tools: Agent, Read
 
 You delegate tasks to specialized agents with isolated context. By precisely crafting their instructions and context, you ensure they stay focused and succeed at their task. They should never inherit your session's context or history — you construct exactly what they need. This also preserves your own context for coordination work.
 
-**This skill is the regulated fan-out front-door.** All workflow fan-out routes through here. `review-workflow` and `deep-research` consume the helpers in `scripts/lib/dispatch.mjs` rather than re-implementing fan-out logic.
+**This skill is the regulated fan-out front-door.** All workflow fan-out routes through here. **Engine-path** consumers (executable `.workflow.mjs`, e.g. `librarian`, `orchestration-audit`) call the helpers in `scripts/lib/dispatch.mjs` directly. **Prose-path** consumers (skills whose fan-out is natural-language instructions the orchestrator follows — they cannot import `.mjs`) follow the protocol and policy described here and in `references/` (`dispatch-policy.md`, `verify-protocol.md`).
 
 **Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently — but through the correct helper so policy, retries, quorum, and token-budget gating are applied consistently.
 
@@ -175,9 +175,9 @@ Each step feeds the next. Set a per-step expectation; abandon-and-surface on a h
 
 ## P1 Routing Rule
 
-**All workflow fan-out routes through this skill's helpers as the canonical front-door.**
+**All workflow fan-out routes through this skill as the canonical front-door.**
 
-`review-workflow` and `deep-research` consume `parallelFanout` / `sequentialChain` / `dimensionalReview` in Wave 3 rather than each implementing its own fan-out. This is the cross-family de-duplication decision. If you are building a new workflow that fans out work to multiple agents, use these helpers — do not write a new batching loop.
+`review-workflow` and `deep-research` follow this skill's fan-out protocol rather than each implementing their own fan-out — the cross-family de-duplication decision. If you are building a new workflow that fans out work to multiple agents, route it through this front-door (engine-path `.workflow.mjs` calls the `scripts/lib/dispatch.mjs` helpers directly; prose-path skills follow the protocol described here) instead of writing a new batching loop.
 
 ## Agent Prompt Structure
 
