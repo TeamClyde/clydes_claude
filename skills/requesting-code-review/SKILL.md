@@ -6,7 +6,7 @@ allowed-tools: Agent, Bash, Read
 
 # Requesting Code Review
 
-Fan out a multi-lens dimensional-review panel over the diff. Each lens is a focused prompt to a model-pinned `general-purpose` agent — not a named agent type. Reviewers get precisely crafted context for their lens, never the session's history. After all lenses return, ONE batched verify/dedup agent synthesizes the findings.
+Fan out a multi-lens dimensional-review panel over the diff. Each lens is a focused prompt to a model-pinned `general-purpose` agent — not a named agent type. Reviewers get precisely crafted context for their lens, never the session's history. After all lenses return, ONE batched **tiered adversarial verify** (triage → clustered re-check → contested-tail consensus) confirms findings against the diff — not dedup-only.
 
 **Front-door citation:** This skill routes fan-out through `dispatching-parallel-agents` §"Dispatching in prose" (Shape A — Dimensional-review panel). See that section for the five rules and full schema depth at [`references/dispatch-policy.md`](references/dispatch-policy.md).
 
@@ -53,7 +53,7 @@ Dispatch all five in one parallel block (≤ min(16, cores−2) concurrent agent
 
 **4. Collect + verify:**
 
-After all five lenses return (mark non-responding agents ABANDONED), run ONE verify/dedup agent: "Deduplicate and rank these findings across all lenses: `<all findings>`." Do not loop per-finding. If the verify agent hangs, surface findings as unverified.
+After all five lenses return (mark non-responding agents ABANDONED), run the **tiered adversarial verify** (`skills/dispatching-parallel-agents/references/verify-protocol.md`, `code-review` profile — defensive bias, guard false-positives): batched triage (dedup + label) → a clustered re-check of the escalated findings against their cited diff hunks → escalate ONLY the still-contested tail to a minority-veto 3-voter consensus. Not per-finding voting on every finding. If a verify tier hangs, surface the pre-tier findings as unverified.
 
 **5. Act on the synthesized findings:**
 - Fix Critical issues immediately
@@ -70,7 +70,7 @@ These apply identically to all prose consumers of `dispatching-parallel-agents`:
 | 1. Model-pin leaves | Every lens agent: `model: "claude-haiku-4-5-20251001"` or Sonnet. Never Opus. |
 | 2. Cap concurrency | Five lenses fit in one parallel block (≤ 16 concurrent). Batch if more lenses are added. |
 | 3. Per-agent timeout | State a 60 s time bound in each lens prompt. Non-responding agent → mark ABANDONED. |
-| 4. ONE batched verify | After all lenses: one verify/dedup agent. No per-finding or per-lens vote loop. |
+| 4. ONE tiered verify | After all lenses: one tiered adversarial verify (triage → clustered re-check → contested-tail consensus). No per-finding or per-lens vote loop. |
 | 5. Cite front-door | See `dispatching-parallel-agents` §"Dispatching in prose" (Shape A). |
 
 ## Example
@@ -102,7 +102,9 @@ Lens 4 — tests:      [same structure, focus: test coverage]
 Lens 5 — style:      [same structure, focus: DRY, decomposition]
 
 [All five return. One verify agent:]
-  "Deduplicate and rank these findings from all lenses: <collected findings>"
+  [Tiered adversarial verify — code-review profile (verify-protocol.md). The batched triage call, e.g.:
+   "Label each finding supported/uncertain/unsupported and merge duplicates; drop unsupported. Escalate uncertain/disagreed. Findings: <collected>".
+   The escalated set then gets a clustered re-check vs the diff, and the still-contested tail a minority-veto 3-voter consensus.]
 
 [Verify agent returns synthesized review:]
   Strengths: Clean architecture, real tests
@@ -174,7 +176,7 @@ See full output format at: `requesting-code-review/code-reviewer.md`
 - Ignore Critical issues
 - Proceed with unfixed Important issues
 - Argue with valid technical feedback
-- Run a verification loop per finding — one batched verify only
+- Run a verification loop per finding — one tiered adversarial verify only (triage → clustered re-check → contested-tail consensus)
 
 **If a finding is wrong:**
 - Push back with technical reasoning
