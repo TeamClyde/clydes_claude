@@ -1,6 +1,14 @@
 {
   "cSpell.words": [
     "adversarially",
+    "arg",
+    "ctx",
+    "dedup",
+    "parseable",
+    "pathspec",
+    "Sev",
+    "specced",
+    "globbed",
     "gitignored",
     "api",
     "pasteable",
@@ -152,6 +160,7 @@
     "marketingskills",
     "sh",
     "memoization",
+    "compat",
     "Inngest",
     "LangGraph",
     "XState",
@@ -175,6 +184,19 @@
     "NeurIPS",
     "POMDP",
     "reimplementations",
+    "Clippy",
+    "denylist",
+    "SARIF",
+    "iff",
+    "decl",
+    "impl",
+    "codegen",
+    "Ahrefs",
+    "pytrends",
+    "pgvector",
+    "Qdrant",
+    "SerpApi",
+    "langchain",
     "en"
   ]
 }

@@ -366,7 +366,7 @@
     {
       "type": "skill",
       "name": "librarian",
-      "description": "Use when the user wants a thorough, multi-aspect analysis or research synthesis of a brief or a source document — a prose description, a local file, or a .docx — produced by a regulated parallel fan-out (not a single pass). Triggers on requests for multi-aspect research, structured source document analysis, regulated fan-out synthesis, or parallel analysis across multiple lenses. Does NOT trigger on quick single-pass summaries or when a single agent pass is sufficient.",
+      "description": "Use when the user wants deep, multi-source WEB research on a topic or on a source document's topics — produced by a regulated parallel fan-out that searches the web, cites sources, and adversarially verifies claims (not a single pass, not memory-only). Triggers on requests to research a topic from scratch, validate a brief's claims against live sources, or produce a cited research report across several sub-questions. Does NOT trigger on quick single-pass summaries or on pure analysis of a document's own content with no external research.",
       "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\librarian\\SKILL.md"
     },
     {

@@ -1,10 +1,14 @@
 // scripts/librarian.workflow.mjs — Claude Code Workflow-tool script (SANDBOX-ONLY).
 // Inlines the engine bundle (sandbox cannot import). Regenerate via `npm run build:engine`.
-// args = { seedText: string, aspects: string[] }  (seedText extracted in main-context).
+// args = { brief: string, subQuestions: string[], seedText?: string }
+//   brief        = the overall research goal
+//   subQuestions = the research threads (main-context derives them from the brief/seed)
+//   seedText     = optional source/draft whose topics to research (VERIFIED, not trusted)
+//   leafModel    = optional research-leaf model (default claude-sonnet-4-6); verify + synth stay Sonnet
 export const meta = {
   name: 'librarian',
-  description: 'Regulated multi-aspect research/analysis fan-out over a seed (front-door exemplar)',
-  phases: [{ title: 'Analyze' }, { title: 'Verify' }, { title: 'Synthesize' }],
+  description: 'Regulated WEB-research fan-out: per sub-question search + cite, ONE adversarial verify, cited synthesis (front-door exemplar)',
+  phases: [{ title: 'Research' }, { title: 'Verify' }, { title: 'Synthesize' }],
 };
 
 // <ENGINE-BUNDLE:start>
@@ -241,30 +245,73 @@ if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing
 // robust to both object and stringified delivery — the front-door exemplar must not
 // assume the happy path.
 const input = typeof args === 'string' ? JSON.parse(args) : args;
-const { seedText, aspects } = input;
-const FINDINGS = { type: 'object', required: ['findings'], properties: { findings: { type: 'array',
-  items: { type: 'object', required: ['aspect', 'point'], properties: { aspect: { type: 'string' }, point: { type: 'string' } } } } } };
+const { brief, subQuestions, seedText, leafModel } = input;
+if (!Array.isArray(subQuestions) || subQuestions.length === 0) {
+  throw new TypeError('librarian: args.subQuestions must be a non-empty string[]');
+}
+// Research leaves are configurable (default Sonnet); the judgment steps (verify + synth) stay Sonnet.
+const LEAF_MODEL = leafModel || 'claude-sonnet-4-6';
 
-phase('Analyze');
-const units = aspects.map((aspect) => ({
-  validate: (v) => (v && Array.isArray(v.findings)) ? { ok: true } : { ok: false, reason: 'need { findings: [...] }' },
+// Research findings are CITED: every claim carries the source URL it came from + the sub-question it answers.
+const FINDINGS = { type: 'object', required: ['findings'], properties: { findings: { type: 'array',
+  items: { type: 'object', required: ['subQuestion', 'claim', 'source'], properties: {
+    subQuestion: { type: 'string' }, claim: { type: 'string' }, source: { type: 'string' }, detail: { type: 'string' } } } } } };
+
+phase('Research');
+// One regulated unit per sub-question: each agent SEARCHES THE WEB, reads sources, returns cited findings.
+// Sonnet — web research + source reading is judgment-heavy (never Opus). Watchdog + quorum via the engine.
+const units = subQuestions.map((q) => ({
+  validate: (v) => (v && Array.isArray(v.findings) && v.findings.length > 0)
+    ? { ok: true } : { ok: false, reason: 'need a non-empty { findings: [{subQuestion, claim, source}] }' },
   work: (repair) => agent(
-    `Analyze the "${aspect}" aspect of the following source document. Return concrete findings.\n` +
-    (repair ? `PREVIOUS REJECTED: ${repair}. Fix.\n` : '') + `--- SOURCE ---\n${seedText}`,
-    { label: `analyze:${aspect}`, phase: 'Analyze', schema: FINDINGS, model: 'claude-haiku-4-5-20251001' }),
+    `You are a research analyst. Investigate this sub-question by SEARCHING THE WEB — do NOT answer from memory.\n` +
+    `SUB-QUESTION: ${q}\n` +
+    (brief ? `OVERALL RESEARCH GOAL (context only): ${brief}\n` : '') +
+    `Method: run several WebSearch queries; for the most relevant hits, fetch the page with WebFetch (if WebFetch is unavailable, rely on search-result content). Prefer recent, primary, authoritative sources; note dates on time-sensitive facts; if sources disagree, report both.\n` +
+    `Return concrete findings. Set "subQuestion" on EVERY finding to exactly: ${q}. Set "source" to the URL the claim came from.\n` +
+    (repair ? `PREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.\n` : '') +
+    (seedText ? `\n--- SEED CONTEXT (the user's draft; use only as a topic map — VERIFY its claims against live sources, do not treat it as ground truth) ---\n${seedText}` : ''),
+    { label: `research:${q.slice(0, 48)}`, phase: 'Research', schema: FINDINGS, model: LEAF_MODEL }),
 }));
-const review = await parallelFanout(units, { perUnitTimeoutMs: 120_000, maxInFlight: 6, modelTier: 'haiku' });
+// maxInFlight = min(units, 8): keeps all units in ONE batch for the common case (≤8 sub-questions),
+// so the runtime's rolling concurrency fills slots instead of parallelFanout imposing a batch barrier
+// (a hardcoded 6 made a 7th sub-question wait for the whole first batch). 8 ≤ runtime cap min(16, cores−2).
+const review = await parallelFanout(units, { perUnitTimeoutMs: 240_000, maxInFlight: Math.min(subQuestions.length, 8), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet' });
 const allFindings = review.confirmed.flatMap((r) => r.findings ?? []);
 
-phase('Verify');               // ONE batched verify (not per-finding)
-// The verify function below is an intentional pass-through placeholder — it collects allFindings
-// into the dimensionalReview result contract without deduplication logic. Specialize this
-// verify callback when domain-specific sanity-checks or deduplication are needed.
-const verified = await dimensionalReview([], { perUnitTimeoutMs: 90_000,
-  verify: async () => allFindings });
+phase('Verify');  // ONE batched ADVERSARIAL verify (never per-finding). Compact verdicts (index/support/drop)
+// applied in JS — keeps the verify's input + output O(small) so it scales to many findings without timing out.
+const VERDICTS = { type: 'object', required: ['verdicts'], properties: { verdicts: { type: 'array',
+  items: { type: 'object', required: ['index', 'support'], properties: {
+    index: { type: 'integer' }, support: { type: 'string', enum: ['supported', 'uncertain', 'unsupported'] },
+    drop: { type: 'boolean' } } } } } };
+// dimensionalReview([], {verify}) passes [] to the callback — read the closed-over allFindings (the T3 contract).
+const verified = await dimensionalReview([], { perUnitTimeoutMs: 300_000, verify: async () => {
+  const v = await agent(
+    `ADVERSARIAL VERIFICATION. The numbered findings below each cite a source URL. For EACH, judge from the cited source + your own knowledge whether the source supports the claim. ` +
+    `WebSearch AT MOST the 3 most surprising or load-bearing claims — do NOT re-search everything; stay well under the time budget. ` +
+    `Return ONE compact verdict per finding: its "index", a "support" label (supported/uncertain/unsupported), and "drop": true ONLY if it is a duplicate or clearly false. Terse — verdicts only, no prose.\n` +
+    allFindings.map((f, i) => `[${i}] (${f.subQuestion}) ${f.claim} — source: ${f.source}`).join('\n'),
+    { label: 'verify', phase: 'Verify', schema: VERDICTS, model: 'claude-sonnet-4-6' });
+  const byIndex = new Map((v.verdicts ?? []).map((d) => [d.index, d]));
+  return allFindings
+    .map((f, i) => { const d = byIndex.get(i); return { ...f, support: d ? d.support : 'uncertain', _drop: d ? !!d.drop : false }; })
+    .filter((f) => !f._drop)
+    .map(({ _drop, ...rest }) => rest);
+} });
+// On verify abandon, dimensionalReview returns findings=[] + verifyDegraded — fall back to the unverified set.
+const vetted = verified.verifyDegraded ? allFindings : verified.findings;
 
 phase('Synthesize');
 const report = await agent(
-  `Synthesize a cited analysis report from these findings (group by aspect, flag risks/recommendations):\n${JSON.stringify(verified.findings)}`,
+  `Write a cited research report to help plan a project, using ONLY the vetted findings below — they are the COMPLETE and ONLY input. ` +
+  `Do NOT add sub-questions, topics, claims, or source URLs that are not present in the findings, and do NOT perform any new research or web search. ` +
+  `Group strictly by the sub-questions that actually appear in the findings (do NOT state a numeric COUNT of sub-questions anywhere — no "this report covers N sub-questions"). For each: what the research found, the source URLs from the findings, and a confidence read (lean on the "support" labels — note any "unsupported"/"uncertain" items). ` +
+  `Surface contradictions between sources, date every time-sensitive fact, and finish with a "What this means for the build" section drawn strictly from the findings.\n` +
+  (brief ? `RESEARCH GOAL (context only — do NOT expand scope beyond the findings): ${brief}\n` : '') +
+  (verified.verifyDegraded ? `NOTE: adversarial verification did not complete — present every claim as UNVERIFIED and say so explicitly.\n` : '') +
+  `--- VETTED FINDINGS (the complete input) ---\n${JSON.stringify(vetted)}`,
   { label: 'synthesize', phase: 'Synthesize', model: 'claude-sonnet-4-6' });
-return { report, aspectCount: aspects.length, findingCount: verified.findings.length, degraded: review.degraded, verifyDegraded: verified.verifyDegraded };
+
+const sources = [...new Set(vetted.map((f) => f.source).filter(Boolean))];
+return { report, subQuestionCount: subQuestions.length, findingCount: vetted.length, sources, degraded: review.degraded, verifyDegraded: verified.verifyDegraded };
