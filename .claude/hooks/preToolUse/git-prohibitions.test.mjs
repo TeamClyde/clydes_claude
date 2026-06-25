@@ -107,7 +107,7 @@ function assertSilent(result, description) {
 
 // ── Cases ─────────────────────────────────────────────────────────────────────
 
-console.log('\ngit-prohibitions hook — 19 test cases\n');
+console.log('\ngit-prohibitions hook — 32 test cases\n');
 
 // Case 1: git add -A → deny
 test('Case 1: git add -A → deny', () => {
@@ -250,6 +250,37 @@ test('Case 19: git add --all src/ → deny', () => {
   const result = runHook('git add --all src/');
   assertDeny(result, 'Case 19');
 });
+
+// ── A2/A3/A4 hardening cases (Wave 5) ─────────────────────────────────────────
+
+// A4 — bypass must be PREFIX-only, not substring-anywhere
+test('Case 20: trailing [git-allowed] in a comment does NOT bypass → deny', () => {
+  assertDeny(runHook('git add -A # ok [git-allowed]'), 'Case 20');
+});
+test('Case 21: prefix [git-allowed] still bypasses → silent', () => {
+  assertSilent(runHook('[git-allowed] git add -A'), 'Case 21');
+});
+
+// A3 — stage-all escapes
+test('Case 22: git -C <path> add -A → deny', () => assertDeny(runHook('git -C /tmp/repo add -A'), 'Case 22'));
+test('Case 23: git add -Av → deny', () => assertDeny(runHook('git add -Av'), 'Case 23'));
+test('Case 24: git add -v -A → deny', () => assertDeny(runHook('git add -v -A'), 'Case 24'));
+
+// A2 — commit -n short form
+test('Case 25: git commit -n -m "x" → deny', () => assertDeny(runHook('git commit -n -m "x"'), 'Case 25'));
+test('Case 26: git commit -nm "x" → deny', () => assertDeny(runHook('git commit -nm "x"'), 'Case 26'));
+test('Case 27: git commit --amend -n → deny', () => assertDeny(runHook('git commit --amend -n'), 'Case 27'));
+
+// Negative guards — must NOT over-match (quoted spans are stripped before detection)
+test('Case 28: git commit -m "fix -n flag" → silent', () => assertSilent(runHook('git commit -m "fix -n flag"'), 'Case 28'));
+test('Case 29: git add src/file.js → silent', () => assertSilent(runHook('git add src/file.js'), 'Case 29'));
+
+// ── Cross-operator guards (Wave 5 review findings) ────────────────────────────
+// Compound commands must NOT let a 2nd command's flags trip the 1st command's detector.
+test('Case 30: git commit -m "msg" && git log -n 5 → silent', () => assertSilent(runHook('git commit -m "msg" && git log -n 5'), 'Case 30'));
+test('Case 31: git add specific-file.js && git log --all → silent', () => assertSilent(runHook('git add specific-file.js && git log --all'), 'Case 31'));
+// ...but a real stage-all in the 2nd command IS still caught (anchor still fires per-command).
+test('Case 32: echo done && git add -A → deny', () => assertDeny(runHook('echo done && git add -A'), 'Case 32'));
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 

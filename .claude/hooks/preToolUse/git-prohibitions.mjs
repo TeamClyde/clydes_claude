@@ -11,22 +11,25 @@
  * catching accidental misuse of prohibited flags.
  *
  * Prohibited patterns:
- *   - Stage-all:  git add -A / git add --all / git add .
- *   - Hook-skip:  --no-verify (as a standalone flag in any git command)
+ *   - Stage-all:  git add -A / --all / . (incl. -C <path>, combined clusters like -Av)
+ *   - Hook-skip:  --no-verify (standalone flag in any git command)
+ *   - Hook-skip:  git commit -n / -nm / -an … (short form of --no-verify, commit-scoped)
  *
  * Short-circuit order:
  *   1. CLAUDE_DISABLE_WORKFLOW_HOOKS → pass
  *   2. Parse stdin; malformed → pass
  *   3. tool_name !== 'Bash' → pass
- *   4. [git-allowed] bypass marker → pass
+ *   4. [git-allowed] bypass marker (PREFIX-only) → pass
  *   5. Strip quoted spans (false-positive guard for flags in commit messages)
  *   6. Not a git command → pass
  *   7. Stage-all detector → deny
- *   8. No-verify detector → deny
- *   9. No match → silent pass
+ *   8. No-verify detector (--no-verify) → deny
+ *   9. Commit no-verify detector (-n short form) → deny
+ *  10. No match → silent pass
  *
- * Override: prefix command with [git-allowed] to bypass, or set
- *           CLAUDE_DISABLE_WORKFLOW_HOOKS=1 for full emergency rollback.
+ * Override: PREFIX the command with [git-allowed] to bypass (substring match
+ *           is intentionally rejected — the marker must lead the command), or
+ *           set CLAUDE_DISABLE_WORKFLOW_HOOKS=1 for full emergency rollback.
  * Runtime budget: <10ms p50.
  */
 
@@ -84,8 +87,8 @@ if (!command) {
   process.exit(0);
 }
 
-// ── Bypass marker (mirrors graph-tools-enforcement's [grep-allowed]) ──────────
-if (command.includes('[git-allowed]')) {
+// ── Bypass marker — PREFIX only (deny text promises "prefix the command") ──────
+if (command.trimStart().startsWith('[git-allowed]')) {
   process.exit(0);
 }
 
@@ -104,11 +107,18 @@ if (!isGit) {
 
 // ── Detector 1 — stage-all ────────────────────────────────────────────────────
 // `git add` followed by -A / --all / . (whitespace-or-EOL bounded after the arg).
-const STAGE_ALL = /(?:^|[\s;|&(`])git\s+add\s+(?:-A|--all|\.)(?:\s|$)/;
+// Handles: git global opts before `add` (-C <path>, -c <key=val>, --flag);
+// -A/--all as any flag token incl. combined clusters (-Av, -vA);
+// . pathspec; trailing flags (-v -A).
+const STAGE_ALL = /(?:^|[\s;|&(`])git\s+(?:-C\s+\S+\s+|-c\s+\S+\s+|--\S+\s+)*add\s+(?:[^\n;|&]*\s)?(?:--all\b|-[A-Za-z]*A[A-Za-z]*|\.)(?:\s|$)/;
 
 // ── Detector 2 — hook-skip ────────────────────────────────────────────────────
 // `--no-verify` as a standalone flag token in a git command.
 const NO_VERIFY = /(?:^|\s)--no-verify(?:\s|$)/;
+
+// ── Detector 3 — commit -n (short for --no-verify) ───────────────────────────
+// `git commit … -n` incl. combined clusters like -nm, -an, and --amend -n.
+const COMMIT_NO_VERIFY = /(?:^|[\s;|&(`])git\s+(?:-C\s+\S+\s+|-c\s+\S+\s+|--\S+\s+)*commit\b[^\n;|&]*?[\s;|&(`]-[A-Za-z]*n[A-Za-z]*(?:\s|$)/;
 
 if (STAGE_ALL.test(stripped)) {
   emitDeny(
@@ -120,7 +130,7 @@ if (STAGE_ALL.test(stripped)) {
   );
 }
 
-if (NO_VERIFY.test(stripped)) {
+if (NO_VERIFY.test(stripped) || COMMIT_NO_VERIFY.test(stripped)) {
   emitDeny(
     command,
     'no-verify',
