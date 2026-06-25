@@ -59,7 +59,7 @@ For **each cluster**, dispatch ONE re-check agent that:
 
 **Cost bound:** N findings → approximately (distinct cluster keys) re-check calls, not N calls. This bounds re-check cost to the number of distinct files/sub-questions touched, regardless of how many findings each contains.
 
-Output set after Tier 2: `keep` decisions pass through; `drop` decisions are removed. Any finding the re-check leaves ambiguous (neither clearly kept nor dropped) escalates to Tier 3.
+Output set after Tier 2: `drop` decisions are removed; `keep` decisions form the **contested tail** that escalates to Tier 3 consensus. The re-check returns a binary `keep`/`drop` per member — there is no separate "ambiguous" outcome.
 
 ---
 
@@ -67,7 +67,7 @@ Output set after Tier 2: `keep` decisions pass through; `drop` decisions are rem
 
 **Task-aware. Contested tail only.**
 
-Only findings that the lower tiers leave contested escalate here: sources disagreed (`disagree` flag), evidence was thin or single-sourced (`thin-source` flag), or the Tier-2 re-check was ambiguous.
+The **contested tail** = findings that escalated at Tier 1 (their label or flag matched the active profile's `escalateOn` — e.g. `uncertain`, `disagree`, `thin-source`) **and** were kept by the Tier-2 re-check. Clean Tier-1 `supported` findings never reach this tier.
 
 ### The Rule (PINNED)
 
