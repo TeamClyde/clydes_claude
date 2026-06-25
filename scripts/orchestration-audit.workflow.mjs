@@ -11,7 +11,7 @@ export const meta = {
   description: 'Fail-successfully fan-out audit of the orchestration vs. the gate-map',
   phases: [
     { title: 'Find', detail: 'one+ agent per audit dimension, batched ≤ cap' },
-    { title: 'Verify', detail: 'single batched verify over all findings' },
+    { title: 'Verify', detail: 'tiered adversarial verify (triage→cluster→consensus)' },
     { title: 'Synthesize', detail: 'per-edge classification + triaged fix list' },
   ],
 }
@@ -649,36 +649,10 @@ const finderClass = finderResults.flatMap((r) => r.edgeClassifications ?? []);
 // (hooks, utility skills, some agents) get no finder row; synthesize stubs those none-yet/low and
 // states the coverage gap explicitly (never a silent truncation).
 
-// --- Stage 2: batched verify — ONE call over ALL findings (not per-finding voting) ---
-// Mirrors the dimensionalReview pattern from librarian.workflow.mjs.
-// feedback_workflow_model_pinning: batch verify, never 3-votes-per-finding.
 phase('Verify');
-const verifyResult = await dimensionalReview([], {
-  perUnitTimeoutMs: VERIFY_TIMEOUT_MS,
-  verify: async () => {
-    if (!allFindings || allFindings.length === 0) return allFindings;
-    // Pass all findings to one adversarial agent; it returns the subset it deems real.
-    const VERIFY_ALL_SCHEMA = {
-      type: 'object',
-      required: ['confirmedFindings'],
-      properties: {
-        confirmedFindings: {
-          type: 'array',
-          items: { type: 'object', required: ['dimension', 'severity', 'where', 'summary'] },
-        },
-      },
-    };
-    const r = await agent(
-      `Adversarially verify these audit findings — try to REFUTE each one. ` +
-      `Default to excluding a finding if uncertain. Return only the findings you consider real and well-evidenced.\n` +
-      `Findings: ${JSON.stringify(allFindings)}`,
-      { label: 'verify:batched', phase: 'Verify', schema: VERIFY_ALL_SCHEMA },
-    );
-    return r?.confirmedFindings ?? allFindings;
-  },
-});
-if (verifyResult.verifyDegraded) log('Verify: batched verify ABANDONED — proceeding on unverified findings');
-const confirmedFindings = verifyResult.verifyDegraded ? allFindings : verifyResult.findings;
+const verified = await tieredVerify(allFindings, { profile: 'audit', agent, perTierTimeoutMs: VERIFY_TIMEOUT_MS });
+if (verified.degraded) log('Verify: tiered verify DEGRADED — proceeding on unverified findings');
+const confirmedFindings = verified.degraded ? allFindings : verified.findings;
 
 // --- Stage 3: synthesize the report payload ---
 phase('Synthesize');
@@ -696,4 +670,4 @@ const report = await agent(
   { label: 'synthesize', phase: 'Synthesize' },
 );
 
-return { report, confirmedCount: confirmedFindings.length, finderClassified: finderClass.length, verifyDegraded: verifyResult.verifyDegraded, raw: { confirmedFindings, finderClass } };
+return { report, confirmedCount: confirmedFindings.length, finderClassified: finderClass.length, verifyDegraded: verified.degraded, raw: { confirmedFindings, finderClass } };
