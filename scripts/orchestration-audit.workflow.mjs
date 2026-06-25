@@ -249,6 +249,11 @@ async function dimensionalReview(dimensions, policy = {}) {
 // rather than silently risking a #76-class hang.
 if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing timer support — cannot guarantee liveness');
 
+// args = { hookFinding: '<Task-1 answer + URL>', cap }. The Workflow tool may deliver `args` as a
+// JSON string — parse-if-string so the script is robust to both object and stringified delivery.
+const input = typeof args === 'string' ? JSON.parse(args) : args;
+const { hookFinding } = input;
+
 // --- tunables (regulation dossier §10.1 — conservative defaults; revisit at run) ---
 const FINDER_TIMEOUT_MS = 240_000;   // per finder agent
 const VERIFY_TIMEOUT_MS = 180_000;   // per verify agent (single batched call)
@@ -305,13 +310,9 @@ const FINDINGS_SCHEMA = {
   },
 };
 
-// args = { hookFinding: '<Task-1 answer + URL>', cap }. Audit INPUTS live in the repo; the sandbox
-// can't read files, but the finder/synthesize subagents can — they read the canonical artifacts
-// themselves (single source of truth). The script only distributes slice rules.
-// The Workflow tool may deliver `args` as a JSON string — parse-if-string so the script is robust
-// to both object and stringified delivery.
-const input = typeof args === 'string' ? JSON.parse(args) : args;
-const { hookFinding } = input;
+// Audit INPUTS live in the repo; the sandbox can't read files, but the finder/synthesize subagents
+// can — they read the canonical artifacts themselves (single source of truth). The script only
+// distributes slice rules.
 const GATEMAP = 'docs/reference/gate-map.json';             // { nodes, edges:[{from,to}] } — 140 edges, sorted
 const INVENTORY = 'docs/reference/component-inventory.json'; // [{ type, name, file }] — 76 components
 
