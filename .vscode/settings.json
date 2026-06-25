@@ -197,6 +197,8 @@
     "Qdrant",
     "SerpApi",
     "langchain",
-    "en"
+    "en",
+    "regreen",
+    "unversioned"
   ]
 }

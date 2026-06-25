@@ -199,7 +199,9 @@
     "Qdrant",
     "SerpApi",
     "langchain",
-    "en"
+    "en",
+    "regreen",
+    "unversioned"
   ],
   "ignorePaths": ["node_modules", ".git"]
 }
