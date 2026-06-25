@@ -6,7 +6,7 @@ description: >
   finds dead references, invocation mismatches, convention conflicts, priority conflicts,
   orphaned components, trigger gaps, and workflow gaps. Triggers on "audit workflow",
   "check consistency", "adherence audit", "find conflicts", "workflow audit", "check for drift".
-allowed-tools: Read, Glob, Grep, Agent
+allowed-tools: Read, Glob, Grep, Bash, Agent
 ---
 
 # Adherence Audit
@@ -17,11 +17,12 @@ what the target expects, and rule priorities don't produce silent contradictions
 
 Run periodically and whenever a new component is added or an existing one is modified.
 
-**Architecture:** This skill is a dimensional-review panel. Phase 1 builds the inventory in the
-main context. Phase 2 dispatches 7 lens-prompt agents in parallel (one per check dimension,
-model-pinned to Haiku). After all lens agents return, Phase 3 runs ONE batched verify over all
-collected findings. Phase 4 synthesizes the tiered report. This follows
-`dispatching-parallel-agents` §"Dispatching in prose" **Shape A** — see the five rules below.
+**Architecture:** This skill is a dimensional-review panel. Phase 1 loads the component spine
+from `docs/reference/component-inventory.json`. Phase 2 dispatches 7 lens-prompt agents in
+parallel (one per check dimension, model-pinned to Haiku). After all lens agents return, Phase 3
+runs the tiered adversarial verify over all collected findings. Phase 4 synthesizes the tiered
+report. This follows `dispatching-parallel-agents` §"Dispatching in prose" **Shape A** — see the
+five rules below.
 
 ---
 
@@ -48,38 +49,25 @@ This skill owns its fan-out and applies the five rules from
 
 | Rule | Application here |
 |---|---|
-| 1. Model-pin leaves | Every lens agent and the verify agent use `model: "claude-haiku-4-5-20251001"`. Never Opus. |
+| 1. Model-pin leaves | Every lens agent uses `model: "claude-haiku-4-5-20251001"` (never Opus). The tiered verify (Phase 3) follows the model spec in `verify-protocol.md` — Haiku/Sonnet across its tiers, never Opus. |
 | 2. Cap concurrency | 7 lenses fit in a single parallel block (7 ≤ min(16, cores−2) ≈ 16–20). No batching needed. |
 | 3. Per-agent timeout | Each lens prompt includes: "Complete within 90 s or return findings so far." Mark non-responding agents ABANDONED and proceed. |
-| 4. One batched verify | After all 7 lenses return, run ONE verify/dedup agent over all findings. No per-finding voting. |
+| 4. Tiered adversarial verify | After all 7 lenses return, run the tiered adversarial verify (Phase 3) over all findings. No per-finding voting. |
 | 5. Citation | This skill cites `dispatching-parallel-agents` as the canonical front-door (Shape A). |
 
 ---
 
 ## How to Run
 
-### Phase 1 — Collect Inventory (main context)
+### Phase 1 — Load the component spine from the harvested inventory (main context)
 
-Read every component file and extract structured data:
-
-```
-Read: CLAUDE.md
-Read: rules/*.md (all rule files)
-Read: rules/filesystem/*.md
-Read: skills/*/SKILL.md (all skill files)
-Read: agents/*.md (all agent files)
-```
-
-For each file, extract:
-- **Name** — from frontmatter `name:` field or filename
-- **Type** — skill | agent | rule | global
-- **Invokes** — every `Skill { skill: "X" }`, `Agent { subagent_type: "X" }`, or prose reference
-  like "invoke X skill" or "call the Y agent"
-- **Conventions stated** — file paths (`plans/<slug>/...`), tool names, status values, naming patterns
-- **Trigger conditions** — from frontmatter `description:` field (for skills/agents)
-- **Allowed tools** — from frontmatter `allowed-tools:` field
-
-Build an inventory: `{ name, type, file, invokes: [], conventions: [], trigger, allowed_tools }`
+Read `docs/reference/component-inventory.json` — the authoritative `[{ type, name, file }]` list
+produced by `npm run harvest` — as the SET of components to audit. Do NOT hand-assemble by
+globbing each directory (that omits components and causes silent false negatives).
+**Stale-inventory guard:** if the file is missing, or older than the newest file under
+`skills/`/`agents/`/`rules/`/`.claude/hooks/`, run `npm run harvest` first and note it.
+Then, per component, the lenses read the source `file` for content (triggers, invokes,
+conventions, allowed_tools) as before — the inventory fixes membership; the lenses fill detail.
 
 **Optional plan-doc extension:** If a `plan-doc` path was passed as input, also read that file
 and extract:
@@ -133,32 +121,23 @@ If fewer than ceil(7/2) = 4 lenses return, surface a `degraded` warning before t
 
 ---
 
-### Phase 3 — ONE Batched Verify (Haiku-pinned)
+### Phase 3 — Tiered adversarial verify
 
-After collecting findings from all non-ABANDONED lens agents, run a single verify agent:
+Run the tiered protocol over the lenses' findings, per
+`skills/dispatching-parallel-agents/references/verify-protocol.md` (`audit` profile):
 
-```
-Agent prompt:
-You are a deduplication and ranking agent. You have no memory of prior conversation.
-Complete within 90 seconds or return deduplicated findings collected so far.
+1. **Triage (batched):** label each finding `supported`/`uncertain`/`unsupported`; merge
+   duplicates (same source file + same root cause), preserving severity tiers; drop `unsupported`.
+2. **Clustered re-check:** group the `uncertain`/disagreed findings by source file; for each
+   cluster, re-read the cited file and keep/drop each member against its premise.
+3. **Minority-veto consensus:** escalate the still-contested tail to 3 structurally-diverse voters
+   that each try to refute; survive iff ≥2/3 keep, else drop + log `contested`.
 
-Below are raw findings from 7 semantic-consistency lens agents. Your tasks:
-1. Deduplicate: merge findings that describe the same issue (same source file + same root cause).
-   Keep the most specific description. Note how many lenses flagged it.
-2. Re-rank within each severity tier (error / warning / note) by impact.
-3. Preserve severity — do not promote or demote between tiers.
-4. Return the deduplicated, ranked list in the same format:
-   SEVERITY: error|warning|note
-   FINDING: <source file> — <description>
-   IMPACT: <one sentence>
-   FLAGGED_BY: <lens numbers, e.g. "Lens 1, Lens 3">
-
-RAW FINDINGS:
-<all findings from Phase 2 lenses>
-```
+Output the surviving findings, re-ranked within severity tier, plus the `contested` list (the
+false-negative trail). No per-finding loops — each tier is one batched/clustered pass.
 
 If the verify agent is ABANDONED, surface findings as unverified: prepend the report with
-`> **Note:** Verify agent timed out — findings below are raw (not deduplicated).`
+`> **Note:** Verify tier timed out — findings below are raw (unverified — triage / re-check / consensus not applied).`
 
 ---
 
@@ -203,7 +182,7 @@ If no findings: report "No adherence issues found."
 
 Include at the bottom of the report:
 ```
-Fan-out: 7 lens agents (Haiku-pinned) + 1 batched verify — Shape A per dispatching-parallel-agents
+Fan-out: 7 lens agents (Haiku-pinned) + tiered adversarial verify — Shape A per dispatching-parallel-agents
 ```
 
 ---
