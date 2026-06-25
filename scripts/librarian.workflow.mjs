@@ -237,6 +237,268 @@ async function dimensionalReview(dimensions, policy = {}) {
   return { findings, counts: review.counts, degraded: review.degraded, verifyDegraded };
 }
 
+// verify.mjs — dependency-free tiered adversarial verify engine.
+// Named exports only — never export default (engine bundle strip regex).
+
+const VERIFY_PROTOCOL = {
+  protocolVersion: '1.0',
+  tiers: ['triage', 'clusteredRecheck', 'consensus'],
+  consensus: { voters: 3, surviveAtLeast: 2, rule: 'minority-veto', diversity: ['role', 'ordering', 'modelFamily'] },
+  labels: ['supported', 'uncertain', 'unsupported'],
+  profiles: {
+    'code-review':  { escalateOn: ['uncertain', 'disagree'], bias: 'guard-false-positive' },
+    'web-research': { escalateOn: ['uncertain', 'unsupported', 'thin-source'], bias: 'guard-unsupported' },
+    'plan-review':  { escalateOn: ['uncertain', 'disagree'], bias: 'balanced' },
+    'audit':        { escalateOn: ['uncertain', 'disagree'], bias: 'balanced' },
+  },
+};
+
+// JSON schemas passed as agent `schema` option.
+const TRIAGE_SCHEMA = {
+  type: 'object', required: ['verdicts'],
+  properties: {
+    verdicts: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['index', 'support'],
+        properties: {
+          index:   { type: 'integer' },
+          support: { enum: ['supported', 'uncertain', 'unsupported'] },
+          disagree: { type: 'boolean' },
+        },
+      },
+    },
+  },
+};
+
+const RECHECK_SCHEMA = {
+  type: 'object', required: ['keep'],
+  properties: {
+    keep: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['index', 'keep'],
+        properties: {
+          index: { type: 'integer' },
+          keep:  { type: 'boolean' },
+        },
+      },
+    },
+  },
+};
+
+const VOTE_SCHEMA = {
+  type: 'object', required: ['refuted'],
+  properties: {
+    refuted: { type: 'boolean' },
+    reason:  { type: 'string' },
+  },
+};
+
+// Cluster key: subQuestion for web-research; file portion of where for others.
+const defaultClusterKey = (f) => f.subQuestion ?? (f.where ? String(f.where).split(':')[0] : 'default');
+
+// Strip internal _idx before returning to caller.
+const stripIdx = (arr) => arr.map(({ _idx, ...rest }) => rest);
+
+// Per-tier deadline using internal setTimeout/Promise.race (no external import).
+function withDeadline(p, ms) {
+  let t;
+  // Belt-and-suspenders: if the timeout wins the race, `p` keeps running and may settle
+  // late. Attach a no-op catch so a post-timeout rejection of `p` is never an unhandled
+  // rejection (the Workflow sandbox escalates those). The race still observes `p` normally.
+  Promise.resolve(p).catch(() => {});
+  return Promise.race([
+    p,
+    new Promise((_, rej) => {
+      t = setTimeout(() => rej(new Error('tier-timeout')), ms);
+    }),
+  ]).finally(() => clearTimeout(t));
+}
+
+// Prompt builders — batched, using global _idx as `index`.
+function triagePrompt(findings) {
+  const list = findings
+    .map((f) => `[${f._idx}] ${f.where} — ${f.summary}`)
+    .join('\n');
+  return (
+    'Triage these findings. For EACH (by index) label `supported`/`uncertain`/`unsupported` from its premise + your knowledge; ' +
+    'set `disagree:true` if it conflicts with another. Do NOT re-research. Terse.\n\n' +
+    list
+  );
+}
+
+function recheckPrompt(members) {
+  const list = members
+    .map((f) => `<${f._idx}>: ${f.where} — ${f.summary}`)
+    .join('\n');
+  return (
+    'Re-check this cluster of related findings against their shared source. For EACH `index`, `keep:true` only if the source supports it. Terse.\n\n' +
+    list
+  );
+}
+
+function refutePrompt(finding, voter) {
+  const frames = [
+    'You are a literalist. Does the cited source/file LITERALLY state this? `refuted:true` if the premise is not directly supported.',
+    'You are a context-skeptic. Could this be true in general but WRONG here? Check the specific context.',
+    'You are an alternative-reader. Is there a benign/correct reading under which the finding is a false positive?',
+  ];
+  return (
+    `${frames[voter]} Return \`refuted:true\` ONLY if you can show it is wrong; default \`refuted:false\` when uncertain.\n\n` +
+    `where: ${finding.where}\nsummary: ${finding.summary}`
+  );
+}
+
+/**
+ * Run tiered adversarial verify over `findings`.
+ *
+ * @param {Array}    findings         - Raw findings from a fan-out.
+ * @param {object}   opts
+ * @param {string}   opts.profile     - Profile key: 'audit'|'code-review'|'web-research'|'plan-review'.
+ * @param {Function} opts.agent       - Workflow agent(prompt, opts) => Promise<result>.
+ * @param {number}   [opts.perTierTimeoutMs=120_000]
+ * @param {Function} [opts.clusterBy] - Custom cluster key fn (f) => string.
+ * @returns {Promise<{findings, contested, counts, degraded}>}
+ */
+async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_000, clusterBy }) {
+  try {
+    const prof = VERIFY_PROTOCOL.profiles[profile] ?? VERIFY_PROTOCOL.profiles.audit;
+    const escalateOn = new Set(prof.escalateOn);
+
+    // Stamp global index; all tier logic uses `work`, NOT the caller's `findings`.
+    const work = findings.map((f, i) => ({ ...f, _idx: i }));
+
+    // ── Tier 1: Batched Triage ───────────────────────────────────────────────
+    const t1 = await withDeadline(
+      agent(triagePrompt(work), { label: 'verify:triage', schema: TRIAGE_SCHEMA, model: 'claude-sonnet-4-6' }),
+      perTierTimeoutMs,
+    );
+
+    // Build verdict map keyed by _idx.
+    const verdictMap = new Map();
+    for (const v of t1.verdicts) {
+      verdictMap.set(v.index, v); // v.index is the global _idx echoed by agent
+    }
+
+    const supported   = [];  // Pass-through without re-check
+    const escalation  = [];  // Routed to Tier 2
+    // Anything else (unsupported, no verdict) is silently dropped.
+
+    for (const f of work) {
+      const v = verdictMap.get(f._idx);
+      if (!v) continue; // No verdict → drop
+
+      const label   = v.support;       // 'supported' | 'uncertain' | 'unsupported'
+      const disagree = v.disagree === true;
+
+      // A finding escalates if its label is in escalateOn, OR if it has disagree:true
+      // and 'disagree' is in escalateOn. These are two SEPARATE predicates.
+      const labelEscalates   = escalateOn.has(label);
+      const disagreeEscalates = disagree && escalateOn.has('disagree');
+
+      if (labelEscalates || disagreeEscalates) {
+        escalation.push(f);
+      } else if (label === 'supported') {
+        supported.push(f);
+      }
+      // unsupported (and not in escalateOn) → dropped.
+    }
+
+    // ── Tier 2: Clustered Adversarial Re-Check ───────────────────────────────
+    const keyFn = clusterBy ?? defaultClusterKey;
+
+    // Group escalation set by cluster key.
+    const clusters = new Map();
+    for (const f of escalation) {
+      const key = keyFn(f);
+      if (!clusters.has(key)) clusters.set(key, []);
+      clusters.get(key).push(f);
+    }
+
+    const contestedTail = []; // Survivors from Tier 2 → routed to Tier 3
+
+    for (const [key, members] of clusters) {
+      const r = await withDeadline(
+        agent(recheckPrompt(members), { label: `verify:recheck:${key}`, schema: RECHECK_SCHEMA, model: 'claude-sonnet-4-6' }),
+        perTierTimeoutMs,
+      );
+
+      // Build keep-set keyed by GLOBAL _idx (not cluster position).
+      const keepSet = new Map();
+      for (const entry of r.keep) {
+        keepSet.set(entry.index, entry.keep); // entry.index is the global _idx
+      }
+
+      for (const f of members) {
+        const shouldKeep = keepSet.get(f._idx);
+        if (shouldKeep !== false) {
+          // Kept (true or absent → keep by default)
+          contestedTail.push(f);
+        }
+        // false → dropped; silently excluded
+      }
+    }
+
+    // ── Tier 3: Minority-Veto 3-Voter Consensus ──────────────────────────────
+    const finalSurvivors = [];
+    const contested      = [];
+
+    for (const f of contestedTail) {
+      const votes = await withDeadline(
+        Promise.all(
+          [0, 1, 2].map((v) =>
+            agent(refutePrompt(f, v), {
+              label: `verify:consensus:${v}`,
+              findingId: f.id,
+              schema: VOTE_SCHEMA,
+              model: 'claude-sonnet-4-6',
+            }),
+          ),
+        ),
+        perTierTimeoutMs,
+      );
+
+      const keepers = votes.filter((x) => !x.refuted).length;
+      const anyRefuted = votes.some((x) => x.refuted);
+
+      if (keepers >= VERIFY_PROTOCOL.consensus.surviveAtLeast) {
+        // Survives
+        finalSurvivors.push(f);
+        if (anyRefuted) {
+          // At least one refutation — log contested (visibility, not drop)
+          contested.push(f);
+        }
+      } else {
+        // < surviveAtLeast keepers → dropped AND logged contested
+        contested.push(f);
+      }
+    }
+
+    // Combine: Tier-1 supported + Tier-3 survivors
+    const survivors = [...supported, ...finalSurvivors];
+
+    return {
+      findings:  stripIdx(survivors),
+      contested: stripIdx(contested),
+      counts: {
+        supported:  survivors.length,
+        dropped:    work.length - survivors.length,
+        contested:  contested.length,
+      },
+      degraded: false,
+    };
+  } catch {
+    // Degraded path: return the caller's ORIGINAL findings (never the _idx-stamped copies).
+    return {
+      findings:  findings,
+      contested: [],
+      counts:    { degraded: true },
+      degraded:  true,
+    };
+  }
+}
+
 // <ENGINE-BUNDLE:end>
 
 if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing timer — cannot guarantee liveness');
@@ -279,28 +541,10 @@ const units = subQuestions.map((q) => ({
 const review = await parallelFanout(units, { perUnitTimeoutMs: 240_000, maxInFlight: Math.min(subQuestions.length, 8), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet' });
 const allFindings = review.confirmed.flatMap((r) => r.findings ?? []);
 
-phase('Verify');  // ONE batched ADVERSARIAL verify (never per-finding). Compact verdicts (index/support/drop)
-// applied in JS — keeps the verify's input + output O(small) so it scales to many findings without timing out.
-const VERDICTS = { type: 'object', required: ['verdicts'], properties: { verdicts: { type: 'array',
-  items: { type: 'object', required: ['index', 'support'], properties: {
-    index: { type: 'integer' }, support: { type: 'string', enum: ['supported', 'uncertain', 'unsupported'] },
-    drop: { type: 'boolean' } } } } } };
-// dimensionalReview([], {verify}) passes [] to the callback — read the closed-over allFindings (the T3 contract).
-const verified = await dimensionalReview([], { perUnitTimeoutMs: 300_000, verify: async () => {
-  const v = await agent(
-    `ADVERSARIAL VERIFICATION. The numbered findings below each cite a source URL. For EACH, judge from the cited source + your own knowledge whether the source supports the claim. ` +
-    `WebSearch AT MOST the 3 most surprising or load-bearing claims — do NOT re-search everything; stay well under the time budget. ` +
-    `Return ONE compact verdict per finding: its "index", a "support" label (supported/uncertain/unsupported), and "drop": true ONLY if it is a duplicate or clearly false. Terse — verdicts only, no prose.\n` +
-    allFindings.map((f, i) => `[${i}] (${f.subQuestion}) ${f.claim} — source: ${f.source}`).join('\n'),
-    { label: 'verify', phase: 'Verify', schema: VERDICTS, model: 'claude-sonnet-4-6' });
-  const byIndex = new Map((v.verdicts ?? []).map((d) => [d.index, d]));
-  return allFindings
-    .map((f, i) => { const d = byIndex.get(i); return { ...f, support: d ? d.support : 'uncertain', _drop: d ? !!d.drop : false }; })
-    .filter((f) => !f._drop)
-    .map(({ _drop, ...rest }) => rest);
-} });
-// On verify abandon, dimensionalReview returns findings=[] + verifyDegraded — fall back to the unverified set.
-const vetted = verified.verifyDegraded ? allFindings : verified.findings;
+phase('Verify');
+const verified = await tieredVerify(allFindings, { profile: 'web-research', agent, perTierTimeoutMs: 300_000 });
+const verifyDegraded = verified.degraded;
+const vetted = verifyDegraded ? allFindings : verified.findings;
 
 phase('Synthesize');
 const report = await agent(
@@ -309,9 +553,9 @@ const report = await agent(
   `Group strictly by the sub-questions that actually appear in the findings (do NOT state a numeric COUNT of sub-questions anywhere — no "this report covers N sub-questions"). For each: what the research found, the source URLs from the findings, and a confidence read (lean on the "support" labels — note any "unsupported"/"uncertain" items). ` +
   `Surface contradictions between sources, date every time-sensitive fact, and finish with a "What this means for the build" section drawn strictly from the findings.\n` +
   (brief ? `RESEARCH GOAL (context only — do NOT expand scope beyond the findings): ${brief}\n` : '') +
-  (verified.verifyDegraded ? `NOTE: adversarial verification did not complete — present every claim as UNVERIFIED and say so explicitly.\n` : '') +
+  (verifyDegraded ? `NOTE: adversarial verification did not complete — present every claim as UNVERIFIED and say so explicitly.\n` : '') +
   `--- VETTED FINDINGS (the complete input) ---\n${JSON.stringify(vetted)}`,
   { label: 'synthesize', phase: 'Synthesize', model: 'claude-sonnet-4-6' });
 
 const sources = [...new Set(vetted.map((f) => f.source).filter(Boolean))];
-return { report, subQuestionCount: subQuestions.length, findingCount: vetted.length, sources, degraded: review.degraded, verifyDegraded: verified.verifyDegraded };
+return { report, subQuestionCount: subQuestions.length, findingCount: vetted.length, sources, degraded: review.degraded, verifyDegraded };
