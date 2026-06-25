@@ -3,14 +3,16 @@
 **C4 Layer:** C3 Component
 **Status:** Active
 **Owner:** solo
-**Last updated:** 2026-06-18
+**Last updated:** 2026-06-25
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
-**Related ADRs:** _(none)_
+**Related ADRs:** ADR-0006 (tiered-adversarial verify standard)
 **Key files:**
   - `skills/requesting-code-review/SKILL.md`, `skills/receiving-code-review/SKILL.md` — the review exchange
   - `skills/verification-before-completion/SKILL.md` — evidence-before-claims gate
   - `skills/systematic-debugging/SKILL.md` — mandatory pre-fix debugging discipline
   - `skills/review-workflow/SKILL.md` — acts on accumulated workflow friction
+  - `skills/dispatching-parallel-agents/references/verify-protocol.md` — canonical tiered-adversarial verify protocol
+  - `scripts/lib/verify.mjs` — dependency-free verify engine implementation
 ---
 
 # Quality & Review
@@ -29,6 +31,8 @@ These skills share a single concern: substituting evidence and structured proces
 
 **Scope boundaries.** This feature does not own testing infrastructure (`test-driven-development`, `test-strategy`, `test-builder`, `test-runner` are covered in `docs/explanation/features/testing-system.md`). It does not govern plan creation, task execution, or git operations. It does not handle Jira transitions. It is narrowly the layer that catches problems after implementation and feeds learnings back into the workflow.
 
+This feature is also the **parent of the repo-wide tiered-adversarial verify standard** (ADR-0006): the canonical verify protocol (`skills/dispatching-parallel-agents/references/verify-protocol.md`) and its engine implementation (`scripts/lib/verify.mjs`) ensure that every fan-out's collected findings are adversarially verified before they are surfaced — across all six fan-out consumers (architect panel, `adherence-audit`, `requesting-code-review`, SDD, `librarian`, `orchestration-audit`).
+
 ## Building Block View
 
 Full descriptions, trigger conditions, and allowed tools for each skill are listed in `docs/reference/component-inventory.md`. The following summarizes each component's structural role.
@@ -43,7 +47,7 @@ A gate function, not a process: identify the command that proves the claim, run 
 
 **`requesting-code-review`** (`skills/requesting-code-review/SKILL.md`)
 
-Structures a review request: obtain `BASE_SHA` / `HEAD_SHA`, populate a templated prompt with implementation context and plan reference, and dispatch a code-reviewer subagent. The subagent receives precisely crafted context — not the session's history — to keep the reviewer focused on the work product. Mandatory after each task in subagent-driven development, after major features, and before merge to main. Requires tests passing before submission.
+Structures a review request: obtain `BASE_SHA` / `HEAD_SHA`, populate a templated prompt with implementation context and plan reference, and dispatch a code-reviewer subagent. The subagent receives precisely crafted context — not the session's history — to keep the reviewer focused on the work product. Mandatory after each task in subagent-driven development, after major features, and before merge to main. Requires tests passing before submission. The dispatched reviewer emits findings using the shared severity vocabulary (`error` / `warning` / `note`) and routes them through the tiered-adversarial verify protocol before surfacing.
 
 **`receiving-code-review`** (`skills/receiving-code-review/SKILL.md`)
 
@@ -88,7 +92,11 @@ implementation complete
       (run tests, check exit code, confirm output — evidence before claim)
   → invoke requesting-code-review
       (obtain BASE_SHA / HEAD_SHA, dispatch code-reviewer subagent with plan context)
-      code-reviewer returns findings (Critical / Important / Minor)
+      code-reviewer returns findings (error / warning / note severity)
+        → findings pass through tiered-adversarial verify protocol
+            Tier 1: batched triage (supported / uncertain / unsupported)
+            Tier 2: clustered adversarial re-check on escalated set
+            Tier 3: minority-veto 3-voter consensus on contested tail only
   → invoke receiving-code-review
       (read all feedback before implementing any item)
       (clarify unclear items before acting on any)
@@ -97,6 +105,32 @@ implementation complete
       (implement all items from reviewer, then commit once)
   → verify again (verification-before-completion) after review changes
   → proceed to next task or merge
+```
+
+The following diagram shows the tiered-adversarial verify pipeline that runs inside Flow 2 between finding collection and surfacing.
+
+```mermaid
+flowchart TD
+    A["Collected findings"] --> B["Tier 1 — Batched triage<br/>label each: supported / uncertain / unsupported"]
+    B --> C{"Label?"}
+    C -->|supported| D["Keep — passes through"]
+    C -->|unsupported| E["Drop"]
+    C -->|"uncertain / disagree"| F["Escalate to Tier 2"]
+    D --> G["Tier 2 — Clustered adversarial re-check<br/>group by cluster key; re-read cited premise"]
+    F --> G
+    G --> H{"Re-check verdict?"}
+    H -->|keep| I["Confirmed finding"]
+    H -->|drop| J["Dropped after re-check"]
+    I --> K["Contested tail?"]
+    K -->|no| L["Surfaced finding"]
+    K -->|yes| M["Tier 3 — Minority-veto 3-voter consensus<br/>3 structurally-diverse refuters"]
+    M --> N{"Refutation count"}
+    N -->|"0 of 3 refute"| O["Survives — surfaced finding"]
+    N -->|"1 of 3 refutes"| P["Survives — logged as contested"]
+    N -->|"2 or 3 of 3 refute"| Q["Dropped by consensus"]
+    O --> R["Surfaced findings"]
+    P --> S["Contested log<br/>(false-negative trail)"]
+    L --> R
 ```
 
 ### Flow 3 — Periodic workflow improvement
@@ -123,7 +157,7 @@ workflow-friction issues accumulate in GitHub (via feedback skill)
 **Internal — skills this feature invokes or is invoked by:**
 
 - `plan-management` (skill) — `systematic-debugging` Phase 4 exit gate requires `plan-management:divergence` before declaring debugging complete; also called by `review-workflow` after executing fixes.
-- `dispatching-parallel-agents` (skill) — invoked by `systematic-debugging` when three or more hypotheses need simultaneous investigation.
+- `dispatching-parallel-agents` (skill) — invoked by `systematic-debugging` when three or more hypotheses need simultaneous investigation; also the home of the canonical tiered-adversarial verify protocol (`references/verify-protocol.md`) consumed by all fan-out-bearing skills in this feature.
 - `test-driven-development` (skill) — `systematic-debugging` Phase 4 delegates failing-test creation to this skill.
 - `different-viewpoint` (skill) — invoked by `review-workflow` when a fix is M-sized.
 - `writing-skills` / `creating-tools` (skills) — invoked by `review-workflow` when a skill update or new skill is approved.
@@ -147,7 +181,8 @@ workflow-friction issues accumulate in GitHub (via feedback skill)
 
 ## Decisions
 
-_(No accepted ADRs yet.)_
+- [ADR-0005](../adr/0005-orchestration-regulation-standard.md) — Repo-wide orchestration-regulation standard (Accepted)
+- [ADR-0006](../adr/0006-tiered-adversarial-verify-standard.md) — Tiered-adversarial verify standard (Accepted)
 
 ## Known Issues & Gotchas
 
@@ -165,6 +200,10 @@ _(No accepted ADRs yet.)_
 
 - **`review-workflow` defers L-sized fixes.** If an approved fix requires a plan doc, `review-workflow` does not execute it inline. It creates one via `brainstorming` instead. Inline execution of L-sized work without a plan bypasses architect review.
 
+- **Tiered-adversarial verify is a sampling pass, not a proof.** A real finding can still slip through. The blind-canary recall harness (`scripts/recall/`) is the false-negative smoke signal. On a tier failure or timeout, that tier degrades to pass-through (stamped `degraded`), never a silent hang or silent loss.
+
+- **Prose consumers of verify-protocol must use the repo-root-relative path.** Skills and agents outside `skills/dispatching-parallel-agents/` must cite the protocol as `skills/dispatching-parallel-agents/references/verify-protocol.md`, not a bare `references/…` path.
+
 ## Observability
 
 Quality state in this workflow is not observed through dashboards or metrics endpoints — it is observed through the outputs of the skills themselves at the moments they are invoked.
@@ -173,7 +212,19 @@ Quality state in this workflow is not observed through dashboards or metrics end
 
 **Verification evidence** is the artifact of `verification-before-completion`. The skill requires that the command output be read and its result stated explicitly alongside any completion claim. The absence of this evidence in a session — a completion claim without a preceding verification run — is itself an observable failure of the quality gate.
 
-**Review findings** (Critical / Important / Minor) are the output of the code-reviewer subagent. The disposition of each finding — fixed, pushed back with reasoning, or deferred — is observable in the session transcript and in commits. Critical issues must be fixed before proceeding; Important issues before proceeding to the next task.
+**Review findings** (using the shared severity vocabulary: `error` / `warning` / `note`) are the output of the code-reviewer subagent after the tiered-adversarial verify pass. The verdict per gate is `APPROVED` / `NEEDS REVISION`, computed `RED` if any `error`-severity finding survives verify. The disposition of each finding — fixed, pushed back with reasoning, or deferred — is observable in the session transcript and in commits. `error`-severity findings must be fixed before proceeding; `warning`-severity findings before proceeding to the next task.
+
+The following diagram shows how per-finding severity rolls up to a gate verdict and its corresponding action label.
+
+```mermaid
+flowchart LR
+    E["error severity finding<br/>(at least 1 survives verify)"] --> RED["Gate verdict: RED"]
+    WN["warning or note only<br/>(zero errors survive)"] --> GREEN["Gate verdict: GREEN"]
+    RED --> NR["NEEDS REVISION"]
+    GREEN --> AP["APPROVED"]
+```
+
+**Verify-protocol conformance** is enforced by the `verify:check` conformance guard wired into `npm test`. This guard asserts that `verify.mjs`'s `VERIFY_PROTOCOL` export deep-equals the canonical param block in `verify-protocol.md`, so the implementation and documentation cannot drift silently.
 
 **Debugging exit gate** — `plan-management:divergence` tagged `[bug]` or `[debug-cascade]` — produces a durable journal entry that is observable in the plan journal and in the commit message when no active plan exists.
 
@@ -198,3 +249,11 @@ Quality state in this workflow is not observed through dashboards or metrics end
 **Adversarial review** — The critical challenge pass after all fixes are executed in `review-workflow` that checks for fix drift, contradiction with the workflow map, unnecessary complexity, and whether `workflow-map.md` needs updating. Not optional.
 
 **Exit gate** — The mandatory `plan-management:divergence` call at the end of `systematic-debugging` Phase 4. Declaring debugging complete without invoking it is a protocol violation. The gate ensures root cause and fix are journaled with a `[bug]` or `[debug-cascade]` tag before the session moves on.
+
+**Severity** — Per-finding classification used by all review producers (`architect`, `adherence-audit`, code-reviewer): `error` (blocks gate — verdict goes RED), `warning` (advisory), `note` (informational). The prior per-tool vocabularies (`BLOCKING/MINOR/LOOKS-GOOD` for architect; `BLOCKING/WARNING/INFO` for adherence-audit) are retired in favor of this one shared vocabulary.
+
+**Verdict** — Per-gate outcome computed from findings: `APPROVED` (GREEN — zero `error`-severity findings survive verify) or `NEEDS REVISION` (RED — one or more `error`-severity findings survive). Consumed by `plan-gate` and `rules/planning.md`.
+
+**Tiered-adversarial verify** — The three-tier protocol (`skills/dispatching-parallel-agents/references/verify-protocol.md`) run against a fan-out's collected findings before surfacing: Tier 1 batched triage drops unsupported findings; Tier 2 clustered adversarial re-check re-examines the escalated set; Tier 3 minority-veto 3-voter consensus on the contested tail only (a finding survives iff ≥2 of 3 voters fail to refute). A lone refutation forces escalation to the `contested` log rather than a silent drop, guarding against agreeableness bias. Adopted by all six fan-out consumers.
+
+**Contested log** — The `contested` annotation attached by the verify protocol to a finding that survived Tier 3 with at least one refutation. Provides the false-negative trail: a finding can survive verify and still be flagged as contested, ensuring visibility of dissent without silently discarding it.

@@ -3,9 +3,9 @@
 **C4 Layer:** C3 Component
 **Status:** Active
 **Owner:** solo
-**Last updated:** 2026-06-23
+**Last updated:** 2026-06-25
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
-**Related ADRs:** [ADR-0002](../adr/0002-executor-spectrum-soft-vs-hard-gates.md) (executor spectrum — Accepted), [ADR-0004](../adr/0004-fail-successfully-fanout-primitive.md) (fail-successfully fan-out primitive — Accepted; informational reference, parented to `orchestration-regulation-layer.md`). ADR-0005 (repo-wide orchestration-regulation standard) is pending promotion at campaign close — it will be parented to this file.
+**Related ADRs:** [ADR-0005](../adr/0005-orchestration-regulation-standard.md) (repo-wide orchestration-regulation standard — Accepted; parented to this file), [ADR-0006](../adr/0006-tiered-adversarial-verify-standard.md) (tiered-adversarial verify standard — Accepted; informational reference, parented to `quality-and-review.md`), [ADR-0002](../adr/0002-executor-spectrum-soft-vs-hard-gates.md) (executor spectrum — Accepted), [ADR-0004](../adr/0004-fail-successfully-fanout-primitive.md) (fail-successfully fan-out primitive — Accepted; informational reference, parented to `orchestration-regulation-layer.md`).
 **Key files:**
   - `.claude/hooks/` — deterministic runtime gates (sessionStart, preToolUse, postToolUse, userPromptSubmit, pre-commit)
   - `skills/plan-gate/SKILL.md` — the canonical soft-gate sequence
@@ -57,6 +57,52 @@ The workflow's review components — `architect`, `adherence-audit`, `docs-statu
 
 Severity describes a *finding*; verdict is a *roll-up of a gate's findings*; enforcement-hardness is a property of the *gate itself*, independent of either. A `soft` gate (e.g. the architect review) still produces `error`-severity findings and computes a `RED` verdict — "soft" refers to how the gate is enforced, not to how serious its findings can be.
 
+The diagram below shows how the three concepts relate — severity rolls up into verdict; enforcement-hardness is a separate gate property; the explicit-vs-prose axis is orthogonal to all three.
+
+```mermaid
+flowchart TB
+    subgraph FINDINGS["Per-finding severity"]
+        direction LR
+        ERR["error"]
+        WARN["warning"]
+        NOTE["note"]
+    end
+
+    subgraph VERDICT["Per-gate verdict — computed roll-up"]
+        direction LR
+        RED["RED — at least one error finding"]
+        GREEN["GREEN — no error findings"]
+    end
+
+    subgraph ACTION["Gate outcome"]
+        direction LR
+        NEEDS["NEEDS REVISION"]
+        APPROVED["APPROVED"]
+    end
+
+    subgraph HARDNESS["Per-gate enforcement-hardness — gate property, not finding property"]
+        direction LR
+        HARD["hard — hook-enforced, deterministic runtime"]
+        SOFT["soft — markdown-interpreted, LLM judgment"]
+    end
+
+    subgraph INVOCATION["Orthogonal axis — how the gate is referenced"]
+        direction LR
+        EXPLICIT["explicit-invocation — gate-map edge present"]
+        PROSE["prose-reference — mentioned in text, no gate-map edge"]
+    end
+
+    ERR -->|"any error finding"| RED
+    WARN --> GREEN
+    NOTE --> GREEN
+    RED --> NEEDS
+    GREEN --> APPROVED
+
+    FINDINGS -.->|"independent of"| HARDNESS
+    VERDICT -.->|"independent of"| HARDNESS
+    INVOCATION -.->|"orthogonal to severity, verdict, and hardness"| FINDINGS
+```
+
 ### Mapping table — each component's surface labels → the canonical tiers
 
 | Component | Its label | Canonical | Axis |
@@ -73,6 +119,8 @@ Severity describes a *finding*; verdict is a *roll-up of a gate's findings*; enf
 `architect`'s `LOOKS GOOD` was never a severity — it labels findings worth *preserving*, which carry no problem-severity. It collapses into a **Strengths** section and the `GREEN` verdict, not into a tier. The action-bearing verdict *words* `APPROVED` / `NEEDS REVISION` are retained (callers key on them) and live on the verdict axis, mapping to `GREEN` / `RED`.
 
 **Why the rename is safe (and why it waited until now):** renaming an externally-consumed severity enum is the GCC-14 `-Werror` / Clippy breakage class — but that hazard only bites when *downstream parsers are external*. Here every consumer is **in-repo markdown read by an LLM** (`plan-gate`, `rules/planning.md`), not an external parser, so all producers and consumers are renamed **atomically in one wave**. Doing it earlier would have broken a consumer in isolation; doing it together does not.
+
+**[Wave 5] One shared verify protocol.** The review and enforcement gates (architect panel, `adherence-audit`, `requesting-code-review`, SDD, `librarian`, `orchestration-audit`) previously each rolled their own finding-verification pass — mostly dedup/rank-only, non-adversarial. [ADR-0006](../adr/0006-tiered-adversarial-verify-standard.md) establishes a single canonical verify protocol shared by all six consumers: `skills/dispatching-parallel-agents/references/verify-protocol.md` is the doc, `scripts/lib/verify.mjs` is the dependency-free engine, and `verify:check` (wired into `npm test`) enforces that the implementation's machine-readable param block byte-matches the doc so the two cannot drift. The protocol is three tiers — batched triage, clustered adversarial re-check, minority-veto 3-voter consensus on the contested tail — with per-consumer profiles carrying asymmetric cost models. Reviewers no longer roll their own verify; every fan-out routes through this one primitive.
 
 ### The explicit-invocation-vs-prose axis is separate and orthogonal
 
@@ -202,6 +250,8 @@ There is no per-hook disable mechanism other than the prefix marker for graph-to
 
 Backlinks to ADRs that govern this feature (status inline).
 
+- [ADR-0005](../adr/0005-orchestration-regulation-standard.md) — Repo-wide orchestration-regulation standard: the fan-out front-door, the one severity/verdict/enforcement taxonomy, the operating-model decision layer, and the hook-hardening policy (Accepted)
+- [ADR-0006](../adr/0006-tiered-adversarial-verify-standard.md) — Tiered-adversarial verify standard (Accepted)
 - [ADR-0002](../adr/0002-executor-spectrum-soft-vs-hard-gates.md) — Executor spectrum — markdown vs code (soft vs hard gates) (Accepted)
 
 ## Known Issues & Gotchas
@@ -276,8 +326,10 @@ This section records which git-compliance checks have been hardened into code, w
 |---|---|---|
 | `git-prohibitions` | `.claude/hooks/preToolUse/git-prohibitions.mjs` | Stage-all (`git add -A` / `git add --all` / `git add .`) and hook-skip (`--no-verify` as a standalone flag in any git command). Registered under the `"Bash"` matcher in `.claude/settings.json`. |
 
+**[Wave 5] Further hardened in Wave 5 (committed `1eb1db2`):** the hook now also catches (a) `git commit -n` short-forms (standalone `-n` flag and combined clusters such as `-nm`); (b) stage-all escapes including `git -C <path> add -A` and combined flag clusters (`-Av`, `-v -A`). The `[git-allowed]` bypass is now **prefix-only** — the marker must appear at the start of the command string; a substring match anywhere in the command no longer bypasses the hook.
+
 Bypass options (in order of preference):
-1. Prefix the command with `[git-allowed]` for a single deliberate override.
+1. Prefix the command with `[git-allowed]` (must be at the very start) for a single deliberate override.
 2. Set `CLAUDE_DISABLE_WORKFLOW_HOOKS=1` for a full emergency rollback (disables all hooks).
 
 ### Future candidates — gated by matured × high-stakes × tool-observable

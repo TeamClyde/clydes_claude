@@ -3,9 +3,9 @@
 **C4 Layer:** C3 Component
 **Status:** Active
 **Owner:** solo
-**Last updated:** 2026-06-18
+**Last updated:** 2026-06-25
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
-**Related ADRs:** _(none)_
+**Related ADRs:** ADR-0005 (orchestration-regulation-standard), ADR-0006 (tiered-adversarial-verify-standard)
 **Key files:**
   - `docs/reference/component-inventory.md` — generated roster of all skills + agents
   - `rules/new-repo-setup.md` — agent/skill registry + invocation conventions
@@ -118,7 +118,30 @@ Skills, agents, and rules are designed to compose across all three dimensions:
 
 **Skills orchestrate agents.** The orchestration skills (`brainstorming` → `writing-plans` → `plan-gate` → `executing-plans`) form a chain. Along the chain, skills dispatch agents: `plan-gate` dispatches `architect`, then `test-strategy`, then `test-builder`. The `infra-init` skill dispatches the three `infra-init-*` agents in sequence and in parallel. Skills run in main context and own all coordination decisions; agents run isolated and return results.
 
+**The `operating-model` skill is the whether/when/which-executor decision layer.** It sits above the fan-out front-door (`dispatching-parallel-agents`), answering the prior question: should this work be fanned out at all, and if so, via which executor surface? Single-threaded inline reasoning is the default; fan-out is the exception that must earn its cost. The skill carries the 2026 executor map (inline → single subagent → parallel batch via the front-door → Agent Teams → Dynamic Workflows), the circuit-reasoning frame for thinking about series vs. parallel cost, the fan-out sizing model (concurrency defers to the runtime ceiling; total volume is token-budget-gated, not spawn-count-capped), and the anti-patterns that most commonly make fan-out a false economy. It delegates all dispatch mechanics to `dispatching-parallel-agents` — the decision layer and the dispatch layer are separated by design.
+
 **Agents invoke agents (narrowly).** The `architect` agent invokes the `researcher` agent when it needs to verify a cross-reference in a plan doc. The `vet-security` skill invokes the `ai-tool-security-reviewer` agent as Gate 3 of the install-vetting funnel. Agent-to-agent dispatch is always narrow and purpose-specific — it is not recursive orchestration.
+
+The following diagram shows the `operating-model` decision layer in full: whether fan-out is warranted, which executor to use, and how all fan-out paths converge on the shared dispatch front-door and verify protocol before findings are surfaced.
+
+```mermaid
+flowchart TD
+    A["Task arrives"] --> B{"Is fan-out warranted?<br/>Single-threaded is the DEFAULT;<br/>fan-out must earn its cost"}
+    B -- "No" --> C["Run inline or a<br/>single subagent"]
+    B -- "Yes" --> D{"Which executor?"}
+    D --> E["Parallel batch"]
+    D --> F["Agent Teams"]
+    D --> G["Dynamic Workflow"]
+    E --> H["dispatching-parallel-agents<br/>front-door<br/>(model-pinned, fail-successfully-wrapped,<br/>token-budget-gated)"]
+    F --> H
+    G --> H
+    H --> I["Tiered-adversarial<br/>verify protocol<br/>(triage → adversarial re-check<br/>→ minority-veto consensus)"]
+    I --> J["Findings surfaced<br/>to caller"]
+
+    style B fill:#f5f5dc,stroke:#999
+    style H fill:#ddeeff,stroke:#6699cc
+    style I fill:#ddeeff,stroke:#6699cc
+```
 
 ```
 Rules (ambient system prompt)
@@ -169,10 +192,12 @@ brainstorming
                         ├── dispatches test-strategy (on APPROVED)
                         ├── dispatches test-builder (on test strategy approval)
                         └── hands off to →
-                              executing-plans  (sequential, multi-session)
-                              OR
-                              subagent-driven-development  (parallel, single-session)
-                                    └── finishing-a-development-branch
+                              operating-model  (whether/when/which-executor decision layer)
+                                └── delegates dispatch mechanics to →
+                                      executing-plans  (sequential, multi-session)
+                                      OR
+                                      subagent-driven-development  (parallel, single-session)
+                                            └── finishing-a-development-branch
 ```
 
 Each handoff in the chain is explicit — a skill emitting the next skill's invocation — not implicit continuation.
@@ -187,6 +212,10 @@ The `infra-init` skill demonstrates the fan-out / reduce pattern used when indep
 
 Re-running the skill reads `progress.json` and resumes from the first incomplete batch. The pattern is recoverable by design.
 
+**Fan-out sizing model (2026):** The old fixed "≤20 concurrent" principle is superseded. Concurrency defers to the runtime's machine-aware ceiling (`min(16, cores−2)` for the Workflow tool; 25 for Agent Teams); total volume is token-budget-gated rather than spawn-count-capped. The real spend controls are model-pinning (Haiku for scan/retrieval, Sonnet for judgment — never inherit Opus) and batched verify (one verifier per ~10 findings, not per-finding voting). The `operating-model` skill is the authoritative reference for these heuristics.
+
+**Shared tiered-adversarial verify protocol:** All six regulated fan-out consumers — the architect panel, `adherence-audit`, `requesting-code-review`, `subagent-driven-development`'s two-lens review, the `librarian` workflow, and the `orchestration-audit` workflow — route their post-fan-out finding verification through one shared protocol (`skills/dispatching-parallel-agents/references/verify-protocol.md`) instead of per-skill ad-hoc verify. The protocol has three tiers: (1) a cheap batched triage that labels findings `supported`/`uncertain`/`unsupported`; (2) a clustered adversarial re-check on the escalation set, one re-check per cluster; (3) a minority-veto 3-voter consensus on the contested tail only. A finding survives Tier 3 iff ≥2 of 3 structurally-diverse voters fail to refute it. This is codified in ADR-0006.
+
 ---
 
 ## Dependencies
@@ -196,6 +225,7 @@ Re-running the skill reads `progress.json` and resumes from the first incomplete
 - **`Agent` tool** — required for agent dispatch. Available in Claude Code CLI sessions. Subagents do not automatically inherit it — `test-runner` requires the caller (orchestrator) to have `Skill` tool access so its REQUIRED NEXT STEP block on failure is actionable.
 - **codebase-memory-mcp** — used by the `researcher` agent, the `infra-init-graph-builder` agent, and by main context code navigation. Must be installed and indexed (via `/infra-init`) before graph queries are available.
 - **Atlassian remote MCP** — used by `jira-workflow-manager`. Governed by the `mcp-governance` rule: never call Atlassian MCP tools directly; always delegate through the agent.
+- **`operating-model` skill** — the whether/when/which-executor decision layer consulted before committing to a fan-out. Carries the 2026 executor map and fan-out sizing model; delegates dispatch mechanics to `dispatching-parallel-agents`. Authoring-time dependency used whenever a workflow step is being designed.
 - **`pulser` skill** — structural quality check for new skills/agents against Anthropic's 7 design principles. Authoring dependency, not a runtime dependency.
 - **`adherence-audit` skill** — semantic consistency checker for dead references, mismatches, and orphaned components across the skill/agent/rule corpus. Invoked periodically and after adding new components.
 
@@ -203,7 +233,8 @@ Re-running the skill reads `progress.json` and resumes from the first incomplete
 
 ## Decisions
 
-_(No accepted ADRs yet.)_
+- [ADR-0005](../adr/0005-orchestration-regulation-standard.md) — Repo-wide orchestration-regulation standard (Accepted)
+- [ADR-0006](../adr/0006-tiered-adversarial-verify-standard.md) — Tiered-adversarial verify standard (Accepted)
 
 ---
 
@@ -220,6 +251,8 @@ _(No accepted ADRs yet.)_
 - **`plugin-lifecycle` suppression is soft enforcement.** The `plugin-lifecycle` rule instructs Claude not to invoke Integrated plugin skills directly. This is model-judgment-dependent, not a technical block. If direct invocation of an Integrated skill persists, the escalation path is narrowing the skill's trigger description — which requires forking the plugin.
 
 - **`feedback` skill does not write to `docs/workflow-feedback.md`.** An earlier version of the skill wrote to that path. The file has been archived. Current behavior: the skill appends observations to the session memory store at `.claude/projects/<project>/memory/` and optionally files a GitHub issue. Do not reference `docs/workflow-feedback.md` in any new skill or rule.
+
+- **Per-skill verify is superseded.** Prior to Wave 5 of the Orchestration & Regulation Campaign, each fan-out consumer (architect panel, `adherence-audit`, `requesting-code-review`, SDD, `librarian`, `orchestration-audit`) maintained its own ad-hoc verify step, most of which were dedup/rank-only rather than adversarial. These are replaced by the shared tiered-adversarial verify protocol (`skills/dispatching-parallel-agents/references/verify-protocol.md`). Do not introduce new per-skill verify logic; route through the shared protocol instead.
 
 - **Agent iteration limit.** The `architect` agent supports a maximum of 3 review rounds. If BLOCKING issues remain after the third pass, the main context surfaces them to the user — a fourth round is not attempted. This prevents infinite review loops but means some blocking issues require human resolution.
 
@@ -261,6 +294,8 @@ The component model is observed through generated artifacts and periodic audits 
 
 **Model tier** — The assignment of a model (Haiku vs. Sonnet) to an agent based on the cognitive demand of its task. Haiku: retrieval and extraction, no synthesis. Sonnet: review, reasoning, and cross-file synthesis.
 
+**Operating-model skill** — The whether/when/which-executor decision layer that sits above the fan-out front-door. Answers: should this work be fanned out at all, and via which executor surface? Single-threaded is the default; fan-out is the exception. Carries the 2026 executor map, the fan-out sizing model, and the anti-patterns. Delegates all dispatch mechanics to `dispatching-parallel-agents`.
+
 **Orchestration skill** — One of the six skills that form the primary workflow chain: `brainstorming`, `writing-plans`, `plan-gate`, `executing-plans`, `subagent-driven-development`, `finishing-a-development-branch`. Each hands off explicitly to the next.
 
 **Rule** — A Markdown file under `~/.claude/rules/` injected into the system prompt at session start. Provides ambient constraints that apply without invocation. Contrast with skills, which are invoked explicitly.
@@ -270,3 +305,5 @@ The component model is observed through generated artifacts and periodic audits 
 **Spawned-only agent** — An agent defined inline in a skill's SKILL.md (not as a persistent `~/.claude/agents/<name>.md` file) and dispatched only by that skill at runtime. The three `infra-init-*` agents are spawned-only.
 
 **Stack hat** — Per-technology best-practice guidance (`~/.claude/stacks/<name>.md`) injected alongside ambient rules when a repo declares a matching stack in `project.json`. Composed on top of the base skill/agent/rule model without replacing it.
+
+**Tiered-adversarial verify** — The repo-wide standard for verifying findings produced by a fan-out before they are surfaced (ADR-0006). Three tiers: (1) batched triage labels each finding `supported`/`uncertain`/`unsupported`; (2) clustered adversarial re-check re-reads each finding cluster's cited premise; (3) minority-veto 3-voter consensus on the contested tail — a finding survives iff ≥2 of 3 structurally-diverse voters fail to refute it. Canonical reference: `skills/dispatching-parallel-agents/references/verify-protocol.md`.

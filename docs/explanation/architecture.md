@@ -2,7 +2,7 @@
 **Repo:** claude-workflow-improvements
 **C4 Layers:** C1 System Context + C2 Containers
 **Owner:** solo
-**Last updated:** 2026-06-18
+**Last updated:** 2026-06-25
 ---
 
 # Architecture
@@ -157,6 +157,54 @@ Hooks are the only deterministic layer. They are JavaScript scripts wired into `
 - **`userPromptSubmit`:** `slash-command-enforcement`
 - **`preCommit`** (via settings): runs `scripts/run-tests.sh`, ESLint, ruff, and gitleaks — all skip gracefully if the tool is absent
 
+**Orchestration-regulation layer**
+
+The orchestration-regulation layer is a cross-cutting subsystem — not a separate installation directory, but a set of standards and shared primitives that every multi-agent fan-out consumes. It was codified by the Orchestration & Regulation Campaign (Waves 1–5, 2026) and is anchored in `docs/explanation/features/orchestration-gating.md`.
+
+- **Fan-out front-door.** Every regulated multi-agent fan-out routes through the `dispatching-parallel-agents` skill over `scripts/lib/dispatch.mjs`. All dispatches are `fail-successfully`-wrapped (per-unit FSM: watchdog + `runUnit` + `quorumBarrier`), model-pinned (Haiku scan / Sonnet judgment, never inherit Opus), and token-budget-gated. Consumers do not re-implement dispatch.
+- **One severity/verdict/enforcement taxonomy.** Three concepts: `error` / `warning` / `note` per finding (SARIF-verbatim); `RED` / `GREEN` verdict per gate (computed — `RED` iff ≥1 `error`); `hard` (hook) / `soft` (markdown) enforcement-hardness per gate. All fan-out producers and consumers share this vocabulary.
+- **Tiered-adversarial verify standard.** Every fan-out's collected findings pass through the three-tier verify protocol before surfacing: (1) batched triage labels each finding `supported`/`uncertain`/`unsupported`; (2) clustered adversarial re-check of the escalation set reads each finding's cited premise; (3) minority-veto 3-voter consensus on the contested tail (a finding survives iff ≥2 of 3 structurally-diverse voters fail to refute it; a lone refuter forces `contested` logging rather than silent survival). Canonical doc: `skills/dispatching-parallel-agents/references/verify-protocol.md`; engine: `scripts/lib/verify.mjs`; drift-guarded by the `verify:check` conformance test wired into `npm test`.
+- **Blind-canary recall harness.** `scripts/recall/` holds quarantined fixtures and an answer-key registry (`registry.json`) never shown to detectors. A cheap hash-check runs on every commit (`npm run recall:check`); a periodic full run (`scripts/recall/run-recall.mjs`) scores real detectors for false-negative signal. Framed as a smoke test, not a statistical recall score.
+- **Decision layer.** The `operating-model` skill is the whether/when/which-executor layer above the front-door: single-threaded is the default; fan-out is the exception that must earn its cost. It carries the 2026 executor map, the circuit-reasoning frame, and the fan-out sizing model, and delegates all dispatch mechanics to the front-door.
+- **Surgical hook-hardening.** A small number of matured × high-stakes × tool-observable control edges are hardened into `preToolUse` hooks (the `git-prohibitions` hook is the first, denying `git add -A` / `git add .` / `--no-verify` flag abuse). This is a compliance safety-net against the assistant's own drift — not a security boundary. Most control edges are not tool-observable and remain soft by design.
+
+The following diagram shows the container relationships within the orchestration-regulation layer.
+
+```mermaid
+flowchart TD
+    DL["operating-model skill<br/>(decision layer — whether / when / which executor)"]
+
+    subgraph FRONTDOOR["Fan-out front-door — dispatching-parallel-agents"]
+        PF["parallel fan-out"]
+        SC["sequential chain"]
+        DR["dimensional review"]
+    end
+
+    subgraph ENGINE["Regulated dispatch primitive<br/>(scripts/lib)"]
+        DISP["dispatch.mjs<br/>(per-unit FSM + quorum barrier)"]
+        FS["fail-successfully.mjs<br/>(watchdog + runUnit wrapper)"]
+    end
+
+    subgraph VERIFY["Tiered-adversarial verify standard"]
+        VENG["verify.mjs<br/>(3-tier: triage → adversarial → minority-veto)"]
+        VPROT["verify-protocol.md<br/>(canonical spec)"]
+        VCHECK["verify:check<br/>(conformance guard — npm test)"]
+    end
+
+    RECALL["Blind-canary recall harness<br/>(scripts/recall — false-negative smoke signal)"]
+
+    HOOK["git-prohibitions PreToolUse hook<br/>(compliance safety-net)"]
+
+    DL -->|"delegates dispatch to"| FRONTDOOR
+    FRONTDOOR -->|"all fan-outs route through"| ENGINE
+    DISP --- FS
+    ENGINE -->|"findings pass through"| VERIFY
+    VENG --- VPROT
+    VCHECK -->|"drift-guards"| VENG
+    ENGINE -->|"false-negative signal"| RECALL
+    HOOK -.->|"side guard on tool calls"| ENGINE
+```
+
 **Templates**
 
 Templates under `templates/` are seed files copied (not symlinked) on first use. They include `CODEBASE.md` (5-category codebase summary for `infra-init`), `testing-plan.md` (starter for `.claude/testing-plan.md`, used by `e2e-init`), `branch-protection.json` (Bitbucket API payload), `pr-description.md`, `mcp-settings.json`, and `stack-setup-record.md` (per-repo install record for project-setup Phase 4).
@@ -207,4 +255,5 @@ The workflow uses a five-layer instruction hierarchy. Layers load at different t
 
 Backlinks to ADRs that operate at C1 or C2.
 
-_(No accepted ADRs operate at C1/C2 yet — promoted at sub-plan close.)_
+- [ADR-0005](adr/0005-orchestration-regulation-standard.md) — Repo-wide orchestration-regulation standard (Accepted)
+- [ADR-0006](adr/0006-tiered-adversarial-verify-standard.md) — Tiered-adversarial verify standard (Accepted)
