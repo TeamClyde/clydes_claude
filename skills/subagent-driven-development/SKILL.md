@@ -53,7 +53,8 @@ digraph process {
         "Implementer subagent implements, tests, commits, self-reviews" [shape=box];
         "Dispatch spec + quality reviewers IN PARALLEL (Shape A)" [shape=box style=filled fillcolor=lightblue];
         "Both reviewers clean?" [shape=diamond];
-        "Implementer subagent fixes combined findings" [shape=box];
+        "Tiered adversarial verify (audit profile)" [shape=box style=filled fillcolor=lightblue];
+        "Implementer subagent fixes surviving findings" [shape=box];
         "Mark Task Reference row ✅ + pulser if skill created" [shape=box style=filled fillcolor=lightyellow];
         "Assert exit gate (X1-X4)" [shape=box style=filled fillcolor=lightyellow];
         "Mark task complete in TodoWrite" [shape=box];
@@ -81,8 +82,9 @@ digraph process {
     "Orchestrator invokes systematic-debugging" -> "Re-dispatch implementer subagent to fix";
     "Re-dispatch implementer subagent to fix" -> "Orchestrator invokes test-runner (if testing-plan.md exists)";
     "Dispatch spec + quality reviewers IN PARALLEL (Shape A)" -> "Both reviewers clean?";
-    "Both reviewers clean?" -> "Implementer subagent fixes combined findings" [label="no (either or both flagged issues)"];
-    "Implementer subagent fixes combined findings" -> "Dispatch spec + quality reviewers IN PARALLEL (Shape A)" [label="re-review (both lenses)"];
+    "Both reviewers clean?" -> "Tiered adversarial verify (audit profile)" [label="no — compile combined findings"];
+    "Tiered adversarial verify (audit profile)" -> "Implementer subagent fixes surviving findings" [label="surviving findings only"];
+    "Implementer subagent fixes surviving findings" -> "Dispatch spec + quality reviewers IN PARALLEL (Shape A)" [label="re-review (both lenses)"];
     "Both reviewers clean?" -> "Mark Task Reference row ✅ + pulser if skill created" [label="yes"];
     "Mark Task Reference row ✅ + pulser if skill created" -> "Assert exit gate (X1-X4)";
     "Assert exit gate (X1-X4)" -> "Mark task complete in TodoWrite";
@@ -173,11 +175,13 @@ State a per-reviewer time bound in each prompt ("complete within 120 s or surfac
 **Collect both results (one batched pass), then:**
 
 1. If **both are clean** (no issues) → proceed to exit gate.
-2. If **either (or both) flagged issues** → compile the combined finding set from both reviewers and re-dispatch the implementer to address them in one fix pass.
-3. After the implementer's fix, re-dispatch **both reviewers in parallel again** (same Shape A block).
-4. Repeat until both lenses return clean.
+2. If **either (or both) flagged issues** → compile the combined finding set from both reviewers.
+3. Run the **tiered adversarial verify** over the combined finding set (`skills/dispatching-parallel-agents/references/verify-protocol.md`, `audit` profile): batched triage drops `unsupported` lens findings → a clustered re-check of the escalated set against the cited code → the still-contested tail escalates to a minority-veto 3-voter consensus that re-checks each finding against the code. Only surviving findings feed the one implementer fix pass; `contested` findings are logged, not actioned. This stays ONE batched pass — no per-finding loops.
+4. Re-dispatch the implementer to address surviving findings in one fix pass.
+5. After the implementer's fix, re-dispatch **both reviewers in parallel again** (same Shape A block).
+6. Repeat until both lenses return clean.
 
-**No per-finding verification loops.** Do not run a separate verify agent per finding — the combined finding set IS the batched pass. ONE synthesized fix loop over all findings is the design.
+**No per-finding verification loops over the full finding set.** The tiered verify is itself the one batched pass (triage → clustered re-check → bounded contested-tail consensus) — it does not run a separate verify agent per finding. ONE synthesized fix loop over surviving findings is the design.
 
 **Quorum:** With exactly two lenses, quorum is both. If one reviewer is ABANDONED, surface the degraded-lens state to the user before proceeding — do not silently skip a lens.
 
@@ -319,7 +323,7 @@ See `./references/example-workflow.md` for a full 2-task walkthrough (entry gate
 
 **Quality gates:**
 - Self-review catches issues before handoff
-- Parallel two-lens review: spec compliance + code quality simultaneously (one batched pass)
+- Parallel two-lens review: spec compliance + code quality simultaneously; combined findings pass through tiered adversarial verify before the implementer fix pass (one batched pass)
 - Review loops ensure fixes actually work (both lenses must be clean before moving on)
 - Spec compliance prevents over/under-building
 - Code quality ensures implementation is well-built
@@ -343,7 +347,7 @@ See `./references/example-workflow.md` for a full 2-task walkthrough (entry gate
 - Accept "close enough" on spec compliance (spec reviewer found issues = not done)
 - Skip review loops (either reviewer found issues = implementer fixes combined set = both re-review)
 - Let implementer self-review replace actual review (both lenses are needed)
-- **Run per-finding verification loops** (one batched pass over combined findings is the design)
+- **Run per-finding verification loops over the full finding set** (the tiered verify is the one batched pass; it does not loop per-finding over the full set)
 - **Skip a lens** when the other passes — both spec compliance AND code quality must be clean
 - Move to next task while either review lens has open issues
 - Dispatch test-runner from within an implementer subagent (orchestrator must invoke it directly)
