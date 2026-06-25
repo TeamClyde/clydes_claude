@@ -10,6 +10,7 @@
     "harvest:check": "node scripts/harvest-components.mjs --emit && git diff --exit-code docs/reference/",
     "build:engine": "node scripts/build-engine-bundle.mjs --emit",
     "engine:check": "node scripts/build-engine-bundle.mjs --emit && git diff --exit-code scripts/orchestration-audit.workflow.mjs scripts/librarian.workflow.mjs",
-    "verify:check": "node scripts/verify-conformance.mjs"
+    "verify:check": "node scripts/verify-conformance.mjs",
+    "recall:check": "node scripts/recall/check.mjs"
   }
 }
