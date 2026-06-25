@@ -17,6 +17,7 @@ You delegate tasks to specialized agents with isolated context. By precisely cra
 Related:
 - `scripts/lib/fail-successfully.mjs` — the underlying engine (`runUnit`, `quorumBarrier`)
 - `scripts/lib/dispatch.mjs` — the three helpers (`parallelFanout`, `sequentialChain`, `dimensionalReview`)
+- `references/verify-protocol.md` — the canonical tiered-adversarial verify protocol (triage → clustered re-check → minority-veto consensus) + machine-readable param block
 - `docs/explanation/orchestration-regulation-layer.md` §5 / §9 — design rationale
 
 ## When to Use
@@ -124,22 +125,27 @@ The five rules apply identically regardless of surface:
 | 1. Model-pin leaves | Pass `model: "claude-haiku-4-5-20251001"` (or Sonnet) in every `Agent` call. Never Opus. |
 | 2. Cap concurrency | Dispatch at most `min(16, cores−2)` agents in a single parallel block (≤ ~16–20). Batch the rest. |
 | 3. Per-agent timeout | State an explicit time bound in the agent prompt ("complete within 60 s or surface what you have"). Mark any non-responding agent ABANDONED and proceed. |
-| 4. One batched verify | After collecting all findings, run ONE verify/dedup agent. Never a verification loop per finding. |
+| 4. Tiered adversarial verify | Where a fan-out produces findings to verify, run the tiered verify (`references/verify-protocol.md`): one batched triage → bounded per-cluster re-check → minority-veto consensus on the contested tail only. Never a per-finding verification loop over the full findings set. |
 | 5. This section IS the citation target | Link here from consuming prose skills; link to [`references/dispatch-policy.md`](references/dispatch-policy.md) for schema depth. |
 
 ---
 
 ### Shape A — Dimensional-review panel
 
-Dispatch N lens-prompt agents in parallel (one per review dimension). After all return (or are abandoned), run ONE batched verify/dedup agent over all findings, then synthesize.
+Dispatch N lens-prompt agents in parallel (one per review dimension). After all return (or are abandoned), run the tiered-adversarial verify protocol over all findings, then synthesize.
+
+> **Verify:** Shape A's verify step follows the canonical three-tier protocol: batched triage → clustered re-check → minority-veto consensus. Full spec, per-consumer profiles, graceful-degradation rules, and the machine-readable param block are in [`references/verify-protocol.md`](references/verify-protocol.md).
 
 ```
 1. Identify N independent review lenses (security, performance, correctness, …).
 2. Dispatch all N via Agent tool in one parallel block, model-pinned to Haiku/Sonnet.
 3. Collect all results. Mark non-responding agents ABANDONED.
 4. If confirmed.length < quorum (default: ceil(N/2)), surface degraded state to caller.
-5. Run ONE verify agent: "Deduplicate and rank these findings: <all findings>."
-   If the verify agent hangs → surface findings as unverified (verifyDegraded).
+5. Run tiered-adversarial verify (see references/verify-protocol.md):
+     Tier 1 — ONE batched triage call: label each finding supported/uncertain/unsupported; drop unsupported.
+     Tier 2 — ONE re-check call per cluster (grouped by file or subQuestion): re-read cited source, keep/drop per member.
+     Tier 3 — Three structurally-diverse voters each attempt to refute each contested finding; ≥2 failed refutations = keep (minority-veto rule).
+   If any tier is abandoned → return that tier's input set stamped verifyDegraded (see protocol § Graceful Degradation).
 6. Synthesize and return.
 ```
 

@@ -64,7 +64,7 @@ Every helper (`parallelFanout`, `sequentialChain`, `dimensionalReview`) accepts 
 | `degraded` | `boolean` | `true` if the fan-out phase didn't reach quorum. |
 | `verifyDegraded` | `boolean` | `true` if the verify step was ABANDONED; `findings` are **UNVERIFIED** — caller must check before trusting. |
 
-**Cost decision — ONE batched verify, not 3-votes-per-finding:** `policy.verify` is called once over all findings. This is a deliberate cost choice: per-finding multi-vote verification burned ~290 agents / 6.4 M tokens in a prior session. Do not reintroduce per-finding verification.
+**Cost decision — batched verify, not 3-votes-per-finding across the full set:** `policy.verify` is called once over all findings. This is a deliberate cost choice: 3-votes-per-finding across *every* finding burned ~290 agents / 6.4 M tokens in a prior session. Do not reintroduce per-finding verification over the full findings set. **Bounded exception:** the tiered protocol (`verify-protocol.md` Tier 3) applies minority-veto 3-voter consensus *only to the contested tail* — after triage + clustering have already reduced the set — which keeps the per-finding cost bounded. That bounded form is sanctioned; the unbounded full-set form is not.
 
 **Verify-step timeout:** The batched verify runs as a `runUnit` via `withDefaults`, so it inherits `perUnitTimeoutMs` — the same bound as an individual lens. A slow batched verify over many findings can be abandoned at that timeout → `verifyDegraded: true`, with unverified findings returned. Set `perUnitTimeoutMs` generously when passing many findings to `policy.verify`, or pre-trim findings before the verify step.
 
