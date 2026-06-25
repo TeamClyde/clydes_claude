@@ -180,7 +180,7 @@ do not use that list to narrow the scan. The whole plan is in scope every round.
 
 **Step 2 — Per-criterion attestation**
 
-For each of the five review criteria, state which sections of the plan you checked and what
+For each of the six review criteria, state which sections of the plan you checked and what
 you found. Use this table structure internally (it does not need to appear in your output):
 
 | Criterion | Sections checked | Findings or "none" |
@@ -190,13 +190,14 @@ you found. Use this table structure internally (it does not need to appear in yo
 | Contradictions | | |
 | Foreseeable issues | | |
 | Self-containment | | |
+| Stack-hat adherence | | |
 
 Only after completing both steps: classify the candidates from Step 1 into
 `error` / `warning` / Strengths and emit your VERDICT.
 
 ## Output Format
 
-Structure your output using exactly these five labels, in this order. Each section must be present.
+Structure your output using exactly these seven labels, in this order. Each section must be present.
 
 **Candidate issues** — numbered list of every potential issue you observed during the sweep, before classification. This is your audit trail. Include marginal items you are uncertain about. Candidate issues lists everything you observed; classification (`error` / `warning` / Strengths) is the disposition of each candidate after evaluation.
 
