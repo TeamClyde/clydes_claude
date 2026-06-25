@@ -41,14 +41,14 @@ Agent {
 1. **Model-pin** each agent to Sonnet — architect is a judgment role; do not use Haiku or Opus.
 2. **Cap concurrency** at ≤ min(16, cores−2) — 6 agents is well within bounds.
 3. **Per-agent watchdog:** if a dimension agent exceeds its timeout, abandon it and record its criterion as unreviewed; surface to user — do not silently drop.
-4. **ONE batched adversarial verify** over the collected `error` findings — not per-finding voting.
+4. **ONE tiered adversarial verify** over the collected `error` findings (per `dispatching-parallel-agents` → `skills/dispatching-parallel-agents/references/verify-protocol.md`, `plan-review` profile): a batched triage pass, then escalate ONLY the contested tail to a minority-veto 3-voter consensus — not per-finding voting on every finding.
 5. **Cite the front-door:** dispatching-parallel-agents §"Dispatching in prose" Shape A.
 
 ---
 
-## Post-Collection: Batched Verify
+## Post-Collection: Tiered Verify
 
-After all 6 agents return: collect every `error` finding into a single list and run **one batched adversarial verify** — one additional `subagent_type: architect` call asking it to confirm whether each `error` item is a genuine blocking concern or a false positive. Merge the verify result into the finding set.
+Run ONE tiered adversarial verify over the collected `error` findings (`skills/dispatching-parallel-agents/references/verify-protocol.md`, `plan-review` profile): batched triage → clustered re-check → escalate only the contested tail to a minority-veto 3-voter consensus; merge surviving + contested; synthesize the round verdict (`NEEDS REVISION` iff ≥1 surviving `error`).
 
 ---
 

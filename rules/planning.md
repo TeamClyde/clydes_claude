@@ -129,7 +129,7 @@ Dispatch one `subagent_type: architect` agent **per criterion**, all in parallel
 1. Model-pin each agent to Sonnet (`model: "claude-sonnet-4-6"`) — architect is a judgment role; do not use Haiku or Opus.
 2. Cap concurrency at ≤ min(16, cores−2) — 6 agents is well within bounds.
 3. Per-agent watchdog: if a dimension agent exceeds its timeout, abandon it and record its criterion as unreviewed (surface to user; do not silently drop).
-4. ONE batched adversarial verify over the collected `error` findings — not per-finding voting.
+4. ONE **tiered adversarial verify** over the collected `error` findings (per `dispatching-parallel-agents` → `skills/dispatching-parallel-agents/references/verify-protocol.md`, `plan-review` profile): a batched triage pass, then escalate ONLY the contested tail to a minority-veto 3-voter consensus — not per-finding voting on every finding.
 5. Cite this front-door: dispatching-parallel-agents §"Dispatching in prose" Shape A.
 
 **Example dispatch (repeat for each of the 6 criteria):**
@@ -142,7 +142,7 @@ Agent {
 }
 ```
 
-After all 6 agents return: collect every `error` finding into a single list and run **one batched adversarial verify** (one additional `subagent_type: architect` call) asking it to confirm whether each `error` item is a genuine blocking concern or a false positive. Merge the verify result into the finding set. Synthesize the full finding set into the SINGLE `APPROVED` / `NEEDS REVISION` verdict for this round.
+After all 6 agents return: collect every `error` finding into a single list and run the **tiered adversarial verify** (`skills/dispatching-parallel-agents/references/verify-protocol.md`, `plan-review` profile): (1) one batched triage labels each `error` `supported`/`uncertain`/`unsupported`; drop `unsupported` (false positives); (2) the Tier-1 escalation set (`uncertain`, or `disagree`-flagged `error`s — `disagree` = two criteria agents cited conflicting evidence on the same item) goes through a clustered re-check that re-reads each finding's cited plan section and keeps/drops it; (3) the survivors form the contested tail, which escalates to a 3-voter minority-veto consensus — three architect voters with distinct framings each independently try to REFUTE the item; it survives as a genuine blocker only if ≥2 of 3 fail to refute, else it is dropped and logged `contested` (the false-negative trail). Merge the surviving + contested sets, then synthesize the SINGLE `APPROVED` / `NEEDS REVISION` verdict (NEEDS REVISION iff ≥1 surviving `error`).
 
 **Iteration rules (max 3 rounds):**
 
