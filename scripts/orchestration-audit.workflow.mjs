@@ -7,7 +7,7 @@
 // and throws). Engine bundle injected below by `npm run build:engine`.
 
 export const meta = {
-  name: 'phase-2-orchestration-audit',
+  name: 'orchestration-audit',
   description: 'Fail-successfully fan-out audit of the orchestration vs. the gate-map',
   phases: [
     { title: 'Find', detail: 'one+ agent per audit dimension, batched ≤ cap' },
