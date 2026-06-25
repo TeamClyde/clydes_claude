@@ -537,6 +537,10 @@
     },
     {
       "from": "dispatching-parallel-agents",
+      "to": "librarian"
+    },
+    {
+      "from": "dispatching-parallel-agents",
       "to": "review-workflow"
     },
     {

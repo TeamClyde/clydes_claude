@@ -12,6 +12,7 @@ flowchart LR
   creating_tools --> writing_agents
   creating_tools --> writing_rules
   creating_tools --> writing_skills
+  dispatching_parallel_agents --> librarian
   dispatching_parallel_agents --> review_workflow
   doc_author --> architecture_decision_records
   doc_author --> docs_architect
@@ -168,6 +169,7 @@ flowchart LR
 | creating-tools | writing-agents |
 | creating-tools | writing-rules |
 | creating-tools | writing-skills |
+| dispatching-parallel-agents | librarian |
 | dispatching-parallel-agents | review-workflow |
 | doc-author | architecture-decision-records |
 | doc-author | docs-architect |
