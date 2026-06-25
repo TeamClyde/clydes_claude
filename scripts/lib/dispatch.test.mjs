@@ -93,6 +93,28 @@ test('sequentialChain: throws if perUnitTimeoutMs is omitted (fast-fail)', async
   );
 });
 
+test('parallelFanout: degraded=true when quorum=0 but a unit abandoned (zero-quorum does not mask abandons)', async () => {
+  // With an explicit quorum:0, confirmed.length < 0 is always false — the extra check catches the abandon.
+  const units = [
+    { work: async () => 'ok' },
+    { work: () => new Promise(() => {}), maxRetries: 0 }, // straggler → abandoned
+  ];
+  const r = await parallelFanout(units, { maxInFlight: 2, perUnitTimeoutMs: 20, quorum: 0 });
+  assert.equal(r.abandoned, 1, 'one unit abandoned');
+  assert.equal(r.degraded, true, 'degraded must be true when quorum=0 but an abandon occurred');
+});
+
+test('parallelFanout: token gate is inert when estimatedTokensPerUnit=0 (est unknown → gate disabled)', async () => {
+  let calls = 0;
+  const units = [0, 1, 2, 3].map((i) => ({ work: async () => { calls++; return i; } }));
+  // tokenBudget set but est=0 and no getRemainingBudget → gate must NOT arm → all units run
+  const r = await parallelFanout(units, {
+    maxInFlight: 4, perUnitTimeoutMs: 100, tokenBudget: 1, estimatedTokensPerUnit: 0,
+  });
+  assert.equal(r.stoppedReason, undefined, 'gate must not fire when est=0 and no live budget');
+  assert.equal(calls, 4, 'all units must run when gate is disabled');
+});
+
 test('dimensionalReview: flags verifyDegraded and keeps unverified findings when verify abandons', async () => {
   const dims = [{ work: async () => ['a'] }, { work: async () => ['b'] }];
   const r = await dimensionalReview(dims, {

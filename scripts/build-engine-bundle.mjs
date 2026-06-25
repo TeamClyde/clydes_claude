@@ -11,7 +11,7 @@ const END = '// <ENGINE-BUNDLE:end>';
 // NOTE: source files must NOT use `export default` — the strip regex below would corrupt it.
 function strip(src) {
   return src
-    .replace(/^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/fail-successfully\.mjs['"];?\s*$/m, '')
+    .replace(/^\s*import\s+\{[\s\S]*?\}\s+from\s+['"]\.\/fail-successfully\.mjs['"];?\s*$/m, '')
     .replace(/^export\s+/gm, '');          // `export function` → `function`, `export const` → `const`
 }
 

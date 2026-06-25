@@ -78,6 +78,7 @@ async function runUnit(spec) {
   const emit = (state, extra = {}) => { history.push(state); if (onEvent) onEvent({ state, ...extra }); };
   if (store && stepId != null && store.has(stepId)) {
     emit('MEMOIZED', { stepId, memoized: true });
+    emit('SUCCEEDED', { memoized: true }); // count memo-hits toward SUCCEEDED in quorumBarrier's counts aggregate
     return { state: 'SUCCEEDED', value: store.get(stepId), history, memoized: true };
   }
   let crashRetriesLeft = maxRetries;
@@ -90,7 +91,12 @@ async function runUnit(spec) {
     const res = await withWatchdog(() => work(repair, ctx), timeoutMs);
     if (res.outcome === 'timeout' || res.outcome === 'error') {
       emit(res.outcome === 'timeout' ? 'TIMED_OUT' : 'FAILED', { attempt });
-      if (crashRetriesLeft > 0) { crashRetriesLeft--; attempt++; continue; }
+      if (crashRetriesLeft > 0) {
+        crashRetriesLeft--;
+        attempt++;
+        ctx = { reason: repair ?? 'crash', value: null, attempt }; // refresh ctx so retried work sees current attempt
+        continue;
+      }
       break;
     }
     emit('VALIDATING', { attempt });
@@ -121,7 +127,7 @@ async function runUnit(spec) {
  * never hold the barrier. SUCCEEDED values are captured, so abandoning is non-lossy.
  * @param {Array<object>} units  - runUnit specs
  * @param {number} threshold     - minimum SUCCEEDED count to consider the barrier healthy
- * @returns {Promise<{confirmed:any[], abandoned:number, degraded:boolean}>}
+ * @returns {Promise<{confirmed:any[], abandoned:number, degraded:boolean, counts:object}>}
  */
 async function quorumBarrier(units, threshold) {
   const results = await Promise.all(units.map((u) => runUnit(u)));
@@ -177,7 +183,9 @@ async function parallelFanout(units, policy = {}) {
   let launched = 0;
   let stoppedReason;
   for (const batch of chunk(units, Math.max(1, p.maxInFlight))) {
-    if (p.tokenBudget != null) {
+    // Token gate: skip entirely when est=0/unset and no live getRemainingBudget — estimate unknown means
+    // "gate disabled". Only arm when we have a meaningful projection (est > 0 OR a live budget callback).
+    if (p.tokenBudget != null && (p.estimatedTokensPerUnit > 0 || p.getRemainingBudget)) {
       const remaining = p.getRemainingBudget ? p.getRemainingBudget()
                                              : p.tokenBudget - launched * p.estimatedTokensPerUnit;
       if (remaining * p.budgetReserve < batch.length * p.estimatedTokensPerUnit) { stoppedReason = 'token-budget'; break; }
@@ -189,7 +197,8 @@ async function parallelFanout(units, policy = {}) {
     for (const [s, n] of Object.entries(r.counts)) counts[s] = (counts[s] ?? 0) + n;
     launched += batch.length;
   }
-  return { confirmed, abandoned, degraded: confirmed.length < quorum, counts, stoppedReason };
+  // degraded: below quorum, OR quorum=0 and something abandoned (ceil(0/2)=0 would never flag degraded without the extra check)
+  return { confirmed, abandoned, degraded: confirmed.length < quorum || (quorum === 0 && abandoned > 0), counts, stoppedReason };
 }
 
 /**
@@ -507,7 +516,10 @@ if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing
 // robust to both object and stringified delivery — the front-door exemplar must not
 // assume the happy path.
 const input = typeof args === 'string' ? JSON.parse(args) : args;
-const { brief, subQuestions, seedText, leafModel } = input;
+const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf } = input;
+// maxSearchesPerLeaf: when set, appends a "search at most N times then synthesize" instruction to the
+// research-leaf prompt. Measure actual token spend before lowering — a tight cap can cut recall on
+// deep sub-questions. Default: unset (no cap); generous is better than aggressive for quality.
 if (!Array.isArray(subQuestions) || subQuestions.length === 0) {
   throw new TypeError('librarian: args.subQuestions must be a non-empty string[]');
 }
@@ -530,6 +542,7 @@ const units = subQuestions.map((q) => ({
     `SUB-QUESTION: ${q}\n` +
     (brief ? `OVERALL RESEARCH GOAL (context only): ${brief}\n` : '') +
     `Method: run several WebSearch queries; for the most relevant hits, fetch the page with WebFetch (if WebFetch is unavailable, rely on search-result content). Prefer recent, primary, authoritative sources; note dates on time-sensitive facts; if sources disagree, report both.\n` +
+    (maxSearchesPerLeaf != null ? `Search budget: perform at most ${maxSearchesPerLeaf} WebSearch calls, then synthesize from what you have found.\n` : '') +
     `Return concrete findings. Set "subQuestion" on EVERY finding to exactly: ${q}. Set "source" to the URL the claim came from.\n` +
     (repair ? `PREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.\n` : '') +
     (seedText ? `\n--- SEED CONTEXT (the user's draft; use only as a topic map — VERIFY its claims against live sources, do not treat it as ground truth) ---\n${seedText}` : ''),

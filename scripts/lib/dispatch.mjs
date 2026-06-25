@@ -44,7 +44,9 @@ export async function parallelFanout(units, policy = {}) {
   let launched = 0;
   let stoppedReason;
   for (const batch of chunk(units, Math.max(1, p.maxInFlight))) {
-    if (p.tokenBudget != null) {
+    // Token gate: skip entirely when est=0/unset and no live getRemainingBudget — estimate unknown means
+    // "gate disabled". Only arm when we have a meaningful projection (est > 0 OR a live budget callback).
+    if (p.tokenBudget != null && (p.estimatedTokensPerUnit > 0 || p.getRemainingBudget)) {
       const remaining = p.getRemainingBudget ? p.getRemainingBudget()
                                              : p.tokenBudget - launched * p.estimatedTokensPerUnit;
       if (remaining * p.budgetReserve < batch.length * p.estimatedTokensPerUnit) { stoppedReason = 'token-budget'; break; }
@@ -56,7 +58,8 @@ export async function parallelFanout(units, policy = {}) {
     for (const [s, n] of Object.entries(r.counts)) counts[s] = (counts[s] ?? 0) + n;
     launched += batch.length;
   }
-  return { confirmed, abandoned, degraded: confirmed.length < quorum, counts, stoppedReason };
+  // degraded: below quorum, OR quorum=0 and something abandoned (ceil(0/2)=0 would never flag degraded without the extra check)
+  return { confirmed, abandoned, degraded: confirmed.length < quorum || (quorum === 0 && abandoned > 0), counts, stoppedReason };
 }
 
 /**

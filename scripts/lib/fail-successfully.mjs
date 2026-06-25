@@ -63,6 +63,7 @@ export async function runUnit(spec) {
   const emit = (state, extra = {}) => { history.push(state); if (onEvent) onEvent({ state, ...extra }); };
   if (store && stepId != null && store.has(stepId)) {
     emit('MEMOIZED', { stepId, memoized: true });
+    emit('SUCCEEDED', { memoized: true }); // count memo-hits toward SUCCEEDED in quorumBarrier's counts aggregate
     return { state: 'SUCCEEDED', value: store.get(stepId), history, memoized: true };
   }
   let crashRetriesLeft = maxRetries;
@@ -75,7 +76,12 @@ export async function runUnit(spec) {
     const res = await withWatchdog(() => work(repair, ctx), timeoutMs);
     if (res.outcome === 'timeout' || res.outcome === 'error') {
       emit(res.outcome === 'timeout' ? 'TIMED_OUT' : 'FAILED', { attempt });
-      if (crashRetriesLeft > 0) { crashRetriesLeft--; attempt++; continue; }
+      if (crashRetriesLeft > 0) {
+        crashRetriesLeft--;
+        attempt++;
+        ctx = { reason: repair ?? 'crash', value: null, attempt }; // refresh ctx so retried work sees current attempt
+        continue;
+      }
       break;
     }
     emit('VALIDATING', { attempt });
@@ -106,7 +112,7 @@ export async function runUnit(spec) {
  * never hold the barrier. SUCCEEDED values are captured, so abandoning is non-lossy.
  * @param {Array<object>} units  - runUnit specs
  * @param {number} threshold     - minimum SUCCEEDED count to consider the barrier healthy
- * @returns {Promise<{confirmed:any[], abandoned:number, degraded:boolean}>}
+ * @returns {Promise<{confirmed:any[], abandoned:number, degraded:boolean, counts:object}>}
  */
 export async function quorumBarrier(units, threshold) {
   const results = await Promise.all(units.map((u) => runUnit(u)));

@@ -149,16 +149,44 @@ test('runUnit: a store with no stepId never memoizes', async () => {
   assert.equal(store.size, 0);
 });
 
+test('quorumBarrier: memo-hit counts toward counts.SUCCEEDED (not undercounted)', async () => {
+  const store = new Map([['k1', 'cached']]);
+  const units = [
+    { work: async () => 'live', timeoutMs: 30 },                          // normal run
+    { work: async () => 'never', timeoutMs: 30, store, stepId: 'k1' },  // memo-hit
+  ];
+  const { counts } = await quorumBarrier(units, 1);
+  assert.equal(counts.SUCCEEDED, 2, 'both the live unit and memo-hit must count toward SUCCEEDED');
+  assert.equal(counts.MEMOIZED, 1, 'memo-hit marker still present');
+});
+
+test('runUnit: crash-retry refreshes ctx.attempt so retried work sees the current attempt', async () => {
+  const seenAttempts = [];
+  await runUnit({
+    work: async (repair, ctx) => {
+      seenAttempts.push(ctx ? ctx.attempt : 0);
+      throw new Error('crash');
+    },
+    timeoutMs: 50, maxRetries: 1,
+  });
+  assert.equal(seenAttempts.length, 2, 'should attempt twice');
+  assert.equal(seenAttempts[0], 0, 'first call: attempt 0');
+  assert.equal(seenAttempts[1], 1, 'retry: ctx.attempt must be 1 (refreshed, not stale)');
+});
+
 test('runUnit: an ABANDONED result is not cached', async () => {
   const store = new Map();
   await runUnit({ work: async () => { throw new Error('x'); }, timeoutMs: 50, maxRetries: 0, store, stepId: 's1' });
   assert.equal(store.has('s1'), false);
 });
 
-test('runUnit: onEvent fires MEMOIZED with payload on a cache hit', async () => {
+test('runUnit: onEvent fires MEMOIZED then SUCCEEDED on a cache hit', async () => {
   const store = new Map([['s1', 'cached']]);
   const events = [];
   const r = await runUnit({ work: async () => 'fresh', timeoutMs: 50, store, stepId: 's1', onEvent: (e) => events.push(e) });
   assert.equal(r.memoized, true);
-  assert.deepEqual(events, [{ state: 'MEMOIZED', stepId: 's1', memoized: true }]);
+  // MEMOIZED fires first (identification), then SUCCEEDED fires (so counts.SUCCEEDED includes memo-hits)
+  assert.equal(events[0].state, 'MEMOIZED');
+  assert.equal(events[0].stepId, 's1');
+  assert.equal(events[1].state, 'SUCCEEDED');
 });
