@@ -516,6 +516,10 @@
       "to": "researcher"
     },
     {
+      "from": "architect",
+      "to": "subagent-driven-development"
+    },
+    {
       "from": "brainstorming",
       "to": "researcher"
     },

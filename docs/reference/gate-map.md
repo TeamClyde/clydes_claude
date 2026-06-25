@@ -7,6 +7,7 @@ flowchart LR
   adherence_audit --> dispatching_parallel_agents
   ai_tool_security_reviewer --> vet_security
   architect --> researcher
+  architect --> subagent_driven_development
   brainstorming --> researcher
   brainstorming --> writing_plans
   creating_tools --> writing_agents
@@ -164,6 +165,7 @@ flowchart LR
 | adherence-audit | dispatching-parallel-agents |
 | ai-tool-security-reviewer | vet-security |
 | architect | researcher |
+| architect | subagent-driven-development |
 | brainstorming | researcher |
 | brainstorming | writing-plans |
 | creating-tools | writing-agents |
