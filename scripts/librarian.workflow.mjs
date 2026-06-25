@@ -547,15 +547,55 @@ const verifyDegraded = verified.degraded;
 const vetted = verifyDegraded ? allFindings : verified.findings;
 
 phase('Synthesize');
-const report = await agent(
-  `Write a cited research report to help plan a project, using ONLY the vetted findings below — they are the COMPLETE and ONLY input. ` +
-  `Do NOT add sub-questions, topics, claims, or source URLs that are not present in the findings, and do NOT perform any new research or web search. ` +
-  `Group strictly by the sub-questions that actually appear in the findings (do NOT state a numeric COUNT of sub-questions anywhere — no "this report covers N sub-questions"). For each: what the research found, the source URLs from the findings, and a confidence read (lean on the "support" labels — note any "unsupported"/"uncertain" items). ` +
-  `Surface contradictions between sources, date every time-sensitive fact, and finish with a "What this means for the build" section drawn strictly from the findings.\n` +
-  (brief ? `RESEARCH GOAL (context only — do NOT expand scope beyond the findings): ${brief}\n` : '') +
+// L3: parallel section-writers (one per sub-question) + cheap stitcher — replaces monolithic synth.
+// Group vetted findings by sub-question so each section-writer is fenced to its own slice.
+const sectionMap = vetted.reduce((acc, f) => {
+  const key = f.subQuestion ?? '__ungrouped__';
+  if (!acc.has(key)) acc.set(key, []);
+  acc.get(key).push(f);
+  return acc;
+}, new Map());
+const sections = [...sectionMap.entries()].map(([subQuestion, findings]) => ({ subQuestion, findings }));
+
+const sectionPrompt = (section) =>
+  `Write the report section for sub-question "${section.subQuestion}" using ONLY these vetted findings — ` +
+  `do NOT add topics, claims, or source URLs not present here, and do NOT perform any new research or web search. ` +
+  `For each finding: what was found, the source URLs, and a confidence read (lean on the "support" labels — flag any "unsupported"/"uncertain"). ` +
+  `Surface contradictions between sources; date every time-sensitive fact. ` +
+  `Do NOT state a numeric count of sub-questions.\n` +
   (verifyDegraded ? `NOTE: adversarial verification did not complete — present every claim as UNVERIFIED and say so explicitly.\n` : '') +
-  `--- VETTED FINDINGS (the complete input) ---\n${JSON.stringify(vetted)}`,
-  { label: 'synthesize', phase: 'Synthesize', model: 'claude-sonnet-4-6' });
+  `FINDINGS: ${JSON.stringify(section.findings)}`;
+
+const sectionUnits = sections.map((section) => ({
+  // work returns { subQuestion, markdown } so the stitcher can reconstruct by KEY, not by
+  // position — parallelFanout's `confirmed` is a COMPACT array (abandoned sections are absent),
+  // so a positional sections[i] map would mislabel neighbours after any abandon.
+  validate: (v) => (v && typeof v.markdown === 'string' && v.markdown.length > 0)
+    ? { ok: true } : { ok: false, reason: 'empty section' },
+  work: async (repair) => ({
+    subQuestion: section.subQuestion,
+    markdown: await agent(
+      sectionPrompt(section) + (repair ? `\nPREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.` : ''),
+      { label: `synth:${section.subQuestion.slice(0, 48)}`, phase: 'Synthesize', model: 'claude-sonnet-4-6' }),
+  }),
+}));
+const sectionReview = await parallelFanout(sectionUnits, { perUnitTimeoutMs: 240_000, maxInFlight: Math.min(sections.length, 8), modelTier: 'sonnet' });
+// Key by sub-question and render in sections[] order — robust to abandoned/out-of-order results.
+const sectionByQ = new Map(sectionReview.confirmed.map((s) => [s.subQuestion, s.markdown]));
+const orderedSections = sections.filter((sec) => sectionByQ.has(sec.subQuestion));
+const missingSections = sections.filter((sec) => !sectionByQ.has(sec.subQuestion)).map((sec) => sec.subQuestion);
+
+const report = await agent(
+  `You are assembling a cited research report from pre-written sections. ` +
+  `Stitch the sections below together in the order given — do NOT rewrite, paraphrase, or add any new research, claims, or source URLs. ` +
+  `After the last section, append a "What this means for the build" section drawn STRICTLY from the findings already in the sections — no new information. ` +
+  `Do NOT state a numeric count of sub-questions anywhere.\n` +
+  (brief ? `RESEARCH GOAL (context only — do NOT expand scope beyond the sections): ${brief}\n` : '') +
+  (verifyDegraded ? `NOTE: adversarial verification did not complete — present every claim as UNVERIFIED and say so explicitly.\n` : '') +
+  (missingSections.length ? `NOTE: ${missingSections.length} section(s) could not be written and are absent — state explicitly that these sub-questions are MISSING from the report: ${JSON.stringify(missingSections)}.\n` : '') +
+  `--- SECTIONS (stitch in this order) ---\n` +
+  orderedSections.map((sec) => `### Section: ${sec.subQuestion}\n${sectionByQ.get(sec.subQuestion)}`).join('\n\n'),
+  { label: 'synth:stitch', phase: 'Synthesize', model: 'claude-sonnet-4-6' });
 
 const sources = [...new Set(vetted.map((f) => f.source).filter(Boolean))];
 return { report, subQuestionCount: subQuestions.length, findingCount: vetted.length, sources, degraded: review.degraded, verifyDegraded };
