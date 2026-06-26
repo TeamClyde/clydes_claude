@@ -310,6 +310,20 @@ const defaultClusterKey = (f) => f.subQuestion ?? (f.where ? String(f.where).spl
 // Strip internal _idx before returning to caller.
 const stripIdx = (arr) => arr.map(({ _idx, ...rest }) => rest);
 
+// Render a finding as a one-line `where — summary` for the tier prompts. The engine's finding
+// contract is { where, summary } and callers should provide them, but fall back across common
+// finding-field names so a caller with a different shape (e.g. web-research { source, claim })
+// still triages on real content. Critically, NEVER emit the literal "undefined — undefined": an
+// unjudgeable row makes triage drop the finding, and a whole set of them empties the result while
+// still reporting success — the silent-failure mode the empty-set guard in tieredVerify backstops.
+function renderFinding(f) {
+  const where   = f.where   ?? f.source ?? f.file   ?? '';
+  const summary = f.summary ?? f.claim  ?? f.detail ?? f.description ?? '';
+  if (where || summary) return `${where} — ${summary}`;
+  const { _idx, ...rest } = f;            // last resort: the finding's own content, never "undefined"
+  return JSON.stringify(rest);
+}
+
 // Per-tier deadline using internal setTimeout/Promise.race (no external import).
 function withDeadline(p, ms) {
   let t;
@@ -328,7 +342,7 @@ function withDeadline(p, ms) {
 // Prompt builders — batched, using global _idx as `index`.
 function triagePrompt(findings) {
   const list = findings
-    .map((f) => `[${f._idx}] ${f.where} — ${f.summary}`)
+    .map((f) => `[${f._idx}] ${renderFinding(f)}`)
     .join('\n');
   return (
     'Triage these findings. For EACH (by index) label `supported`/`uncertain`/`unsupported` from its premise + your knowledge; ' +
@@ -339,7 +353,7 @@ function triagePrompt(findings) {
 
 function recheckPrompt(members) {
   const list = members
-    .map((f) => `<${f._idx}>: ${f.where} — ${f.summary}`)
+    .map((f) => `<${f._idx}>: ${renderFinding(f)}`)
     .join('\n');
   return (
     'Re-check this cluster of related findings against their shared source. For EACH `index`, `keep:true` only if the source supports it. Terse.\n\n' +
@@ -355,7 +369,7 @@ function refutePrompt(finding, voter) {
   ];
   return (
     `${frames[voter]} Return \`refuted:true\` ONLY if you can show it is wrong; default \`refuted:false\` when uncertain.\n\n` +
-    `where: ${finding.where}\nsummary: ${finding.summary}`
+    `finding: ${renderFinding(finding)}`
   );
 }
 
@@ -368,7 +382,7 @@ function refutePrompt(finding, voter) {
  * @param {Function} opts.agent       - Workflow agent(prompt, opts) => Promise<result>.
  * @param {number}   [opts.perTierTimeoutMs=120_000]
  * @param {Function} [opts.clusterBy] - Custom cluster key fn (f) => string.
- * @returns {Promise<{findings, contested, counts, degraded}>}
+ * @returns {Promise<{findings, contested, counts, degraded, verifyEmptied?}>}
  */
 async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_000, clusterBy }) {
   try {
@@ -388,6 +402,25 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
     const verdictMap = new Map();
     for (const v of t1.verdicts) {
       verdictMap.set(v.index, v); // v.index is the global _idx echoed by agent
+    }
+
+    // Fail loud, never silent. If triage judged NONE of a non-empty input (no verdicts, or verdicts
+    // whose indices match no finding), the verify never actually ran — a broken contract (e.g.
+    // findings that render to nothing, or a triage agent that returned nothing usable). Silently
+    // continuing would drop every finding and return an empty set with degraded:false: a confident,
+    // empty result with no error signal (the worst failure mode). Degrade instead and fall back to
+    // the unverified findings, flagged, so the caller surfaces it. This keys on "did triage evaluate
+    // anything", NOT on "did anything survive" — a legitimate all-`unsupported` triage DID judge
+    // every finding (they just drop), so it is a correct empty result and must NOT trip this.
+    const anyJudged = work.some((f) => verdictMap.has(f._idx));
+    if (!anyJudged && work.length > 0) {
+      return {
+        findings:      findings,
+        contested:     [],
+        counts:        { supported: 0, dropped: work.length, contested: 0 },
+        degraded:      true,
+        verifyEmptied: true,
+      };
     }
 
     const supported   = [];  // Pass-through without re-check

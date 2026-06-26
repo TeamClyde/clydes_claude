@@ -93,3 +93,50 @@ test('web-research profile: unsupported finding escalates to Tier 2 (not dropped
   assert.ok(out.findings.map((f) => f.id).includes('u'),
     'web-research unsupported finding survives when recheck + consensus keep it');
 });
+
+// Regression — Bug 3: findings whose shape lacks `where`/`summary` (e.g. web-research
+// { subQuestion, claim, source }) must still triage on their own fields. The original bug
+// rendered every row as "undefined — undefined", so triage dropped 100% of findings.
+test('tolerant rendering: a finding lacking where/summary triages on its own fields (no "undefined" defeat)', async () => {
+  const WR = [{ subQuestion: 'q1', claim: 'pgvector is fine at small scale', source: 'https://example.com/pg' }];
+  let triageSeen = '';
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') { triageSeen = prompt; return { verdicts: [{ index: 0, support: 'supported' }] }; }
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [{ index: 0, keep: true }] };
+    if (opts.label?.startsWith('verify:consensus')) return { refuted: false };
+  };
+  const out = await tieredVerify(WR, { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
+  assert.ok(!triageSeen.includes('undefined'), 'must not render "undefined" into the triage prompt');
+  assert.ok(triageSeen.includes('pgvector'), 'renders the finding content (claim) for triage');
+  assert.equal(out.findings.length, 1, 'web-research finding survives without a where/summary adapter');
+});
+
+// Regression — Bug 3 (the dangerous half): if triage judges NOTHING on a non-empty input (no
+// verdicts back), the verify never ran — surface it as degraded (verifyEmptied), never as a silent
+// empty set with degraded:false.
+test('fail loud: triage judging nothing on a non-empty input degrades (verifyEmptied), not silent-empty success', async () => {
+  // Triage returns no verdicts → no finding is judged → broken contract, not a real empty result.
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: [] };
+    return { keep: [], refuted: true };
+  };
+  const out = await tieredVerify(F, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.degraded, true, 'triage judged nothing → surfaced as degraded, not success');
+  assert.equal(out.verifyEmptied, true);
+  assert.deepEqual(out.findings, F, 'falls back to the unverified findings, not an empty set');
+});
+
+// Regression — the guard must NOT over-fire. A legitimate "everything is unsupported" triage DID
+// judge every finding; under audit/code-review those drop at Tier 1, so survivors=0 — but that is a
+// CORRECT empty result, not a verify failure. Guarding on "did triage judge anything" (not "did
+// anything survive") is what keeps this case quiet.
+test('all-unsupported with verdicts present is a clean empty result, not verifyEmptied', async () => {
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: F.map((_, i) => ({ index: i, support: 'unsupported' })) };
+    return { keep: [], refuted: false };
+  };
+  const out = await tieredVerify(F, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.degraded, false, 'triage judged every finding → not a failure');
+  assert.ok(!out.verifyEmptied, 'must not flag verifyEmptied when findings were genuinely judged');
+  assert.equal(out.findings.length, 0, 'all-unsupported → correct empty result');
+});
