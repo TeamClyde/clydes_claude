@@ -2,11 +2,12 @@
 name: review-workflow
 description: >
   Use when workflow friction issues have accumulated in TeamClyde/clydes_claude and you want
-  to act on them — scanning the workflow system for context, proposing multi-angle fixes, and
-  routing improvements to the right component. Run periodically or after several friction
-  issues accumulate.
+  to act on them — scanning the meta-workflow system for context, proposing multi-angle fixes,
+  and routing improvements to the right component. This is about the WORKFLOW SYSTEM itself,
+  not reviewing code changes — for code review, use requesting-code-review. Run periodically
+  or after several friction issues accumulate.
 argument-hint: "(no arguments needed — reads open workflow-friction GitHub issues)"
-allowed-tools: Read, Write, Edit, Glob, Agent
+allowed-tools: Read, Write, Edit, Glob, Agent, Skill
 ---
 
 # review-workflow
@@ -54,34 +55,67 @@ Wait for user confirmation before merging. Do not merge silently.
 
 For each high-signal item (or merged group), run a targeted scan before proposing anything.
 
+> **Fan-out governed by `dispatching-parallel-agents` — Shape B (Parallel fan-out).**
+> Five rules apply: (1) model-pin leaves to Haiku; (2) cap concurrency ≤ min(16, cores−2)
+> (~≤20); (3) per-agent watchdog — abandon-and-proceed on hang; (4) one batched pass over
+> collected results — no per-item voting loop; (5) one batched verify/dedup after collection.
+
 **3a. Read `docs/workflow-map.md`**
 
-Use the map to identify which components are in scope for this item. Do not read every
+Use the map to identify which components are in scope for each item. Do not read every
 component file — the map is the index.
 
-**3b. Dispatch an Explore agent**
+**3b. Dispatch all Explores in parallel (regulated fan-out)**
+
+After completing 3a for all items, dispatch the initial Explore for each high-signal item
+in **one parallel block** — not one at a time. Pin every agent to Haiku (read-only scan
+work). Batch at ≤ min(16, cores−2) agents in flight; queue remaining items for the next
+batch. Give each agent an explicit time bound and mark non-responding agents **ABANDONED**.
 
 ```
-Agent {
-  subagent_type: "Explore",
-  prompt: "Given this workflow feedback: [issue title + body summary]. The components in scope appear to be: [component names from workflow-map]. Answer two questions: (1) Does any existing skill or agent already handle this concern, directly or partially? Could it be extended rather than replaced? (2) What other components reference or invoke [affected component]? Would changing it break or conflict with anything downstream?"
-}
+For each item i in [all high-signal items], emit in parallel:
+
+  Agent {
+    model: "claude-haiku-4-5-20251001",
+    subagent_type: "Explore",
+    prompt: "Complete within 90 s or surface what you have. Given this workflow feedback:
+             [issue title + body summary for item i]. The components in scope appear to be:
+             [component names from workflow-map for item i]. Answer two questions:
+             (1) Does any existing skill or agent already handle this concern, directly or
+             partially? Could it be extended rather than replaced?
+             (2) What other components reference or invoke [affected component]? Would
+             changing it break or conflict with anything downstream?"
+  }
+
+Dispatch at most min(16, cores−2) at a time. Any agent that exceeds its time bound is
+marked ABANDONED — do not wait for it; proceed with remaining results.
 ```
 
-**3c. Handle the response**
+**3c. Collect results**
 
-- Findings returned: record them, proceed to 3d
-- Nothing relevant returned: do not treat as clean — re-dispatch with broader framing:
-  > "Look more broadly across the workflow — are there any components that handle similar
-  > concerns, even indirectly? What patterns exist near this problem area?"
-  Trust the second answer.
-- Second dispatch also returns nothing: note "no related components found" and proceed.
+After the parallel block completes (or agents are abandoned):
 
-**3d. Chain follow-up dispatches if needed**
+- Findings returned for item: record them, proceed to 3d for that item.
+- ABANDONED (hung): record "Explore timed out — no findings" and proceed to 3d.
+- Nothing relevant returned (agent responded but found nothing): do not treat as clean —
+  queue that item for a follow-up broader-framing dispatch (see 3d).
 
-If the Explore answer opens new threads ("component X also does Y, which might be relevant"),
-dispatch a targeted follow-up Explore for those threads. Cap at 3 total Explore dispatches per
-item. Trust each answer — do not re-read files the agent already covered.
+**3d. Follow-up dispatches for items needing retry**
+
+**Hard cap: 3 total Explore dispatches per item** (initial + all follow-ups combined).
+
+For items where the initial Explore returned nothing relevant, dispatch a follow-up with
+broader framing. These follow-ups may be batched together in a second parallel block if
+multiple items need them. Give each the same Haiku pin and time bound.
+
+> "Look more broadly across the workflow — are there any components that handle similar
+> concerns, even indirectly? What patterns exist near this problem area?"
+
+Trust the second answer in the common case — if it returns nothing, note "no related
+components found" and proceed to Step 3.5 for that item. If the second answer opens new
+threads ("component X also does Y, which might be relevant"), dispatch one more targeted
+follow-up Explore for those threads (3rd and final dispatch). Trust each answer — do not
+re-read files the agent already covered.
 
 ### Step 3.5 — Size the fix
 
@@ -115,31 +149,11 @@ shifts detected" is a valid result — proceed with original direction.
 ### Step 4 — Propose fixes
 
 For each item, generate proposals from the combined Explore findings and Phoenix output (if
-run). Present as distinct angles — not a single recommendation.
+run). Present as three distinct angles (Targeted / Root-cause / Structural) with tradeoffs.
+Wait for user to choose or combine before executing. Angles may converge — that is signal.
 
-**Angle 1 — Targeted fix:** Smallest change to the specific component exhibiting the behavior.
-Lowest risk, fastest to execute. May not address root cause — note this explicitly.
-
-**Angle 2 — Root cause fix:** Fix the underlying condition, which may be a different component
-than the one in the feedback. Cite the specific Explore finding that supports this angle.
-
-**Angle 3 — Structural fix:** A rule or governance change that prevents this class of problem
-from recurring. Only propose when the Explore scan or Phoenix output surfaced a systemic
-pattern. Do not default to this for every item.
-
-Angles may converge on the same change from different directions — that is signal the fix is
-sound. Present all angles with tradeoffs. Wait for user to choose or combine before executing.
-
-Execute each approved fix using this routing table:
-
-| Fix type | Action |
-|----------|--------|
-| Skill update | Invoke `writing-skills` skill with the proposed change |
-| New skill | Route through `creating-tools` skill |
-| CLAUDE.md edit | Edit directly using Edit tool |
-| Memory entry | Write to memory using Write tool |
-| Rule update | Edit directly using Edit tool |
-| Agent update | Edit directly using Edit tool |
+Full angle definitions and execution routing table: see
+`skills/review-workflow/references/proposal-angles.md`.
 
 ### Step 5 — Execute approved fixes
 

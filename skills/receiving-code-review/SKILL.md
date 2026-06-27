@@ -1,6 +1,6 @@
 ---
 name: receiving-code-review
-description: Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation
+description: Use when you have RECEIVED code review feedback and need to act on it — evaluating, verifying, and implementing reviewer suggestions with technical rigor, not performative agreement. Owns the "respond to feedback" direction. For submitting work to be reviewed, use requesting-code-review.
 allowed-tools: Read, Write, Edit, Bash
 ---
 

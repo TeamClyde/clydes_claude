@@ -1,0 +1,23 @@
+[
+  {
+    "id": "adherence-dead-ref",
+    "fixture": "fixtures/adherence/dead-ref-skill.md",
+    "family": "adherence",
+    "expectedFinding": "bib-dedup",
+    "sha256": "9da3ff764413454545a5c223509050596c691150a578ed937b35ce75bf8251a3"
+  },
+  {
+    "id": "code-review-off-by-one",
+    "fixture": "fixtures/code-review/off-by-one.mjs",
+    "family": "code-review",
+    "expectedFinding": "pageCount",
+    "sha256": "4cd68e1486a984c6f3be34b55e3898d2815afe81c8479748fbd318c7d2dd11cf"
+  },
+  {
+    "id": "web-research-unsupported-claim",
+    "fixture": "fixtures/web-research/unsupported-claim.md",
+    "family": "web-research",
+    "expectedFinding": "not supported",
+    "sha256": "29ca9f632a657ac55cf9efd3748cf69981b7d3e8650fec1c659c913285620b10"
+  }
+]

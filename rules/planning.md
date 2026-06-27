@@ -113,26 +113,48 @@ During execution, divergences (architecture changes, scope shifts, discovered bu
 
 ## Architect Gate
 
-Invoke the `architect` agent in `plan` mode before ExitPlanMode. The gate sequence is:
+> **Canonical source:** The severity taxonomy (`error` / `warning` / `Strengths`) and verdict words (`APPROVED` / `NEEDS REVISION`) are defined in `agents/architect.md` and documented in `docs/explanation/features/orchestration-gating.md` — the text below is a restatement, not the source of truth.
+
+Invoke the architect **per-criterion dimension panel** in `plan` mode before ExitPlanMode (Shape A — Dimensional-review panel, per `dispatching-parallel-agents` §"Dispatching in prose"). The gate sequence is:
 
 ```
-draft plan → architect → test-strategy → ExitPlanMode
+draft plan → architect panel → test-strategy → ExitPlanMode
 ```
 
 Architect runs first — it reviews the plan for design soundness and self-containment. Test-strategy runs after architect approval — it appends the Testing section.
 
+Dispatch one `subagent_type: architect` agent **per criterion**, all in parallel. The 7 criteria come from `agents/architect.md`: (1) design soundness, (2) logic completeness, (3) contradictions, (4) foreseeable issues, (5) self-containment, (6) stack-hat adherence, (7) systemic/strategic. Each agent receives the plan doc path, an `instructions` field narrowing its dispatch to its single criterion, and an `executor_profile` field identifying the executor (e.g. `"executor = subagent-driven-development with file access + TDD"`). Model-pin each agent to Sonnet.
+
+**Five dispatch rules (Shape A):**
+1. Model-pin each agent to Sonnet (`model: "claude-sonnet-4-6"`) — architect is a judgment role; do not use Haiku or Opus.
+2. Cap concurrency at ≤ min(16, cores−2) — 7 agents is well within bounds.
+3. Per-agent watchdog: if a dimension agent exceeds its timeout, abandon it and record its criterion as unreviewed (surface to user; do not silently drop).
+4. ONE **tiered adversarial verify** over the collected `error` findings (per `dispatching-parallel-agents` → `skills/dispatching-parallel-agents/references/verify-protocol.md`, `plan-review` profile): a batched triage pass, then escalate ONLY the contested tail to a minority-veto 3-voter consensus — not per-finding voting on every finding.
+5. Cite this front-door: dispatching-parallel-agents §"Dispatching in prose" Shape A.
+
+**Example dispatch (repeat for each of the 7 criteria):**
 ```
-Agent { subagent_type: "architect", prompt: "plan\n\nPlan doc: plans/<slug>/<slug>-plan.md" }
+Agent {
+  subagent_type: "architect",
+  model: "claude-sonnet-4-6",
+  prompt: "plan\n\nPlan doc: plans/<slug>/<slug>-plan.md",
+  instructions: "Review criterion 1 only: design soundness — do the design decisions make sense given the stated goal? Is the approach coherent? Narrow your error/warning/Strengths findings to this criterion.",
+  executor_profile: "executor = subagent-driven-development with file access + TDD"
+}
 ```
+
+After all 7 agents return: collect every `error` finding into a single list and run the **tiered adversarial verify** (`skills/dispatching-parallel-agents/references/verify-protocol.md`, `plan-review` profile): (1) one batched triage labels each `error` `supported`/`uncertain`/`unsupported`; drop `unsupported` (false positives); (2) the Tier-1 escalation set (`uncertain`, or `disagree`-flagged `error`s — `disagree` = two criteria agents cited conflicting evidence on the same item) goes through a clustered re-check that re-reads each finding's cited plan section and keeps/drops it; (3) the survivors form the contested tail, which escalates to a 3-voter minority-veto consensus — three architect voters with distinct framings each independently try to REFUTE the item; it survives as a genuine blocker only if ≥2 of 3 fail to refute, else it is dropped and logged `contested` (the false-negative trail). Merge the surviving + contested sets, then synthesize the SINGLE `APPROVED` / `NEEDS REVISION` verdict (NEEDS REVISION iff ≥1 surviving `error`).
 
 **Iteration rules (max 3 rounds):**
 
-| BLOCKING item type | Handling |
+| `error` finding type | Handling |
 |---|---|
-| User-judgment question (not researchable) | Surface to the user verbatim. Do not resolve with assumptions. Update plan after user responds. Re-invoke architect. |
-| Design flaw resolvable from available context | Resolve from context. Update plan. Re-invoke architect. |
+| User-judgment question (not researchable) | Surface to the user verbatim. Do not resolve with assumptions. Update plan after user responds. Re-invoke the full panel. |
+| Design flaw resolvable from available context | Resolve from context. Update plan. Re-invoke the full panel. |
 
-Each re-invocation is a fresh pass — no memory of prior rounds. If BLOCKING issues remain after 3 rounds, surface them to the user; do not attempt a fourth round. ExitPlanMode only after APPROVED verdict.
+Each re-invocation dispatches the full 7-agent panel as a fresh pass — no memory of prior rounds. `warning` and `Strengths` findings are informational only. **Value-exhaustion stop:** stop iterating early when a round yields no NEW genuine blocker (every surviving `error` is a prior-round duplicate or was already addressed in the plan update) — do not run another round purely to produce a finding-free sweep. The 3-round cap is the hard ceiling: if `error` findings remain after 3 rounds, surface them to the user; do not attempt a fourth round. ExitPlanMode only after APPROVED verdict.
+
+**APPROVED ≠ exhaustive coverage.** The architect panel is a sampling review — non-deterministic and non-exhaustive. An `APPROVED` verdict means no `error`-severity findings survived the tiered verify in this pass, not that the plan is provably correct. A later round can catch a bug an earlier round missed. The proof of correctness is execution and tests; do not gate solely on architect approval.
 
 ---
 

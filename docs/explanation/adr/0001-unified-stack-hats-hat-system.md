@@ -6,7 +6,7 @@ Accepted (2026-06-18, at stack-hats tree close — concurrent with the PR #65 me
 
 ## Related
 
-Parent: docs/workflow-map.md
+Parent: docs/explanation/features/stack-hats.md
 
 ## Supersedes
 

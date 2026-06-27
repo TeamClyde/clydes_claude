@@ -2,6 +2,14 @@
 
 ## In Progress
 
+- [ ] Orchestration Layer Foundation — Phase 1A: generated component inventory + gate-map (harvest scanner over skills/agents/rules/hooks), then doc + audit Form-A sub-plans. Gives the workflow system its missing "code graph" for drift resistance. — [plan doc](plans/orchestration-layer-foundation/orchestration-layer-foundation-plan.md)
+  - [x] Task 1 — Harvest scanner: component inventory from frontmatter
+  - [x] Task 2 — Gate-edge extraction: first-cut gate-map + reverse-dependency lookup
+  - [x] Task 3 — Emit + commit generated artifacts + drift-check test
+  - [x] Task 4 — Existing-doc cleanup triage (the ~17 flat docs/ files)
+  - [ ] Task 5 — Spawn Form-A sub-plan: Phase 1B (Docs)
+  - [ ] Task 6 — Spawn Form-A sub-plan: Phase 2 (Fan-out orchestration audit)
+
 ## Up Next
 
 - [ ] Workflow Feedback Fixes — six triaged workflow-friction fixes. Closes GitHub issues #61, #49, #54, #50, #55, #48, #56, #57. — [plan doc](plans/workflow-feedback-fixes/workflow-feedback-fixes-plan.md)
@@ -14,7 +22,7 @@
 
 - [ ] Orchestrator Routing v2 — mechanical enforcement of orchestrator routing decisions via Claude Code hooks + agent frontmatter pinning. Closes 8 GitHub workflow-friction issues (#14, #21, #28, #30, #31, #32, #33, #34). — [plan doc](plans/orchestrator-routing-v2/orchestrator-routing-v2-plan.md)
   - [ ] Tier 1 — Mechanical routing core: agent discovery + Haiku frontmatter pinning, PreToolUse Agent dispatch hook, SessionStart graph-tools directive + PreToolUse Grep/Glob enforcement, architect prompt expansion (symbol verification + callers query)
-  - [ ] Tier 3 — Focused fixes: UserPromptSubmit slash-command directive, brainstorming two-stage research bookends, project-name PostToolUse self-heal + root-cause fix, plan-gate parallel dispatch with soft-gate adherence-audit, [gate-complete] tag + plan-gate end-of-success :divergence
+  - [ ] Tier 3 — Focused fixes: UserPromptSubmit slash-command directive, brainstorming two-stage research bookends, project-name PostToolUse self-heal + root-cause fix, plan-gate parallel dispatch with soft-gate adherence-audit, [gate-complete] tag + plan-gate end-of-success :divergence — **NOTE (Phase 2 audit fold-in B):** `skills/plan-gate/SKILL.md` currently has NO `§ Sub-Plan Mode` section and never mentions `adherence-audit`, yet `rules/plan-docs.md` + `writing-plans` cite it; this Tier-3 item must add that section so the citations resolve.
   - [ ] Tier 2 — Sub-plan spawn: subagent-driven-development frontier rewrite (B1 tier-aware dispatch, B2 re-anchoring, B3 cache-stable prompt prefix, B4 executable-verification preference) — runs in sub-plan after parent Task 10
 
 ## Backlog
@@ -28,9 +36,12 @@
 - codebase-memory `delete_project` returns "Permission denied" on Windows (server holds the SQLite file open; no force flag) — workflow reset can't clear the external index without restarting the MCP server. Investigate a force/close option or document a reset recipe. [scope] [blocked]
 - Glob does not follow the `~/.claude/templates` symlink (Read/ls do) — audit skills that use Glob to verify file/template availability across symlinks; they can wrongly trip "not found" on a correctly-installed system. [debt]
 - No sanctioned abstraction for destructive `git clean` — git-manager covers commit/branch/push/PR but not working-tree cleaning, which dry runs and resets need. Decide whether git-manager gains a `clean` workflow or a rule sanctions direct use. [scope]
+- Rename code artifacts coupled to planning-doc phases/waves so they describe their *function*, not their plan origin — e.g. `scripts/phase-2-audit.workflow.mjs` names a plan PHASE, not what it does (a regulated orchestration fan-out audit); a maintainer without plan context can't tell. Repo-wide sweep of file + variable names; check `gate-map.json`/`component-inventory.json` + `package.json` script refs + any importers before renaming each. The specific `phase-2-audit.workflow.mjs` rename may be folded into the Wave 3 reconcile of that file (it's already being edited there). Raised 2026-06-22. [debt]
+- Post-Wave-4 cleanup: plan-closing completeness verifier. Root gap — `plan-management:close-subplan` has no owner for TODO.md sync: its flow (journal → parent-task ✅ → handoff → active-plan revert → ADR scan → feature-doc synthesis) never runs the TODO.md `completed` update, so closed waves leave stale TODO rows (observed: campaign Wave 2 row stale after close, fixed by hand 2026-06-22). Add a completeness check at plan/sub-plan close — a deterministic checklist of closeout invariants + ONE completeness-critic agent ("which closeout step did we forget?"), not a wide fan-out (checks are mostly deterministic). User-scoped to a cleanup effort AFTER Wave 4 of the orchestration-regulation campaign. Raised 2026-06-22. [debt]
 
 ## History
 
+- [x] Orchestration & Regulation Campaign — completed 2026-06-25. Five sequential Form-A sub-plan waves: cleanup + cross-family de-dup (W1); `fail-successfully` §9 items 5–7 engine + fault-injection harness + `dispatching-parallel-agents` front-door (W2); upgrade sweep of every fan-out consumer + monolith→fan-out reviewers (W3); one severity/verdict/enforcement taxonomy + surgical hook-hardening + `operating-model` skill (W4); tiered-adversarial verify primitive + blind-canary recall harness + confirmed-defect fixes + architect-agent hardening (W5). ADR-0004/0005/0006 + regulation-layer explanation docs committed (`78df11d`). Branch `feature/orchestration-regulation-campaign` — push/PR pending. — [plan doc](plans/orchestration-regulation-campaign/orchestration-regulation-campaign-plan.md)
 - [x] Agent UI Trial — REJECTED 2026-06-18 (closed, not deferred). Trial of Anthropic Remote Control + novelty "vibes" agent UIs across the Windows/Mac setup, abandoned mid-execution (Phase 1 complete; Task 7 RC baseline + Task 8 Agent Monitor and the `mac-build-orchestration` sub-plan parked). No longer pursuing cross-host agent-visibility tooling — closed as rejected so it is not resumed. Local plan docs retained under `plans/agent-ui-trial/` (gitignored, never committed).
 - [x] Stack Hats Phase 2 — completed 2026-06-18. Setup automation wired into project-setup (Phase 4 Tooling Setup: marker→stack detection, propose-then-confirm `stacks`, guided net-new on-ramp) + the 3-gate install-vetting funnel (vet-reputation / vet-capability-fit / vet-security) over the install surfaces, anchored to OWASP ASI/AST with a local `ai-tool-security-reviewer` semantic gate (GuardDog→OSV-Scanner). Two sm_fw_g2 firmware dry runs hardened project-setup to run end-to-end on Windows; ADR 0001 Accepted. Merged via PR #65; plan tree closed. See `docs/explanation/adr/0001-unified-stack-hats-hat-system.md`. Closes the rest of GitHub #43, #58.
 - [x] Stack Hats (Phase 1) — completed 2026-06-01. Global per-stack "hat" catalog (`stacks/<tech>.md`) + SessionStart injection hook (10-case test suite), unified so `architect` (criterion 6), `executing-plans`, and `subagent-driven-development` also resolve+leverage active hats off one source (`project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`). Validated end-to-end vs klondike_gui. Merged to `main` + pushed; plan tree closed 2026-06-15. Phase 2 (auto-detect/install/write-back) deferred. Closes part of GitHub #43, #58.

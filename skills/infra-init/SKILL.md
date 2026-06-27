@@ -89,7 +89,7 @@ ToolSearch("select:mcp__codebase-memory-mcp__index_repository,mcp__codebase-memo
 
 If `index_repository` is not found, stop and tell the user — do not attempt inline installation.
 
-Get the absolute repo path — pass the correct, fully-qualified absolute path to `index_repository` so the index persists against the right project. Use `git rev-parse --show-toplevel`, **not** `pwd -P`: on Windows git-bash `pwd -P` returns an MSYS `/c/Users/...` path the native MCP binary cannot resolve (it fails with a generic "Pipeline failed. Check repo_path exists"), whereas `--show-toplevel` emits the OS-native form (`C:/Users/...` on Windows, `/Users/...` or `/home/...` on macOS/Linux) on every platform. See `rules/filesystem/path-portability.md`.
+Get the absolute repo path using `git rev-parse --show-toplevel` — not `pwd -P`. See `rules/filesystem/path-portability.md` for why (`pwd -P` returns an MSYS path on Windows that the native MCP binary cannot resolve).
 
 ```bash
 REPO_PATH="$(git rev-parse --show-toplevel)"
@@ -239,5 +239,5 @@ Wait for this agent to complete. It writes `.claude-init/CODEBASE.md` and sets `
 2. Call ToolSearch("select:mcp__codebase-memory-mcp__index_repository") at Phase 2 start to verify codebase-memory-mcp is loaded.
 3. Phase 3 reads meta.repo_path from progress.json — verify it was written in Phase 2 before spawning the graph-builder agent.
 4. The codebase-memory-mcp project name is path-derived but the conversion (slashes→hyphens, internal underscores preserved) is non-obvious. Always pull it from `list_projects()` output — never construct it client-side.
-5. Set `REPO_PATH` with `git rev-parse --show-toplevel`, never `pwd -P`. On Windows git-bash `pwd -P` returns an MSYS `/c/...` path the native MCP binary rejects ("Pipeline failed"); `--show-toplevel` returns the OS-native path on every platform. See `rules/filesystem/path-portability.md`.
+5. Set `REPO_PATH` with `git rev-parse --show-toplevel`, never `pwd -P`. See `rules/filesystem/path-portability.md` for the Windows MSYS path bug class this avoids.
 6. `index_status` takes `project`, not `repo_path`. Capture the `project` key from `index_repository`'s response and poll with it; a literal `index_status(repo_path=...)` errors — the tool has no `repo_path` parameter.

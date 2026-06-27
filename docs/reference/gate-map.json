@@ -1,0 +1,1115 @@
+{
+  "nodes": [
+    {
+      "type": "agent",
+      "name": "ai-tool-security-reviewer",
+      "description": "Semantic security judge for AI/agentic install candidates. Invoked by the vet-security skill (install-vetting Gate 3) for the four agentic surfaces — MCP servers, Claude plugins/skills, AI IDE extensions, and AI CLI tools/agents. Receives a temp-dir path to the candidate's already-materialized static artifacts, the declared install surface, and vet-security's deterministic pre-scan findings; returns a single structured GREEN/YELLOW/RED verdict with OWASP-anchored findings. Read-only and advisory — it never installs, never runs external scanners, never acts.",
+      "model": "claude-sonnet-4-6",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\ai-tool-security-reviewer.md"
+    },
+    {
+      "type": "agent",
+      "name": "api-documenter",
+      "description": "Master API documentation with OpenAPI 3.1, AI-powered tools, and modern developer experience practices. Create interactive docs, generate SDKs, and build comprehensive developer portals. Use PROACTIVELY for API documentation or developer portal creation.",
+      "model": "sonnet",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\api-documenter.md"
+    },
+    {
+      "type": "agent",
+      "name": "architect",
+      "description": "Independent plan reviewer invoked at the end of planning, before ExitPlanMode or before a task transitions from In Progress to Testing/Done. Reads the plan doc cold — with no access to the conversation that produced it — and evaluates design soundness, logic completeness, internal consistency, cross-plan accuracy, and self-containment. Returns structured findings at severity `error` / `warning` / Strengths and a VERDICT of APPROVED or NEEDS REVISION. Invoke with a plan_doc_path and an optional instructions field to narrow the review focus.",
+      "model": "claude-sonnet-4-6",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\architect.md"
+    },
+    {
+      "type": "agent",
+      "name": "docs-architect",
+      "description": "Creates comprehensive technical documentation from existing codebases. Analyzes architecture, design patterns, and implementation details to produce long-form technical manuals and ebooks. Use PROACTIVELY for system documentation, architecture guides, or technical deep-dives.",
+      "model": "sonnet",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\docs-architect.md"
+    },
+    {
+      "type": "agent",
+      "name": "integration-engineer",
+      "description": "Cross-repo contract analyst. Invoked during planning when a proposed change has cross-repo impact, when a consumer repo needs to integrate with a provider repo, when a new endpoint is added and callers in other repos need to be mapped, or when an explicit audit of endpoint coverage across repos is requested. Read-only — never modifies files, never writes code, never guesses. Returns CONFIRMED CONNECTIONS, MISMATCHES, GAPS, and BLOCKERS with exact file:line citations.",
+      "model": "claude-sonnet-4-6",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\integration-engineer.md"
+    },
+    {
+      "type": "agent",
+      "name": "jira-workflow-manager",
+      "description": "Handles all Jira operations for the Claude-assisted development workflow: creating Epic, Task, and Bug tickets from structured inputs, transitioning ticket statuses, adding comments under a strict sparse-comment policy, reading tickets, searching for duplicates, and updating descriptions. Invoke this agent whenever a Jira ticket needs to be created (after plan finalization and architect approval), when starting a task (transition to In Progress), when a bug is identified, when a task is committed and needs closing, or when working on a human-created ticket. Never call Atlassian MCP tools directly from the main context — always delegate through this agent.",
+      "model": "claude-sonnet-4-6",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\jira-workflow-manager.md"
+    },
+    {
+      "type": "agent",
+      "name": "mermaid-expert",
+      "description": "Create Mermaid diagrams for flowcharts, sequences, ERDs, and architectures. Masters syntax for all diagram types and styling. Use PROACTIVELY for visual documentation, system diagrams, or process flows.",
+      "model": "haiku",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\mermaid-expert.md"
+    },
+    {
+      "type": "agent",
+      "name": "reference-builder",
+      "description": "Creates exhaustive technical references and API documentation. Generates comprehensive parameter listings, configuration guides, and searchable reference materials. Use PROACTIVELY for API docs, configuration references, or complete technical specifications.",
+      "model": "haiku",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\reference-builder.md"
+    },
+    {
+      "type": "agent",
+      "name": "researcher",
+      "description": "Lookup agent that answers a single specific question by querying the appropriate MCP — local codebase MCP for symbol locations, imports, and env vars; AWS MCP for ARNs, SSM parameters, DynamoDB table names, and other live infrastructure values. Returns the direct answer only: the ARN, the parameter value, the resource name. Invoked by the main context or the architect agent to keep MCP lookup work out of the main context window. One question per instance; the main context handles sequencing when answers chain.",
+      "model": "claude-haiku-4-5-20251001",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\researcher.md"
+    },
+    {
+      "type": "agent",
+      "name": "test-builder",
+      "description": "Execution-phase test code writer. Invoked at plan execution start, before implementation begins, in parallel with the main implementation work. Takes the Testing section from the plan doc as its specification and writes runnable failing tests directly to disk. Never reads implementation source files — derives all test logic from the Testing section and the repo testing plan. Returns a status summary only to the main context; the test code itself is not passed back, keeping the TDD contract intact.",
+      "model": "claude-sonnet-4-6",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\test-builder.md"
+    },
+    {
+      "type": "agent",
+      "name": "test-runner",
+      "description": "Post-implementation test executor. Invoked by the main context or orchestrator after implementation is committed, before verification-before-completion. Reads the test suite run command from .claude/testing-plan.md, executes it, classifies the result (PASS / BUILD FAILURE / TEST FAILURE / ENVIRONMENT FAILURE), and returns a structured summary. On failure, emits a REQUIRED NEXT STEP block mandating systematic-debugging before any fix attempt. Must only be invoked by a context with Skill tool access — never by a leaf implementer subagent.",
+      "model": "claude-haiku-4-5-20251001",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\test-runner.md"
+    },
+    {
+      "type": "agent",
+      "name": "test-strategy",
+      "description": "Per-plan validation checkpoint. Invoked after architect review returns an APPROVED verdict, before ExitPlanMode. Reads the plan doc's stated intent and the repo testing plan, then produces a Testing section defining what validation is needed for the change. Black-box reviewer — defines what correct behavior looks like from the outside, not how the implementation achieves it. Output is appended to the plan doc by the caller. Does not block the plan, read implementation source files, or write test code.",
+      "model": "claude-sonnet-4-6",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\test-strategy.md"
+    },
+    {
+      "type": "agent",
+      "name": "tutorial-engineer",
+      "description": "Creates step-by-step tutorials and educational content from code. Transforms complex concepts into progressive learning experiences with hands-on examples. Use PROACTIVELY for onboarding guides, feature tutorials, or concept explanations.",
+      "model": "sonnet",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\tutorial-engineer.md"
+    },
+    {
+      "type": "hook",
+      "name": "agent-model-pinning",
+      "event": "preToolUse",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\preToolUse\\agent-model-pinning.mjs"
+    },
+    {
+      "type": "hook",
+      "name": "git-prohibitions",
+      "event": "preToolUse",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\preToolUse\\git-prohibitions.mjs"
+    },
+    {
+      "type": "hook",
+      "name": "graph-tools-directive",
+      "event": "sessionStart",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\sessionStart\\graph-tools-directive.mjs"
+    },
+    {
+      "type": "hook",
+      "name": "graph-tools-enforcement",
+      "event": "preToolUse",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\preToolUse\\graph-tools-enforcement.mjs"
+    },
+    {
+      "type": "hook",
+      "name": "graph-tools-self-heal",
+      "event": "postToolUse",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\postToolUse\\graph-tools-self-heal.mjs"
+    },
+    {
+      "type": "hook",
+      "name": "install-vetting-advisory",
+      "event": "preToolUse",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\preToolUse\\install-vetting-advisory.mjs"
+    },
+    {
+      "type": "hook",
+      "name": "session-start",
+      "event": "sessionStart",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\session-start.mjs"
+    },
+    {
+      "type": "hook",
+      "name": "slash-command-enforcement",
+      "event": "userPromptSubmit",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\userPromptSubmit\\slash-command-enforcement.mjs"
+    },
+    {
+      "type": "hook",
+      "name": "stack-hat-directive",
+      "event": "sessionStart",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\sessionStart\\stack-hat-directive.mjs"
+    },
+    {
+      "type": "hook",
+      "name": "subagent-prefix-prepend",
+      "event": "preToolUse",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\.claude\\hooks\\preToolUse\\subagent-prefix-prepend.mjs"
+    },
+    {
+      "type": "rule",
+      "name": "cspell",
+      "description": "When you encounter a spellcheck false positive for a technical term, add it to **both** of the following without asking for confirmation. Do not surface it to the user.",
+      "title": "Spellcheck — False Positives",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\cspell.md"
+    },
+    {
+      "type": "rule",
+      "name": "doc-tools",
+      "description": "| Quadrant | Location | User need | |---|---|---| | Tutorials | docs/tutorials/ | Learning | | How-To | docs/how-to/ | Doing | | Reference | docs/reference/ | Information | | Explanation | docs/explanation/ | Understanding |",
+      "title": "Doc Tools",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\doc-tools.md"
+    },
+    {
+      "type": "rule",
+      "name": "filesystem/efficiency",
+      "description": "Before reading or searching files, identify the minimum set needed. Do not read files speculatively. If a plan doc exists for the current task, read it first — it should contain the file paths, function names, and data structures needed. On",
+      "title": "Filesystem Efficiency Rules",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\filesystem\\efficiency.md"
+    },
+    {
+      "type": "rule",
+      "name": "filesystem/path-portability",
+      "description": "Skills, agents, and scripts run in a shell, but the paths they produce are often consumed by **native OS binaries and MCP servers** that do not understand the shell's path conventions. A path that works in git-bash can be rejected by the na",
+      "title": "Filesystem Path Portability",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\filesystem\\path-portability.md"
+    },
+    {
+      "type": "rule",
+      "name": "install-vetting",
+      "description": "When the workflow (or Claude in-session) is about to install a tool, run `vet-install` first. Never block, never auto-install — the funnel informs and recommends; the user decides every time. Scope: workflow/Claude-initiated installs only, ",
+      "title": "Install Vetting — Advisory Pre-Install Funnel",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\install-vetting.md"
+    },
+    {
+      "type": "rule",
+      "name": "integration-test-constraints",
+      "description": "After `systematic-debugging` completes and identifies a confirmed root cause during test execution, evaluate whether the finding qualifies as a persistent constraint:",
+      "title": "Integration Test Constraints — Write-Back Rule",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\integration-test-constraints.md"
+    },
+    {
+      "type": "rule",
+      "name": "mcp-governance",
+      "description": "Two rules for Claude Code CLI and subagent sessions (contexts where Tool Search is not configurable):",
+      "title": "MCP Governance — CLI Sessions",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\mcp-governance.md"
+    },
+    {
+      "type": "rule",
+      "name": "new-repo-setup",
+      "description": "All agents and skills are global — they live in `~/.claude/` and are available in every repo without per-project copies. Install them once by running `scripts/setup.sh`.",
+      "title": "New Repo Setup",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\new-repo-setup.md"
+    },
+    {
+      "type": "rule",
+      "name": "plan-docs",
+      "description": "Every top-level plan consists of exactly four files under `plans/<slug>/`:",
+      "title": "Plan Docs — Structure, Lifecycle, and Loading Model",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\plan-docs.md"
+    },
+    {
+      "type": "rule",
+      "name": "planning",
+      "description": "Complete all four phases in order. Do not draft until Phase 3 is resolved.",
+      "title": "Planning Protocol & Plan Doc Format",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\planning.md"
+    },
+    {
+      "type": "rule",
+      "name": "plugin-lifecycle",
+      "description": "When a plugin is **Integrated**, always route through `creating-tools`. Do not invoke Integrated plugin skills directly.",
+      "title": "Plugin Lifecycle — Conflict Suppression and Routing",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\plugin-lifecycle.md"
+    },
+    {
+      "type": "rule",
+      "name": "secrets-handling",
+      "description": "Never ask the user to paste a secret, token, or password into the chat. A pasted secret enters the transcript and context window — treat it as compromised and rotate it immediately.",
+      "title": "Secrets Handling — Credentials in Workflow",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\secrets-handling.md"
+    },
+    {
+      "type": "rule",
+      "name": "stack-hats",
+      "description": "A **stack hat** is specialist best-practice + tooling guidance for a technology (Python, React, C/C++, …), layered on top of SE-fundamentals — never replacing them. Hats compose: a Python+React repo wears both.",
+      "title": "Stack Hats — Per-Stack Best-Practice Layer",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\stack-hats.md"
+    },
+    {
+      "type": "rule",
+      "name": "workflow-phases",
+      "description": "This workflow applies to all repositories. Project-specific settings override global defaults.",
+      "title": "Workflow Phases — Jira + Git",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\workflow-phases.md"
+    },
+    {
+      "type": "skill",
+      "name": "adherence-audit",
+      "description": "Use when adding new workflow components, after modifying rules or skills, or periodically to check for drift. Audits semantic consistency across all skills, agents, rules, and CLAUDE.md: finds dead references, invocation mismatches, convention conflicts, priority conflicts, orphaned components, trigger gaps, and workflow gaps. Triggers on \"audit workflow\", \"check consistency\", \"adherence audit\", \"find conflicts\", \"workflow audit\", \"check for drift\".",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\adherence-audit\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "architecture-decision-records",
+      "description": "Write and maintain Architecture Decision Records (ADRs) following best practices for technical decision documentation. Use when documenting significant technical decisions, reviewing past architectural choices, or establishing decision processes.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\architecture-decision-records\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "brainstorming",
+      "description": "Use when designing a new feature, planning a significant refactor, or exploring solution approaches — any time the right implementation isn't obvious and options need to be considered before writing code. Do not skip when requirements feel clear; surface assumptions first.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\brainstorming\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "changelog-automation",
+      "description": "Automate changelog generation from commits, PRs, and releases following Keep a Changelog format. Use when setting up release workflows, generating release notes, or standardizing commit conventions.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\changelog-automation\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "creating-tools",
+      "description": "Use when creating any workflow component — skill, agent, rule, hook, command, or plugin. Routes to the correct specialist skill based on artifact type.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\creating-tools\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "different-viewpoint",
+      "description": "Thinking tool — full CIA Phoenix Checklist sweep on a problem. Takes a problem statement and an optional hypothesis. Without a hypothesis, runs in problem-definition mode: surfaces what the unknown actually is before solutions are considered. With a hypothesis, runs the checklist with the hypothesis as context and flags answers that contradict or challenge it. The mechanism is answering ALL questions in order, including ones that seem irrelevant — those are often the ones that shift framing. Triggers on \"different viewpoint\", \"phoenix checklist\", \"challenge my thinking\", \"am I solving the right problem\", \"stress test this solution\", \"full sweep\".",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\different-viewpoint\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "different-viewpoints-lite",
+      "description": "Thinking tool — adversarial 5-question Phoenix Checklist challenge against a problem and optional hypothesis. Unlike different-viewpoint (full sweep in order), this selects the 5 questions most likely to falsify or expose flaws in current thinking. Without a hypothesis, selects questions most likely to surface what the real problem actually is. Selection is adversarial: most threatening questions, not most topically related. Triggers on \"different viewpoints lite\", \"quick adversarial check\", \"challenge this hypothesis\", \"find the flaw\", \"stress test lite\".",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\different-viewpoints-lite\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "dispatching-parallel-agents",
+      "description": "Use when dispatching 2+ agent tasks as a regulated fan-out — parallel independent work, a sequential pipeline where each step feeds the next, or multi-lens review — applying quorum, retries, model-pinning, and token-budget gating consistently",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\dispatching-parallel-agents\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "doc-author",
+      "description": "Use when authoring or updating a feature-doc (docs/explanation/features/<slug>.md) or docs/explanation/architecture.md. Wraps the docs-architect agent with merge-not-replace + 2-step (backlink-first → content-second) constraints. Invoked by plan-management:close-subplan (after ADR Promotion Scan), /doc-backfill (whole-repo backfill), and /docs-refresh feature|architecture (manual refresh). Triggers on \"draft feature doc\", \"update feature explainer\", \"synthesize architecture doc\".",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\doc-author\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "doc-backfill",
+      "description": "Use when bringing an existing repo's code up to the hybrid Explanation layout (docs/explanation/architecture.md + features/<slug>.md) for the first time. Reads codebase graph (codebase-memory-mcp) to identify C2 containers and C3 components; invokes doc-author per detected file; surfaces all drafts for user review in one pass. Whole-repo one-shot — no per-feature mode in v1. Triggers on \"/doc-backfill\", \"backfill docs\", \"generate feature docs for repo\", \"bootstrap arc42 docs\".",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\doc-backfill\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "docs-refresh",
+      "description": "Use when generating or refreshing doc content for a specific Diátaxis quadrant or artifact type — routes to the right bundled doc specialist agent or skill (tutorial-engineer / docs-architect / reference-builder / architecture-decision-records / changelog-automation / openapi-spec-generation / mermaid-expert). Multi-domain aware. Does not commit (user reviews specialist output). Triggers on \"docs refresh\", \"generate tutorial\", \"draft ADR\", \"refresh changelog\", \"/docs-refresh\".",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\docs-refresh\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "docs-status",
+      "description": "Use when auditing a repo's documentation against its docs/manifest.md — checks what's missing, stale, or aspirational vs what's actually on disk. Multi-domain aware via project.json domain. Outputs tiered report (ERRORS / WARNINGS / SUGGESTIONS) per rules/doc-tools.md. Also validates ADR ↔ feature-doc cross-link integrity (3 regex sweeps: ## Related section + Parent: paths resolve, parent backlinks ADR, Decisions section links resolve). Read-only audit; never modifies repo files except scaffolding manifest on first use. Triggers on \\\"docs status\\\", \\\"audit my docs\\\", \\\"check what docs are missing\\\", \\\"/docs-status\\\".",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\docs-status\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "e2e-init",
+      "description": "Use when a repo's test suite needs to be established or audited — inventorying existing tests, identifying coverage gaps, setting up missing infrastructure, adding dummy or fixture data, or surfacing failing tests. Useful for first-time setup and for expanding an existing suite. Run after /infra-init, before writing any new code.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\e2e-init\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "executing-plans",
+      "description": "Use when you have a written implementation plan to execute yourself — runs all tasks in a single continuing context with review checkpoints between steps. For isolated fresh-subagent-per-task execution instead, use subagent-driven-development.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\executing-plans\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "feedback",
+      "description": "Use when experiencing friction, confusion, or a gap mid-session — a skill that didn't trigger, a rule that conflicted with reality, a missing capability, or a process that felt wrong. Captures the observation as a GitHub issue without interrupting current work.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\feedback\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "finishing-a-development-branch",
+      "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\finishing-a-development-branch\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "git-manager",
+      "description": "Use when committing files, creating a branch, pushing to remote, syncing with main, opening a pull request, or when a merge conflict needs to be surfaced and handled safely. Invoke for any git action during development — starting work, recording progress, shipping, or managing conflicts.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\git-manager\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "handoff",
+      "description": "Use when you are mid-work and want to start a fresh, clean session that continues the current work — e.g. context is filling up, or you want to resume the same task elsewhere. Produces a copy-pasteable prompt for the next session and, when an active plan exists, refreshes that plan tree's live handoff doc in place.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\handoff\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "infra-init",
+      "description": "Use when starting a new repo session, before exploring an unfamiliar codebase, or when code structure has changed significantly. Builds a queryable symbol graph and CODEBASE.md so future navigation uses the graph instead of broad file searches.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\infra-init\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "librarian",
+      "description": "Use when the user wants deep, multi-source WEB research on a topic or on a source document's topics — produced by a regulated parallel fan-out that searches the web, cites sources, and adversarially verifies claims (not a single pass, not memory-only). Triggers on requests to research a topic from scratch, validate a brief's claims against live sources, or produce a cited research report across several sub-questions. Does NOT trigger on quick single-pass summaries or on pure analysis of a document's own content with no external research.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\librarian\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "openapi-spec-generation",
+      "description": "Generate and maintain OpenAPI 3.1 specifications from code, design-first specs, and validation patterns. Use when creating API documentation, generating SDKs, or ensuring API contract compliance.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\openapi-spec-generation\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "operating-model",
+      "description": "Use when deciding whether to fan out work at all, which executor surface to use (inline / single subagent / parallel batch / Agent Teams / Dynamic Workflow), or how to size a fan-out — the whether/when/which-executor decision layer. For how to run one fan-out once the decision is made, use dispatching-parallel-agents.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\operating-model\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "plan-gate",
+      "description": "Triggers on writing-plans completion. Gates the plan through architect review, test-strategy, test-builder, Jira ticket creation, and TODO.md registration before execution begins. Can also be invoked manually against any plan doc at plans/<slug>/<slug>-plan.md.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\plan-gate\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "plan-management",
+      "description": "Use when Jira tickets are created or change status (in_progress, done), when adding items to the backlog, when reconciling TODO.md against current ticket state, or when a plan deviation is discovered, a sub-plan is spawned, or a sub-plan is ready to close. Invoke after every ticket creation or status transition to keep TODO.md current; invoke for plan-doc state changes (divergence, spawn-subplan, close-subplan) independently of Jira.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\plan-management\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "project-setup",
+      "description": "Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUDE.md is missing or generic, or the codebase graph hasn't been generated. Configures Jira integration, testing setup, and workflow preferences.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\project-setup\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "receiving-code-review",
+      "description": "Use when you have RECEIVED code review feedback and need to act on it — evaluating, verifying, and implementing reviewer suggestions with technical rigor, not performative agreement. Owns the \"respond to feedback\" direction. For submitting work to be reviewed, use requesting-code-review.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\receiving-code-review\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "requesting-code-review",
+      "description": "Use when you want to request a code review — after completing a task, implementing a major feature, or before merging/opening a PR to verify work meets requirements. Owns the \"submit work for review\" direction. For acting on feedback you already received, use receiving-code-review.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\requesting-code-review\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "review-workflow",
+      "description": "Use when workflow friction issues have accumulated in TeamClyde/clydes_claude and you want to act on them — scanning the meta-workflow system for context, proposing multi-angle fixes, and routing improvements to the right component. This is about the WORKFLOW SYSTEM itself, not reviewing code changes — for code review, use requesting-code-review. Run periodically or after several friction issues accumulate.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\review-workflow\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "subagent-driven-development",
+      "description": "Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with a parallel two-lens review (spec compliance + code quality run simultaneously) after each task. For single-context step-by-step execution with checkpoints instead, use executing-plans.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\subagent-driven-development\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "systematic-debugging",
+      "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes — requires reproducing the issue, isolating root cause, and validating the fix rather than guessing.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\systematic-debugging\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "test-driven-development",
+      "description": "Use when implementing any feature or bugfix, before writing implementation code — requires a failing test first, then minimum code to pass, then refactor. No implementation without a red test.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\test-driven-development\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "using-git-worktrees",
+      "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\using-git-worktrees\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "using-superpowers",
+      "description": "Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\using-superpowers\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "verification-before-completion",
+      "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\verification-before-completion\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "vet-capability-fit",
+      "description": "Use when you need to determine whether a candidate tool actually covers a stated need and which component of it provides that capability. Gate 2 of the install-vetting funnel.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\vet-capability-fit\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "vet-install",
+      "description": "Use when the workflow or Claude is about to install a tool and needs to vet it before proceeding. Entry point for the 3-gate install-vetting funnel — runs vet-reputation, vet-capability-fit, and vet-security in order, consolidates ONE report, and always asks the user before any install. Never auto-installs.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\vet-install\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "vet-reputation",
+      "description": "Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustworthy before installing it. Gate 1 of the install-vetting funnel.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\vet-reputation\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "vet-security",
+      "description": "Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of the install-vetting funnel.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\vet-security\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "writing-agents",
+      "description": "Use when creating a new agent, editing an existing agent's system prompt, or determining agent frontmatter conventions and testing approach.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-agents\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "writing-plans",
+      "description": "Use when you have a spec or requirements for a multi-step task, before touching code — produces a plan doc with concrete file paths, task breakdown, and architecture blueprint. Hands off to plan-gate automatically.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-plans\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "writing-rules",
+      "description": "Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-rules\\SKILL.md"
+    },
+    {
+      "type": "skill",
+      "name": "writing-skills",
+      "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment — requires TDD baseline testing before writing skill content. Route through creating-tools, not directly.",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-skills\\SKILL.md"
+    }
+  ],
+  "edges": [
+    {
+      "from": "adherence-audit",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "ai-tool-security-reviewer",
+      "to": "vet-security"
+    },
+    {
+      "from": "architect",
+      "to": "researcher"
+    },
+    {
+      "from": "architect",
+      "to": "subagent-driven-development"
+    },
+    {
+      "from": "brainstorming",
+      "to": "researcher"
+    },
+    {
+      "from": "brainstorming",
+      "to": "writing-plans"
+    },
+    {
+      "from": "creating-tools",
+      "to": "writing-agents"
+    },
+    {
+      "from": "creating-tools",
+      "to": "writing-rules"
+    },
+    {
+      "from": "creating-tools",
+      "to": "writing-skills"
+    },
+    {
+      "from": "dispatching-parallel-agents",
+      "to": "librarian"
+    },
+    {
+      "from": "dispatching-parallel-agents",
+      "to": "review-workflow"
+    },
+    {
+      "from": "doc-author",
+      "to": "architecture-decision-records"
+    },
+    {
+      "from": "doc-author",
+      "to": "docs-architect"
+    },
+    {
+      "from": "doc-author",
+      "to": "git-manager"
+    },
+    {
+      "from": "doc-backfill",
+      "to": "architecture-decision-records"
+    },
+    {
+      "from": "doc-backfill",
+      "to": "doc-author"
+    },
+    {
+      "from": "doc-backfill",
+      "to": "git-manager"
+    },
+    {
+      "from": "doc-tools",
+      "to": "doc-author"
+    },
+    {
+      "from": "doc-tools",
+      "to": "project-setup"
+    },
+    {
+      "from": "docs-refresh",
+      "to": "architecture-decision-records"
+    },
+    {
+      "from": "docs-refresh",
+      "to": "changelog-automation"
+    },
+    {
+      "from": "docs-refresh",
+      "to": "doc-author"
+    },
+    {
+      "from": "docs-refresh",
+      "to": "docs-architect"
+    },
+    {
+      "from": "docs-refresh",
+      "to": "git-manager"
+    },
+    {
+      "from": "docs-refresh",
+      "to": "mermaid-expert"
+    },
+    {
+      "from": "docs-refresh",
+      "to": "openapi-spec-generation"
+    },
+    {
+      "from": "docs-refresh",
+      "to": "reference-builder"
+    },
+    {
+      "from": "docs-refresh",
+      "to": "tutorial-engineer"
+    },
+    {
+      "from": "docs-status",
+      "to": "project-setup"
+    },
+    {
+      "from": "executing-plans",
+      "to": "e2e-init"
+    },
+    {
+      "from": "executing-plans",
+      "to": "git-manager"
+    },
+    {
+      "from": "executing-plans",
+      "to": "systematic-debugging"
+    },
+    {
+      "from": "executing-plans",
+      "to": "test-runner"
+    },
+    {
+      "from": "finishing-a-development-branch",
+      "to": "git-manager"
+    },
+    {
+      "from": "finishing-a-development-branch",
+      "to": "infra-init"
+    },
+    {
+      "from": "git-manager",
+      "to": "secrets-handling"
+    },
+    {
+      "from": "handoff",
+      "to": "plan-management"
+    },
+    {
+      "from": "install-vetting",
+      "to": "vet-capability-fit"
+    },
+    {
+      "from": "install-vetting",
+      "to": "vet-install"
+    },
+    {
+      "from": "install-vetting",
+      "to": "vet-reputation"
+    },
+    {
+      "from": "install-vetting",
+      "to": "vet-security"
+    },
+    {
+      "from": "integration-test-constraints",
+      "to": "systematic-debugging"
+    },
+    {
+      "from": "jira-workflow-manager",
+      "to": "researcher"
+    },
+    {
+      "from": "librarian",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "mcp-governance",
+      "to": "git-manager"
+    },
+    {
+      "from": "mcp-governance",
+      "to": "jira-workflow-manager"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "architect"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "creating-tools"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "e2e-init"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "git-manager"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "infra-init"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "integration-engineer"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "jira-workflow-manager"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "plan-management"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "researcher"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "test-builder"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "test-strategy"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "writing-agents"
+    },
+    {
+      "from": "new-repo-setup",
+      "to": "writing-rules"
+    },
+    {
+      "from": "operating-model",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "plan-docs",
+      "to": "brainstorming"
+    },
+    {
+      "from": "plan-docs",
+      "to": "finishing-a-development-branch"
+    },
+    {
+      "from": "plan-docs",
+      "to": "plan-gate"
+    },
+    {
+      "from": "plan-docs",
+      "to": "plan-management"
+    },
+    {
+      "from": "plan-docs",
+      "to": "systematic-debugging"
+    },
+    {
+      "from": "plan-docs",
+      "to": "writing-plans"
+    },
+    {
+      "from": "plan-gate",
+      "to": "adherence-audit"
+    },
+    {
+      "from": "plan-gate",
+      "to": "architect"
+    },
+    {
+      "from": "plan-gate",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "plan-gate",
+      "to": "executing-plans"
+    },
+    {
+      "from": "plan-gate",
+      "to": "jira-workflow-manager"
+    },
+    {
+      "from": "plan-gate",
+      "to": "plan-management"
+    },
+    {
+      "from": "plan-gate",
+      "to": "test-builder"
+    },
+    {
+      "from": "plan-gate",
+      "to": "test-strategy"
+    },
+    {
+      "from": "plan-gate",
+      "to": "writing-plans"
+    },
+    {
+      "from": "plan-management",
+      "to": "brainstorming"
+    },
+    {
+      "from": "plan-management",
+      "to": "doc-author"
+    },
+    {
+      "from": "plan-management",
+      "to": "executing-plans"
+    },
+    {
+      "from": "plan-management",
+      "to": "git-manager"
+    },
+    {
+      "from": "plan-management",
+      "to": "jira-workflow-manager"
+    },
+    {
+      "from": "plan-management",
+      "to": "subagent-driven-development"
+    },
+    {
+      "from": "plan-management",
+      "to": "systematic-debugging"
+    },
+    {
+      "from": "plan-management",
+      "to": "writing-plans"
+    },
+    {
+      "from": "planning",
+      "to": "architect"
+    },
+    {
+      "from": "planning",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "planning",
+      "to": "integration-engineer"
+    },
+    {
+      "from": "planning",
+      "to": "plan-management"
+    },
+    {
+      "from": "planning",
+      "to": "researcher"
+    },
+    {
+      "from": "planning",
+      "to": "subagent-driven-development"
+    },
+    {
+      "from": "planning",
+      "to": "test-strategy"
+    },
+    {
+      "from": "plugin-lifecycle",
+      "to": "creating-tools"
+    },
+    {
+      "from": "plugin-lifecycle",
+      "to": "using-superpowers"
+    },
+    {
+      "from": "project-setup",
+      "to": "e2e-init"
+    },
+    {
+      "from": "project-setup",
+      "to": "infra-init"
+    },
+    {
+      "from": "project-setup",
+      "to": "vet-install"
+    },
+    {
+      "from": "project-setup",
+      "to": "vet-reputation"
+    },
+    {
+      "from": "requesting-code-review",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "review-workflow",
+      "to": "creating-tools"
+    },
+    {
+      "from": "review-workflow",
+      "to": "different-viewpoint"
+    },
+    {
+      "from": "review-workflow",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "review-workflow",
+      "to": "git-manager"
+    },
+    {
+      "from": "review-workflow",
+      "to": "writing-skills"
+    },
+    {
+      "from": "stack-hats",
+      "to": "architect"
+    },
+    {
+      "from": "stack-hats",
+      "to": "executing-plans"
+    },
+    {
+      "from": "stack-hats",
+      "to": "project-setup"
+    },
+    {
+      "from": "stack-hats",
+      "to": "subagent-driven-development"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "jira-workflow-manager"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "plan-management"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "researcher"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "systematic-debugging"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "test-runner"
+    },
+    {
+      "from": "systematic-debugging",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "systematic-debugging",
+      "to": "plan-management"
+    },
+    {
+      "from": "test-builder",
+      "to": "git-manager"
+    },
+    {
+      "from": "test-runner",
+      "to": "e2e-init"
+    },
+    {
+      "from": "test-runner",
+      "to": "systematic-debugging"
+    },
+    {
+      "from": "using-git-worktrees",
+      "to": "finishing-a-development-branch"
+    },
+    {
+      "from": "using-git-worktrees",
+      "to": "infra-init"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "architect"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "creating-tools"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "git-manager"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "infra-init"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "integration-engineer"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "jira-workflow-manager"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "plan-gate"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "researcher"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "test-builder"
+    },
+    {
+      "from": "using-superpowers",
+      "to": "test-strategy"
+    },
+    {
+      "from": "vet-capability-fit",
+      "to": "researcher"
+    },
+    {
+      "from": "vet-capability-fit",
+      "to": "vet-reputation"
+    },
+    {
+      "from": "vet-capability-fit",
+      "to": "vet-security"
+    },
+    {
+      "from": "vet-install",
+      "to": "vet-capability-fit"
+    },
+    {
+      "from": "vet-install",
+      "to": "vet-reputation"
+    },
+    {
+      "from": "vet-install",
+      "to": "vet-security"
+    },
+    {
+      "from": "vet-security",
+      "to": "ai-tool-security-reviewer"
+    },
+    {
+      "from": "vet-security",
+      "to": "vet-capability-fit"
+    },
+    {
+      "from": "vet-security",
+      "to": "vet-reputation"
+    },
+    {
+      "from": "workflow-phases",
+      "to": "git-manager"
+    },
+    {
+      "from": "workflow-phases",
+      "to": "jira-workflow-manager"
+    },
+    {
+      "from": "workflow-phases",
+      "to": "plan-management"
+    },
+    {
+      "from": "writing-plans",
+      "to": "executing-plans"
+    },
+    {
+      "from": "writing-plans",
+      "to": "finishing-a-development-branch"
+    },
+    {
+      "from": "writing-plans",
+      "to": "git-manager"
+    },
+    {
+      "from": "writing-plans",
+      "to": "researcher"
+    },
+    {
+      "from": "writing-plans",
+      "to": "subagent-driven-development"
+    },
+    {
+      "from": "writing-plans",
+      "to": "writing-agents"
+    },
+    {
+      "from": "writing-plans",
+      "to": "writing-rules"
+    },
+    {
+      "from": "writing-plans",
+      "to": "writing-skills"
+    },
+    {
+      "from": "writing-rules",
+      "to": "writing-agents"
+    },
+    {
+      "from": "writing-rules",
+      "to": "writing-skills"
+    },
+    {
+      "from": "writing-skills",
+      "to": "creating-tools"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 ---
 name: docs-refresh
-description: Use when generating or refreshing doc content for a specific Diátaxis quadrant or artifact type — routes to the right wshobson doc agent or skill (tutorial-engineer / docs-architect / reference-builder / architecture-decision-records / changelog-automation / openapi-spec-generation / mermaid-expert). Multi-domain aware. Does not commit (user reviews specialist output). Triggers on "docs refresh", "generate tutorial", "draft ADR", "refresh changelog", "/docs-refresh".
+description: Use when generating or refreshing doc content for a specific Diátaxis quadrant or artifact type — routes to the right bundled doc specialist agent or skill (tutorial-engineer / docs-architect / reference-builder / architecture-decision-records / changelog-automation / openapi-spec-generation / mermaid-expert). Multi-domain aware. Does not commit (user reviews specialist output). Triggers on "docs refresh", "generate tutorial", "draft ADR", "refresh changelog", "/docs-refresh".
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Task
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Task
 
 ## Purpose
 
-Manual doc-content generation. `/docs-status` shows what's missing; `/docs-refresh` generates content for one specific artifact type via the appropriate specialist (wshobson agent or skill).
+Manual doc-content generation. `/docs-status` shows what's missing; `/docs-refresh` generates content for one specific artifact type via the appropriate specialist (bundled doc specialist agent or skill).
 
 This skill is a thin router. Specialists handle their own internal logic.
 

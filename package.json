@@ -1,0 +1,16 @@
+{
+  "name": "claude-workflow-improvements",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test scripts/ .claude/hooks/",
+    "harness": "node scripts/run-harness.mjs",
+    "harvest": "node scripts/harvest-components.mjs --emit",
+    "harvest:check": "node scripts/harvest-components.mjs --emit && git diff --exit-code docs/reference/",
+    "build:engine": "node scripts/build-engine-bundle.mjs --emit",
+    "engine:check": "node scripts/build-engine-bundle.mjs --emit && git diff --exit-code scripts/orchestration-audit.workflow.mjs scripts/librarian.workflow.mjs",
+    "verify:check": "node scripts/verify-conformance.mjs",
+    "recall:check": "node scripts/recall/check.mjs"
+  }
+}

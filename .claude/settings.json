@@ -57,6 +57,11 @@
             "type": "command",
             "command": "node .claude/hooks/preToolUse/install-vetting-advisory.mjs",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/preToolUse/git-prohibitions.mjs",
+            "timeout": 5
           }
         ]
       }

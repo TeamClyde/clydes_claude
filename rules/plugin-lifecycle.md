@@ -35,7 +35,7 @@ If direct invocation of an Integrated plugin skill persists despite this rule, t
 Verify both are symlinked before treating this system as operational:
 ```
 ls ~/.claude/rules/plugin-lifecycle.md
-ls ~/.claude/skills/creating-tools/skill.md
+ls ~/.claude/skills/creating-tools/SKILL.md
 ```
 
 ## Lifecycle States

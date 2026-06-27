@@ -1,7 +1,7 @@
 ---
 name: executing-plans
-description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
-allowed-tools: Read, Agent
+description: Use when you have a written implementation plan to execute yourself — runs all tasks in a single continuing context with review checkpoints between steps. For isolated fresh-subagent-per-task execution instead, use subagent-driven-development.
+allowed-tools: Read, Agent, Skill
 ---
 
 # Executing Plans

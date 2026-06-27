@@ -225,7 +225,7 @@ The design doc (`plans/<slug>/<slug>-design.md`) is written at Step 12, after bo
   - Dates live inside the doc, not in the filename
   - (User preferences for spec location override this default)
 - Use elements-of-style:writing-clearly-and-concisely skill if available
-- Commit the design document to git
+- (`plans/` is gitignored — the design doc is a session working artifact, not committed to git)
 
 **Spec Self-Review:**
 After writing the spec document, look at it with fresh eyes:

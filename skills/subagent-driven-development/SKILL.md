@@ -1,16 +1,16 @@
 ---
 name: subagent-driven-development
-description: Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with two-stage review (spec compliance, then code quality) after each task.
+description: Use when executing implementation plans with independent tasks — dispatches a fresh subagent per task for isolated context-preserving execution, with a parallel two-lens review (spec compliance + code quality run simultaneously) after each task. For single-context step-by-step execution with checkpoints instead, use executing-plans.
 allowed-tools: Agent, Read, Skill, Write
 ---
 
 # Subagent-Driven Development
 
-Execute plan by dispatching fresh subagent per task, with two-stage review after each: spec compliance review first, then code quality review.
+Execute plan by dispatching fresh subagent per task, with a parallel two-lens review after each: spec compliance and code quality run simultaneously, findings collected in one batched pass.
 
 **Why subagents:** You delegate tasks to specialized agents with isolated context. By precisely crafting their instructions and context, you ensure they stay focused and succeed at their task. They should never inherit your session's context or history — you construct exactly what they need. This also preserves your own context for coordination work.
 
-**Core principle:** Fresh subagent per task + two-stage review (spec then quality) = high quality, fast iteration
+**Core principle:** Fresh subagent per task + parallel two-lens review (spec + quality simultaneously) = high quality, fast iteration
 
 ## When to Use
 
@@ -35,7 +35,7 @@ digraph when_to_use {
 **vs. Executing Plans (parallel session):**
 - Same session (no context switch)
 - Fresh subagent per task (no context pollution)
-- Two-stage review after each task: spec compliance first, then code quality
+- Parallel two-lens review after each task: spec compliance + code quality simultaneously
 - Faster iteration (no human-in-loop between tasks)
 
 ## The Process
@@ -51,12 +51,10 @@ digraph process {
         "Implementer subagent asks questions?" [shape=diamond];
         "Answer questions, provide context" [shape=box];
         "Implementer subagent implements, tests, commits, self-reviews" [shape=box];
-        "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" [shape=box];
-        "Spec reviewer subagent confirms code matches spec?" [shape=diamond];
-        "Implementer subagent fixes spec gaps" [shape=box];
-        "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" [shape=box];
-        "Code quality reviewer subagent approves?" [shape=diamond];
-        "Implementer subagent fixes quality issues" [shape=box];
+        "Dispatch spec + quality reviewers IN PARALLEL (Shape A)" [shape=box style=filled fillcolor=lightblue];
+        "Both reviewers clean?" [shape=diamond];
+        "Tiered adversarial verify (audit profile)" [shape=box style=filled fillcolor=lightblue];
+        "Implementer subagent fixes surviving findings" [shape=box];
         "Mark Task Reference row ✅ + pulser if skill created" [shape=box style=filled fillcolor=lightyellow];
         "Assert exit gate (X1-X4)" [shape=box style=filled fillcolor=lightyellow];
         "Mark task complete in TodoWrite" [shape=box];
@@ -79,18 +77,15 @@ digraph process {
     "Implementer subagent asks questions?" -> "Implementer subagent implements, tests, commits, self-reviews" [label="no"];
     "Implementer subagent implements, tests, commits, self-reviews" -> "Orchestrator invokes test-runner (if testing-plan.md exists)";
     "Orchestrator invokes test-runner (if testing-plan.md exists)" -> "Tests pass?";
-    "Tests pass?" -> "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" [label="yes / no testing-plan.md"];
+    "Tests pass?" -> "Dispatch spec + quality reviewers IN PARALLEL (Shape A)" [label="yes / no testing-plan.md"];
     "Tests pass?" -> "Orchestrator invokes systematic-debugging" [label="no"];
     "Orchestrator invokes systematic-debugging" -> "Re-dispatch implementer subagent to fix";
     "Re-dispatch implementer subagent to fix" -> "Orchestrator invokes test-runner (if testing-plan.md exists)";
-    "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" -> "Spec reviewer subagent confirms code matches spec?";
-    "Spec reviewer subagent confirms code matches spec?" -> "Implementer subagent fixes spec gaps" [label="no"];
-    "Implementer subagent fixes spec gaps" -> "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" [label="re-review"];
-    "Spec reviewer subagent confirms code matches spec?" -> "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" [label="yes"];
-    "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" -> "Code quality reviewer subagent approves?";
-    "Code quality reviewer subagent approves?" -> "Implementer subagent fixes quality issues" [label="no"];
-    "Implementer subagent fixes quality issues" -> "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" [label="re-review"];
-    "Code quality reviewer subagent approves?" -> "Mark Task Reference row ✅ + pulser if skill created" [label="yes"];
+    "Dispatch spec + quality reviewers IN PARALLEL (Shape A)" -> "Both reviewers clean?";
+    "Both reviewers clean?" -> "Tiered adversarial verify (audit profile)" [label="no — compile combined findings"];
+    "Tiered adversarial verify (audit profile)" -> "Implementer subagent fixes surviving findings" [label="surviving findings only"];
+    "Implementer subagent fixes surviving findings" -> "Dispatch spec + quality reviewers IN PARALLEL (Shape A)" [label="re-review (both lenses)"];
+    "Both reviewers clean?" -> "Mark Task Reference row ✅ + pulser if skill created" [label="yes"];
     "Mark Task Reference row ✅ + pulser if skill created" -> "Assert exit gate (X1-X4)";
     "Assert exit gate (X1-X4)" -> "Mark task complete in TodoWrite";
     "Mark task complete in TodoWrite" -> "More tasks remain?";
@@ -122,7 +117,7 @@ Use the least powerful model that can handle each role to conserve cost and incr
 
 Implementer subagents report one of four statuses. Handle each appropriately:
 
-**DONE:** If `.claude/testing-plan.md` exists in the repo, invoke test-runner before spec review:
+**DONE:** If `.claude/testing-plan.md` exists in the repo, invoke test-runner before the parallel review:
 
 ```
 Agent {
@@ -131,17 +126,17 @@ Agent {
 }
 ```
 
-- **PASS**: proceed to spec compliance review.
+- **PASS**: proceed to parallel two-lens review (spec + quality simultaneously).
 - **FAILURE**: invoke `Skill { skill: "systematic-debugging" }` as the orchestrator. After
   systematic-debugging completes Phase 1, re-dispatch the implementer to fix the root cause.
-  Re-run test-runner after the fix before dispatching spec review.
-- **SETUP REQUIRED**: no testing-plan.md — proceed to spec review without test-runner.
+  Re-run test-runner after the fix before dispatching the parallel review.
+- **SETUP REQUIRED**: no testing-plan.md — proceed to parallel review without test-runner.
 
 test-runner must always be invoked by the orchestrator (this context), never by the implementer
 subagent — the implementer does not have Skill tool access needed to act on the REQUIRED NEXT
 STEP block if tests fail.
 
-If `.claude/testing-plan.md` does not exist: proceed directly to spec review.
+If `.claude/testing-plan.md` does not exist: proceed directly to parallel review.
 
 **DONE_WITH_CONCERNS:** The implementer completed the work but flagged doubts. Read the concerns before proceeding. If the concerns are about correctness or scope, address them before review. If they're observations (e.g., "this file is getting large"), note them and proceed to review.
 
@@ -155,16 +150,53 @@ If `.claude/testing-plan.md` does not exist: proceed directly to spec review.
 
 **Never** ignore an escalation or force the same model to retry without changes. If the implementer said it's stuck, something needs to change.
 
+## Parallel Two-Lens Review
+
+After tests pass (or when no testing-plan.md exists), dispatch the spec-compliance and code-quality reviewers **in parallel** following `dispatching-parallel-agents` §"Dispatching in prose" Shape A — Dimensional-review panel. The five rules from that section apply here identically.
+
+**Dispatch both reviewers in one parallel block:**
+
+```
+Agent {                                  // Lens 1 — spec compliance
+  subagent_type: "spec-reviewer",
+  model: "claude-sonnet-4-6",            // Sonnet per tier table (M)
+  prompt: "[role: spec-reviewer]\n..."   // variable suffix only; hook prepends prefix
+}
+
+Agent {                                  // Lens 2 — code quality
+  subagent_type: "code-quality-reviewer",
+  model: "claude-sonnet-4-6",            // Sonnet per tier table (M)
+  prompt: "[role: code-quality-reviewer]\n..."
+}
+```
+
+State a per-reviewer time bound in each prompt ("complete within 120 s or surface what you have"). If a reviewer does not respond within the stated bound, mark it ABANDONED and treat that lens as unverified — surface the degraded state to the caller.
+
+**Collect both results (one batched pass), then:**
+
+1. If **both are clean** (no issues) → proceed to exit gate.
+2. If **either (or both) flagged issues** → compile the combined finding set from both reviewers.
+3. Run the **tiered adversarial verify** over the combined finding set (`skills/dispatching-parallel-agents/references/verify-protocol.md`, `audit` profile): batched triage drops `unsupported` lens findings → a clustered re-check of the escalated set against the cited code → the still-contested tail escalates to a minority-veto 3-voter consensus that re-checks each finding against the code. Only surviving findings feed the one implementer fix pass; `contested` findings are logged, not actioned. This stays ONE batched pass — no per-finding loops.
+4. Re-dispatch the implementer to address surviving findings in one fix pass.
+5. After the implementer's fix, re-dispatch **both reviewers in parallel again** (same Shape A block).
+6. Repeat until both lenses return clean.
+
+**No per-finding verification loops over the full finding set.** The tiered verify is itself the one batched pass (triage → clustered re-check → bounded contested-tail consensus) — it does not run a separate verify agent per finding. ONE synthesized fix loop over surviving findings is the design.
+
+**Quorum:** With exactly two lenses, quorum is both. If one reviewer is ABANDONED, surface the degraded-lens state to the user before proceeding — do not silently skip a lens.
+
+**Model pinning:** Both reviewer dispatches must pass `model: "claude-sonnet-4-6"` explicitly (Sonnet = M tier per §Model Selection). Never inherit the orchestrator's model or pass Opus.
+
 ## Per-Task Constitutional Gates
 
 **Gate ownership:** The orchestrator (this skill / this context) is responsible for running all gates. The implementer subagent does **not** have `Skill` tool access to `plan-management` and cannot invoke gates itself. The sequence is:
 
 1. Orchestrator runs **entry gate** before dispatching the implementer for a task
 2. Implementer reports DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED
-3. Orchestrator handles status (test-runner, spec review, code quality review per above)
+3. Orchestrator handles status (test-runner, then parallel two-lens review per above)
 4. Orchestrator runs **exit gate** before marking the task complete in TodoWrite
 
-The two-stage review (spec compliance, then code quality) still happens between entry and exit gate runs — the gates wrap the entire per-task cycle.
+The parallel two-lens review (spec compliance + code quality simultaneously) still happens between entry and exit gate runs — the gates wrap the entire per-task cycle.
 
 ### Constitutional Entry Gate (assert before dispatching the implementer)
 
@@ -268,87 +300,7 @@ Active stack hats: <names + a one-line digest each, resolved from project.json s
 
 ## Example Workflow
 
-```
-You: I'm using Subagent-Driven Development to execute this plan.
-
-[Read plan file once: docs/superpowers/plans/feature-plan.md]
-[Extract all 5 tasks with full text and context]
-[Create TodoWrite with all tasks]
-
-Task 1: Hook installation script
-
-[Get Task 1 text and context (already extracted)]
-[Assert entry gate: E1 ✅ active-plan confirmed, E2 ✅ no prior task (Task 1), E3 ✅ prompt read]
-[Dispatch implementation subagent with full task text + context]
-
-Implementer: "Before I begin - should the hook be installed at user or system level?"
-
-You: "User level (~/.config/superpowers/hooks/)"
-
-Implementer: "Got it. Implementing now..."
-[Later] Implementer:
-  - Implemented install-hook command
-  - Added tests, 5/5 passing
-  - Self-review: Found I missed --force flag, added it
-  - Committed
-
-[Dispatch spec compliance reviewer]
-Spec reviewer: ✅ Spec compliant - all requirements met, nothing extra
-
-[Get git SHAs, dispatch code quality reviewer]
-Code reviewer: Strengths: Good test coverage, clean. Issues: None. Approved.
-
-[Mark Task 1 row ✅ in plan Task Reference]
-[Pulser n/a — no skill created in this task]
-[Assert exit gate: X1 ✅ row marked, X2 n/a (no divergence), X3 ✅ handoff refreshed, X4 n/a (no test-mechanics change)]
-[Mark Task 1 complete in TodoWrite]
-
-Task 2: Recovery modes
-
-[Get Task 2 text and context (already extracted)]
-[Assert entry gate: E1 ✅ active-plan confirmed, E2 ✅ Task 1 row marked, E3 ✅ prompt read]
-[Dispatch implementation subagent with full task text + context]
-
-Implementer: [No questions, proceeds]
-Implementer:
-  - Added verify/repair modes
-  - 8/8 tests passing
-  - Self-review: All good
-  - Committed
-
-[Dispatch spec compliance reviewer]
-Spec reviewer: ❌ Issues:
-  - Missing: Progress reporting (spec says "report every 100 items")
-  - Extra: Added --json flag (not requested)
-
-[Implementer fixes issues]
-Implementer: Removed --json flag, added progress reporting
-
-[Spec reviewer reviews again]
-Spec reviewer: ✅ Spec compliant now
-
-[Dispatch code quality reviewer]
-Code reviewer: Strengths: Solid. Issues (Important): Magic number (100)
-
-[Implementer fixes]
-Implementer: Extracted PROGRESS_INTERVAL constant
-
-[Code reviewer reviews again]
-Code reviewer: ✅ Approved
-
-[Mark Task 2 row ✅ in plan Task Reference]
-[Pulser n/a — no skill created in this task]
-[Assert exit gate: X1 ✅ row marked, X2 ✅ journal entry appended via plan-management:divergence (scope shift: removed --json flag, added progress reporting), X3 ✅ handoff refreshed, X4 n/a]
-[Mark Task 2 complete in TodoWrite]
-
-...
-
-[After all tasks]
-[Dispatch final code-reviewer]
-Final reviewer: All requirements met, ready to merge
-
-Done!
-```
+See `./references/example-workflow.md` for a full 2-task walkthrough (entry gates, parallel two-lens review with re-review loop, exit gates).
 
 ## Advantages
 
@@ -371,8 +323,8 @@ Done!
 
 **Quality gates:**
 - Self-review catches issues before handoff
-- Two-stage review: spec compliance, then code quality
-- Review loops ensure fixes actually work
+- Parallel two-lens review: spec compliance + code quality simultaneously; combined findings pass through tiered adversarial verify before the implementer fix pass (one batched pass)
+- Review loops ensure fixes actually work (both lenses must be clean before moving on)
 - Spec compliance prevents over/under-building
 - Code quality ensures implementation is well-built
 
@@ -393,23 +345,25 @@ Done!
 - Skip scene-setting context (subagent needs to understand where task fits)
 - Ignore subagent questions (answer before letting them proceed)
 - Accept "close enough" on spec compliance (spec reviewer found issues = not done)
-- Skip review loops (reviewer found issues = implementer fixes = review again)
-- Let implementer self-review replace actual review (both are needed)
-- **Start code quality review before spec compliance is ✅** (wrong order)
-- Move to next task while either review has open issues
+- Skip review loops (either reviewer found issues = implementer fixes combined set = both re-review)
+- Let implementer self-review replace actual review (both lenses are needed)
+- **Run per-finding verification loops over the full finding set** (the tiered verify is the one batched pass; it does not loop per-finding over the full set)
+- **Skip a lens** when the other passes — both spec compliance AND code quality must be clean
+- Move to next task while either review lens has open issues
 - Dispatch test-runner from within an implementer subagent (orchestrator must invoke it directly)
-- Dispatch spec reviewer before test-runner passes when testing-plan.md exists
+- Dispatch parallel review before test-runner passes when testing-plan.md exists
 
 **If subagent asks questions:**
 - Answer clearly and completely
 - Provide additional context if needed
 - Don't rush them into implementation
 
-**If reviewer finds issues:**
-- Implementer (same subagent) fixes them
-- Reviewer reviews again
-- Repeat until approved
-- Don't skip the re-review
+**If either (or both) reviewer(s) find issues:**
+- Compile all findings from both lenses into one combined set
+- Implementer (re-dispatched subagent) fixes the combined set in one pass
+- Re-dispatch both reviewers in parallel again
+- Repeat until both lenses are clean
+- Don't skip the re-review for either lens
 
 **If subagent fails task:**
 - Dispatch fix subagent with specific instructions

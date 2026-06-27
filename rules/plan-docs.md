@@ -27,7 +27,7 @@ Sub-plans follow the two-form distinction from `rules/planning.md`:
 
 Never a journal or handoff — all journal-worthy and handoff-worthy content rolls up to the **top-level** journal/handoff. This rule applies at arbitrary depth: sub-sub-plans also get only design + plan.
 
-Form A sub-plans pass through `plan-gate` in **sub-plan mode**: architect + adherence-audit run as normal, but test-strategy, test-builder, Jira ticket creation, and TODO.md registration are skipped (the parent plan owns those). For trivial refinements, invoke plan-gate with `mode: minimal` to skip adherence-audit as well — architect-only. See `skills/plan-gate/skill.md` § Sub-Plan Mode.
+Form A sub-plans pass through `plan-gate` in **sub-plan mode**: architect + adherence-audit run as normal, but test-strategy, test-builder, Jira ticket creation, and TODO.md registration are skipped (the parent plan owns those). For trivial refinements, invoke plan-gate with `mode: minimal` to skip adherence-audit as well — architect-only. See `skills/plan-gate/SKILL.md` § Sub-Plan Mode.
 
 ### Plan-type frontmatter
 
@@ -44,7 +44,7 @@ plan-type: standard
 | `standard` (default) | Full sequence runs |
 | `test-suite-addition` (alias `tests-only`) | Step 3 (test-builder) skips — the plan's deliverable IS the test suite, so writing failing tests against it is circular. All other steps run. Skip recorded with `[test-only-plan]` journal tag. |
 
-The declaration belongs to the plan author — path-heuristic detection was rejected because ecosystem-specific test conventions (Go's sibling `*_test.go`, Rust's mixed `tests/`/`#[cfg(test)]`, mixed-scope plans) make it unreliable. See `skills/writing-plans/skill.md` § Plan Frontmatter.
+The declaration belongs to the plan author — path-heuristic detection was rejected because ecosystem-specific test conventions (Go's sibling `*_test.go`, Rust's mixed `tests/`/`#[cfg(test)]`, mixed-scope plans) make it unreliable. See `skills/writing-plans/SKILL.md` § Plan Frontmatter.
 
 ### Form B — Small addition: appended section in parent plan
 
