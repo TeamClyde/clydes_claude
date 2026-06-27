@@ -170,6 +170,12 @@ If the user includes `[skip-research]` anywhere in their initial info dump, skip
 
 If brainstorming is invoked from a session that has already done research on this topic (e.g., a second session continuing earlier work, or a session where web research was run ad-hoc), the user may decline either dispatch by saying so. Acknowledge the opt-out and skip that stage without re-prompting. Skill respects any stated decline — do not argue or re-offer.
 
+### Watchdog — abandon and proceed
+
+Each bookend is a **single inline Haiku dispatch, not a fan-out** — the orchestrator cannot preempt an awaited dispatch, so the time bound lives in the *prompt*: each research agent is told to cap its searches and return partial findings rather than loop on a stalling tool (the same self-limiting discipline `dispatching-parallel-agents` applies to any dispatch). If a dispatch returns empty, partial, or errors, do **not** wait or re-dispatch in a loop — note "research abandoned — proceeding without" in the Research appendix and continue to the next step (identical downstream behavior to `[skip-research]`). A stalled research agent must never stall the design session.
+
+**Opt-in escalation.** If the user wants deeper, adversarially-verified research than the lightweight bookend provides, they may opt into the hardened deep-research / `librarian` Workflow harness (watchdog + quorum + cited verify). This is an explicit user escalation, not the default — the bookends stay lightweight, Haiku, and inline.
+
 ### Step 3 — Light research dispatch
 
 After orientation (and Visual Companion offer if applicable), dispatch:
@@ -178,7 +184,7 @@ After orientation (and Visual Companion offer if applicable), dispatch:
 Agent {
   subagent_type: "general-purpose",
   model: "haiku",
-  prompt: "The user is brainstorming <topic>. Conduct light research aimed at adding value to the eventual plan — either by finding potential flaws in candidate approaches or by removing ambiguity from open decisions. Surface terminology, common patterns, and known pitfalls so the questions stage starts informed. Use WebSearch and WebFetch. Return a concise artifact (~300 words) with source URLs."
+  prompt: "The user is brainstorming <topic>. Conduct light research aimed at adding value to the eventual plan — either by finding potential flaws in candidate approaches or by removing ambiguity from open decisions. Surface terminology, common patterns, and known pitfalls so the questions stage starts informed. Use WebSearch and WebFetch, but run at most ~4 searches and then synthesize from what you have; if a search stalls or hangs, stop and return whatever partial findings you have rather than waiting. Return a concise artifact (~300 words) with source URLs."
 }
 ```
 
@@ -200,7 +206,7 @@ After clarifying questions are complete, dispatch:
 Agent {
   subagent_type: "general-purpose",
   model: "haiku",
-  prompt: "The user has scoped a brainstorming session on <topic> with concrete direction: <answers summary>. Conduct deeper research aimed at finding potential flaws in the chosen direction or removing remaining ambiguity from open decisions. Surface anything that would change the design. Use WebSearch and WebFetch. Return a structured artifact appended to an existing Research appendix."
+  prompt: "The user has scoped a brainstorming session on <topic> with concrete direction: <answers summary>. Conduct deeper research aimed at finding potential flaws in the chosen direction or removing remaining ambiguity from open decisions. Surface anything that would change the design. Use WebSearch and WebFetch, but run at most ~6 searches and then synthesize from what you have; if a search stalls or hangs, stop and return your partial findings rather than waiting. Return a structured artifact appended to an existing Research appendix."
 }
 ```
 
