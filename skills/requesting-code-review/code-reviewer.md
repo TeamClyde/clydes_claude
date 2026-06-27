@@ -60,6 +60,29 @@ git diff {BASE_SHA}..{HEAD_SHA}
 - Documentation complete?
 - No obvious bugs?
 
+## External-Behavior Verification
+
+Before assessing readiness, list every assertion the code — **or your own review reasoning** — makes about behavior outside this repo, and verify each against an authoritative source rather than inferring it from local code. Scan for: cloud-provider IAM permissions, SDK/client serialization, retry/backoff defaults, framework lifecycle/ordering guarantees, protocol and wire-format details, and any library default the code uses without naming.
+
+**Verify against a source, in this order:**
+1. An active domain "hat" reference if one is loaded in session (see `rules/stack-hats.md`)
+2. `context7` — library, framework, and SDK documentation
+3. `WebSearch` / `WebFetch` — vendor docs, the **IAM Action Reference**, platform reference pages, protocol specs
+4. The `researcher` agent / AWS MCP (read-only) — for **deployed-state** assertions only (does this role actually have this policy? does this table have this GSI? actual ARN or parameter value). Verifies what *is provisioned*, not what an API *requires* — use docs (2–3) for behavioral/semantic claims (e.g. whether `TransactWriteItems` needs a distinct IAM action), live read for deployed-state. Requires a read-only profile to be configured; if unavailable, treat the assertion as unverified.
+
+**Disposition** (mirrors the architect assumption sweep):
+- An authoritative source actively contradicts the assertion → **Critical**.
+- Unverifiable but load-bearing (the change would fail or misbehave if the assertion is wrong) → **Important**; flag it explicitly for confirmation.
+- Confirmed by a source, or not load-bearing → ok.
+
+**Naming the source is the mechanism.** An attestation that claims verification without naming the doc/page/URL or the tool call attempted is "not performed" — an uncited external-behavior claim manufactures false confidence and is worse than omitting it. An unverifiable assertion is never by itself Critical; Critical is reserved for active contradiction.
+
+Immediately before the Assessment, include one line:
+
+> `External-behavior check: I identified [K] external assertions, verified [V] against a named source, and flagged [U] as unverified. Findings: [list].`
+
+A count of zero is valid only if the change genuinely depends on no behavior outside this repo — in that case state: "The change makes no assertions about behavior outside this repo."
+
 ## Output Format
 
 ### Strengths

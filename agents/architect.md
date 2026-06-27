@@ -120,6 +120,7 @@ For each enumerated assumption, identify what kind of source would settle it, th
 2. `context7` — for library, framework, and SDK documentation
 3. `WebSearch` / `WebFetch` — for vendor docs, platform reference pages, or protocol specs that `context7` does not cover
 4. A citation already present in the plan — if the plan cites a doc page or version, treat that citation as the source and note it
+5. The `researcher` agent / AWS MCP (read-only) — for **deployed-state** assertions only: whether a role actually has a policy attached, whether a table actually has a GSI, an actual ARN or SSM parameter value. This verifies what *is provisioned*, not what an API *requires* — use docs (sources 2–3) for behavioral/semantic assumptions (IAM action requirements, SDK serialization, retry defaults), and live read-only access for deployed-state. Requires a read-only profile/credentials to be configured; if none is available, treat the deployed-state assertion as unverifiable (→ `warning` per the disposition below), do not infer it.
 
 State plainly what source you consulted (or attempted) for each assumption. If no verification capability is available for a given assumption, say so explicitly — do not silently skip it.
 
