@@ -293,6 +293,148 @@ Surface:
 
 ---
 
+### 7. `clean-gone` — Prune local branches whose upstream was deleted
+
+Purpose: after PRs merge on the remote, clean up local tracking branches marked `gone` and their associated worktrees.
+
+#### Step 1 — Resolve base branch
+
+Read `project.json` at the repo root. Use `git.main-branch` if present; default to `main` if the key is absent or `project.json` does not exist. Call this value `<base>`. Do NOT hardcode `main` — on repos using `master` or `trunk`, `git branch --merged origin/main` would return empty and every gone branch would read as unmerged, triggering spurious force-delete prompts.
+
+#### Step 2 — Fetch and prune remote refs
+
+```bash
+git fetch --prune origin
+```
+
+This removes remote-tracking refs (`origin/<branch>`) for branches that no longer exist on the remote. It does NOT delete local branches — Step 3 does that.
+
+#### Step 3 — Enumerate gone branches
+
+```bash
+git branch -vv
+```
+
+Parse for lines that contain `: gone]` in the upstream tracking column. These are local branches whose upstream has been deleted. **Exclude the current branch** (`git branch --show-current`) from this list unconditionally — it is never a candidate for deletion, regardless of its upstream state.
+
+#### Step 4 — Build worktree map
+
+Before any deletion, parse `git worktree list --porcelain` once to build a `branch-name → worktree-path` map. This must happen before Step 5 because `git branch -d/-D` refuses to delete a branch that is currently checked out in a linked worktree — worktree removal must precede branch deletion.
+
+```bash
+git worktree list --porcelain
+```
+
+This outputs blocks like:
+```
+worktree /path/to/worktree
+HEAD <sha>
+branch refs/heads/<branch-name>
+```
+
+Parse these blocks to build the map: strip the `refs/heads/` prefix so the key is the bare branch name.
+
+#### Step 5 — Present list for confirmation
+
+Show the user the list of gone branches before any deletion. Surface it as:
+
+```
+The following local branches have no upstream (merged or deleted on remote):
+  <branch-1>
+  <branch-2>
+  ...
+
+Proceed with analysis? Merged branches will be deleted automatically. Unmerged branches
+will each require a separate typed 'force-delete <branch>' confirmation before deletion.
+(y/n)
+```
+
+If the list is empty, report "No gone branches found." and stop. Never delete without confirmation.
+
+#### Step 6 — Per-branch: worktree remove → sidecar clean → branch delete
+
+For each branch in the confirmed list, execute in this exact order:
+
+**6a. Worktree removal (if applicable)**
+
+Look up the branch in the map built in Step 4.
+
+If the branch has an associated worktree:
+
+> **Why worktree removal must come first:** `git branch -d` and `git branch -D` both refuse to delete a branch that is currently checked out in any linked worktree, returning `error: Cannot delete branch '<name>' checked out at '<path>'`. The worktree must be removed before the branch can be deleted.
+
+```bash
+git worktree remove "<worktree-path>"
+```
+
+If `git worktree remove` fails (e.g., the worktree has uncommitted changes), do NOT force removal and do NOT silently skip. Instead:
+
+1. Surface the worktree's state to the user:
+   ```bash
+   git -C "<worktree-path>" status --short
+   ```
+2. Tell the user: the worktree at `<path>` has uncommitted changes and cannot be removed automatically. Options: commit or stash the changes manually, remove the worktree manually, or skip this branch entirely.
+3. **Skip the branch-delete for this branch** (the worktree still holds it checked out; the delete would fail anyway). Note it in the final report as "skipped — worktree has uncommitted changes."
+
+**6b. Sidecar cleanup (if worktree was successfully removed)**
+
+```bash
+repo_root=$(git rev-parse --show-toplevel)
+wt_name=$(basename "<worktree-path>")
+# Remove the per-worktree sidecar created by using-git-worktrees.
+# Safe unconditionally — no-op if the sidecar was never created.
+rm -rf "$repo_root/.claude/worktrees/$wt_name"
+```
+
+The repo root is anchored via `git rev-parse --show-toplevel` because `clean-gone` may run from any CWD; a relative path would resolve incorrectly if CWD is not the repo root.
+
+**6c. Branch deletion**
+
+**Merged check (use the remote ref — local `<base>` may be stale):**
+
+```bash
+git branch --merged origin/<base>
+```
+
+- **If the branch appears in this output (merged into `origin/<base>`):**
+  Delete safely: `git branch -d <branch>`. (`-d` refuses if the branch is not fully merged, providing a backstop.)
+
+- **If the branch does NOT appear (not merged):**
+  Flag it explicitly and require a per-branch explicit confirmation before force-deleting:
+
+  ```
+  Branch <branch> is NOT merged into origin/<base>. Force-delete anyway?
+  Commits that would be lost: <git log --oneline origin/<base>..<branch>>
+  Type 'force-delete <branch>' to confirm.
+  ```
+
+  Wait for exact typed confirmation. If confirmed: `git branch -D <branch>`. If not confirmed: skip this branch and note it in the final report.
+
+If the branch has NO associated worktree: proceed directly to 6c (branch deletion). No worktree step.
+
+#### Step 7 — Report (summary)
+
+Surface a summary:
+
+```
+Pruned:
+  <branch-1>  (merged, worktree removed at <path>)
+  <branch-2>  (merged, no worktree)
+
+Force-deleted (unmerged, explicitly confirmed):
+  <branch-3>  (worktree removed at <path>)
+
+Skipped (unmerged, not confirmed):
+  <branch-4>
+
+Skipped (worktree has uncommitted changes — manual cleanup required):
+  <branch-5>  (worktree at <path>)
+```
+
+If nothing was pruned, say so. Always report what was skipped and why.
+
+---
+
 ## Blocking Conditions
 
 Stop immediately and surface to the user:
@@ -308,6 +450,8 @@ Stop immediately and surface to the user:
 | Merge conflicts | List files, do not auto-resolve |
 | Bitbucket credential missing (empty `git credential fill`) | Stop; direct the user to set up their API token per the `secrets-handling` rule. Do not prompt interactively. The check itself lives in the `bitbucket` adapter's `create_pr` in `references/host-adapters.md`. |
 | Bitbucket HTTP 401 on PR create | Token may be invalid or lack pull-request scope. Surface the status; do not retry blindly. Handled inside the `bitbucket` adapter's `create_pr` in `references/host-adapters.md`. |
+| `clean-gone`: current branch is a gone candidate | Exclude it unconditionally — never delete the branch currently checked out. |
+| `clean-gone`: unmerged branch force-delete | Require typed `force-delete <branch>` confirmation per branch; never force-delete silently. |
 
 ---
 
