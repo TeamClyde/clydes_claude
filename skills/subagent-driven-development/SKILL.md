@@ -56,7 +56,7 @@ digraph process {
         "Tiered adversarial verify (audit profile)" [shape=box style=filled fillcolor=lightblue];
         "Implementer subagent fixes surviving findings" [shape=box];
         "Mark Task Reference row ✅ + pulser if skill created" [shape=box style=filled fillcolor=lightyellow];
-        "Assert exit gate (X1-X4)" [shape=box style=filled fillcolor=lightyellow];
+        "Assert exit gate (X1-X8)" [shape=box style=filled fillcolor=lightyellow];
         "Mark task complete in TodoWrite" [shape=box];
         "Orchestrator invokes test-runner (if testing-plan.md exists)" [shape=box];
         "Tests pass?" [shape=diamond];
@@ -86,8 +86,8 @@ digraph process {
     "Tiered adversarial verify (audit profile)" -> "Implementer subagent fixes surviving findings" [label="surviving findings only"];
     "Implementer subagent fixes surviving findings" -> "Dispatch spec + quality reviewers IN PARALLEL (Shape A)" [label="re-review (both lenses)"];
     "Both reviewers clean?" -> "Mark Task Reference row ✅ + pulser if skill created" [label="yes"];
-    "Mark Task Reference row ✅ + pulser if skill created" -> "Assert exit gate (X1-X4)";
-    "Assert exit gate (X1-X4)" -> "Mark task complete in TodoWrite";
+    "Mark Task Reference row ✅ + pulser if skill created" -> "Assert exit gate (X1-X8)";
+    "Assert exit gate (X1-X8)" -> "Mark task complete in TodoWrite";
     "Mark task complete in TodoWrite" -> "More tasks remain?";
     "More tasks remain?" -> "Assert entry gate (E1-E5)" [label="yes"];
     "More tasks remain?" -> "Dispatch final code reviewer subagent for entire implementation" [label="no"];
@@ -226,7 +226,7 @@ Record the list of files the task is scoped to touch, read from the plan doc —
 
 **Why these two values matter:**
 
-Both are captured by the orchestrator before the implementer runs. They are the inputs the **exit gate added next** consumes to verify the task landed correctly — checking observed git state rather than relying on the implementer's self-report.
+Both are captured by the orchestrator before the implementer runs. They are the inputs **the Constitutional Exit Gate's observed-state checks below** (X5–X8) consume to verify the task landed correctly — checking observed git state rather than relying on the implementer's self-report.
 
 **Micro vs. macro entry gate:**
 
@@ -257,8 +257,33 @@ Before running this gate, the orchestrator performs three pre-exit actions:
   - The relevant testing artifact (`.claude/testing-plan.md`, `scripts/run-tests.sh`, or repo equivalent) was updated **in the same `plan-management:divergence` call**.
   Test-mechanics changes always count as divergence regardless of how small they appear.
 
+#### Observed-state verification (X5–X8) — assert observed git state, not the implementer's claim
+
+X1–X4 confirm the *records* (plan row, journal, handoff, testing artifact) are in order. X5–X8 confirm the *task actually landed* by inspecting **observed git state**, never the implementer's self-reported commit hash. They are keyed off the two truth sources the micro entry gate captured before dispatch (`BASELINE` SHA + the in-scope file list) — both orchestrator-held and implementer-independent. The orchestrator runs these BEFORE honoring the task's ✅.
+
+**Read-only git routing exception:** X5–X8 run `git log`, `git status`, `git branch --show-current`, and `git config --worktree --get` — all READ-ONLY queries. As with the entry gate's E4 capture, these are a sanctioned exception to the "route git through git-manager" rule, which governs MUTATING operations (commit, branch, push, merge). Do NOT route these reads through git-manager — it has no read-only query workflow, and adding one would be over-engineering for a few `git` reads. git-manager owns mutations, not read-only inspection.
+
+- [ ] **X5 — In-scope files landed since baseline:** `git log <BASELINE>..HEAD --name-only` must include the task's in-scope files. Keying off the committed file set (rather than a reported hash) survives empty or amended commits — the question is "did these files land," not "what hash was reported." **Empty / no-in-scope carve-out:** if the in-scope file list is empty (e.g. a journal-note-only task) OR the commit legitimately touched no plan-scoped files, treat X5 as PASSED rather than failing — there is nothing to have landed.
+- [ ] **X6 — In-scope files clean:** `git status --porcelain -- <in-scope paths>` must be empty. Scope the check STRICTLY to the in-scope paths so that a pre-commit auto-fixer which touched *other* files does not false-positive this task. A non-empty result means in-scope files are uncommitted — the task is not complete.
+- [ ] **X7 — Right branch:** `git branch --show-current` must equal `claude.expectedBranch`, read via the P2 mechanism `git config --worktree --get claude.expectedBranch`. **If `claude.expectedBranch` is unset for the worktree, SKIP X7 silently** — consistent with the soft-warn contract (no binding → no gate). Without this clause the gate would false-fail every task on any plan started before per-worktree branch binding existed (including this plan's own early tasks), so the unset-binding skip is mandatory, not optional.
+- [ ] **X8 — Optional hash cross-check (corroboration only):** If the implementer reported a commit hash, confirm it falls within `<BASELINE>..HEAD`. This is corroboration ONLY — it is never the basis for pass/fail. X5 (observed file landing) is authoritative; X8 just cross-checks the implementer's claim against observed state. If no hash was reported, skip X8.
+
+**Principle:** verify the *effect* (the observed git state) — never the actor's claim. The implementer self-reports across an untrusted boundary; the orchestrator confirms what actually happened in the repo rather than trusting what was reported.
+
+**Scope boundary — applies to subagent-driven-development only:** X5–X8 exist because there is an untrusted implementer→orchestrator boundary here — a separate subagent does the work and self-reports completion. **`executing-plans` is OUT of scope:** there the orchestrator is itself the committer (no untrusted boundary, no self-report to verify), so observed-state verification is unnecessary and is deliberately not applied there.
+
 **Exit gate failure message format:**
-> EXIT GATE FAILED — [X1 | X2 | X3 | X4]: [specific reason]. Cannot mark Task N complete until this is resolved.
+> EXIT GATE FAILED — [X1 | X2 | X3 | X4 | X5 | X6 | X7]: [specific reason]. Cannot mark Task N complete until this is resolved.
+
+X1–X7 are stop-conditions — any one failing blocks the ✅. X8 is corroboration, not a stop-condition: a failed or absent hash cross-check is logged, never a gate failure.
+
+**Recovery path (EXIT GATE FAILED on X5–X7):**
+When an observed-state check fails:
+1. Do NOT honor the task ✅ (do not advance it in TodoWrite). **If the pre-exit recording actions already marked the Task Reference row ✅ and ticked the task's step checkboxes, REVERT them now** — change the ✅ back to unmarked and the `- [x]` boxes back to `- [ ]`. The records must not claim the task landed when X5–X7 just proved it did not. (These are reversible plan-doc file edits, not git mutations — the pre-exit recording ran on the assumption the work landed, and that assumption was just falsified.)
+2. Surface the EXACT observed-state discrepancy to the record — name the specific files and branch (e.g. "in-scope files X, Y are uncommitted on branch Z").
+3. Re-dispatch the implementer ONCE with that discrepancy stated, so it can land or commit the missing work.
+4. On a SECOND failure of the same check, STOP and surface to the user — do not loop further.
+5. The orchestrator must NOT silently commit the dirty tree itself. This preserves the leaf-commits contract: the implementer owns its commits, and the orchestrator committing on its behalf would defeat the boundary X5–X8 exist to verify.
 
 **Trivial-change exception (X2 and X4 only):**
 The journal entry (X2) is optional — and X4 does not apply — when ALL of the following are true:
