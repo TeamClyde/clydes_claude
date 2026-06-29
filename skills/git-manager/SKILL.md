@@ -548,9 +548,15 @@ Stop immediately and surface to the user:
 
 ## Merge Strategy
 
-All PRs squash-merge into `main`. Squash commit message = PR title (conventional commit format). No fast-forward or three-way merge commits on `main`.
+The merge strategy is resolved per-PR, not globally fixed:
 
-The merge strategy is enforced **host-side** — by branch-protection rules or the host's repository merge settings — so this skill documents the expected squash policy; it does not (and cannot) guarantee it per-PR. Configure squash-only at the host to make the policy binding.
+- **Default: `squash`** — used when `project.json` has no `git.merge-strategy` key, or when no pattern matches the PR's target branch. This preserves backward compatibility.
+- **Per-branch overrides** — `project.json git.merge-strategy` is a glob map of `branch-pattern → squash | merge-commit | rebase`. The resolution happens in the `finish` workflow's **Merge Strategy Resolution step (step 4b)**, which produces the named outputs `<dst>` and `<merge-strategy>` consumed by later steps.
+- **Enforcement is host-side** — git-manager requests the strategy and flags divergence; it does not run the merge. Specifically:
+  - Step 5b (**read-only `merge-tree` dry-run**) previews promotion conflicts for `merge-commit` targets before the PR opens — no working-tree mutation occurs.
+  - Step 5c (**host merge-method divergence check**) warns when the host's configured merge method disagrees with the resolved `<merge-strategy>`. This check is advisory and non-blocking.
+
+  The host (branch-protection rules or repository merge settings) enforces the actual merge.
 
 ---
 
