@@ -24,7 +24,7 @@ Caller owns decisions (files, message, timing). This skill owns safe, consistent
 | `description` | For `commit` | Subject line (imperative mood, max 72 chars) |
 | `jira-key` | Conditional (see table below) | Jira issue key (e.g. `PROJ-42`) |
 | `pr-body` | For `finish`, optional | Override PR description body |
-| `target-branch` | For `switch` | Branch name to check out |
+| `target-branch` | For `switch` (required); for `finish` (optional, default: `git.main-branch`) | Branch name to check out (`switch`) or explicit PR target branch (`finish`) |
 | `target-plan` | For `switch` | Plan doc path to activate (e.g. `plans/slug/<slug>-plan.md`); required — no branch→plan index exists |
 
 ---
@@ -214,8 +214,32 @@ This workflow is **host-blind**: it never branches on a host name. PR creation i
 2. If WIP/debug commits flagged: surface to user, suggest squash rebase (only safe pre-PR)
 3. **`detect_host`:** resolve the target host per the contract. The `project.json` `git.backend` override wins over auto-detection when set (`github` | `gitlab` | `bitbucket` | `manual`) — use it for enterprise hosts (`github.mycompany.com`, self-hosted GitLab, Bitbucket Data Center) where the URL doesn't match a public host. Otherwise `git remote get-url origin` is matched: `github.com` → `github`, `gitlab.com` → `gitlab`, `bitbucket.org` → `bitbucket`, anything else → `manual`. Returns the normalized `{ host, owner_or_workspace, repo, api_base }`. See `references/host-adapters.md` § `detect_host` and the per-adapter `detect_host` blocks for the parsing rules.
 4. **`auth_preflight`:** confirm a usable credential per the contract; returns `ok` or `missing-cred`. On `missing-cred`, fall back to `manual` and surface the adapter's one-line remediation (e.g. install `gh`/`glab`, or set up the Bitbucket API token). See `references/host-adapters.md` § `auth_preflight` and each adapter's block.
-5. **Diff inspection:** fetch the branch diff (`git diff origin/main...HEAD`); flag unrelated changes before opening the PR.
-6. **`create_pr(title, body, src_branch, dst_branch)`:** open the PR through the detected adapter, passing the rendered title (`type: subject [PROJ-N]`) and body (from the template below, or the `pr-body` override). The adapter parses its host's output and returns a normalized **PR URL**; the `manual` adapter returns the sentinel `manual submission required`. The per-adapter `create_pr` blocks in `references/host-adapters.md` own all host-specific transport — `gh pr create` for GitHub, `glab mr create` for GitLab, the self-contained `git credential fill` + `curl` REST script for Bitbucket (which retrieves the credential non-interactively, builds the auth header in a variable, and unsets all secrets), and the rendered title/body for `manual`. Do not inline any of that here. All Bitbucket secret-handling guarantees live in that block.
+4b. **Merge Strategy Resolution:**
+
+   **Resolve the PR target branch `<dst>`:** Use the caller-supplied `target-branch` input if provided; otherwise read `project.json` `git.main-branch` (default `main` if the key is absent or `project.json` does not exist). This is the branch the PR targets, and the branch name matched against the merge-strategy map. When `target-branch` is omitted the behavior is identical to before this step existed — backward compatible.
+
+   **Read the merge-strategy map:** Read `project.json` `git.merge-strategy` — a map of branch-pattern → strategy value.
+
+   Example schema:
+   ```jsonc
+   "git": { "merge-strategy": { "main": "squash", "release/*": "merge-commit", "prod": "merge-commit" } }
+   ```
+
+   Valid strategy values: `"squash"` | `"merge-commit"` | `"rebase"`.
+
+   **Matching rules (glob, order-independent):**
+   - Exact branch name beats any wildcard.
+   - Among wildcards, the longest (most-specific) pattern wins.
+   - This is deterministic and does NOT depend on JSON key/declaration order.
+
+   **Default:** When `git.merge-strategy` is absent, or no pattern matches `<dst>` → use `squash`. This preserves backward compatibility with repos that do not declare a map.
+
+   **Named outputs:** This step produces two resolved values — `<dst>` (the PR target branch) and `<merge-strategy>` (the matched or defaulted strategy) — that all subsequent steps in `finish` consume. Later steps (diff inspection, `create_pr`, and the checks that follow) reference these resolved values rather than re-reading `project.json`.
+
+   **Scope of this step:** This step resolves and records the intended merge strategy for `<dst>`. It does NOT enforce it. Enforcement is host-side (branch-protection rules or repository merge settings — see `## Merge Strategy`). The promotion conflict preview and the host merge-method divergence check (both added to this workflow next) consume `<merge-strategy>` and `<dst>`.
+
+5. **Diff inspection:** fetch the branch diff (`git diff origin/<dst>...HEAD`, where `<dst>` is the PR target branch resolved in step 4b); flag unrelated changes before opening the PR.
+6. **`create_pr(title, body, src_branch, dst_branch)`:** open the PR through the detected adapter, where `dst_branch` is the resolved `<dst>` from step 4b — not separately derived. Pass the rendered title (`type: subject [PROJ-N]`) and body (from the template below, or the `pr-body` override). The adapter parses its host's output and returns a normalized **PR URL**; the `manual` adapter returns the sentinel `manual submission required`. The per-adapter `create_pr` blocks in `references/host-adapters.md` own all host-specific transport — `gh pr create` for GitHub, `glab mr create` for GitLab, the self-contained `git credential fill` + `curl` REST script for Bitbucket (which retrieves the credential non-interactively, builds the auth header in a variable, and unsets all secrets), and the rendered title/body for `manual`. Do not inline any of that here. All Bitbucket secret-handling guarantees live in that block.
 7. Report the PR URL returned by `create_pr` on success (or "manual submission required" with the rendered title/body for the `manual` path).
 
 **Backend scope.** `github`, `gitlab`, and `bitbucket` are first-class adapters in `references/host-adapters.md`. Gitea, Azure DevOps, and other self-hosted variants use the `manual` fallback (or override via `project.json` `git.backend: manual` to make it explicit) until an adapter block is added for them — see the Extension Recipe in `references/host-adapters.md` (write one adapter block filling the four operations; no edit to this procedure is needed).

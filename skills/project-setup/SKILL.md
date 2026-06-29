@@ -157,6 +157,25 @@ After writing, validate:
 python -m json.tool project.json
 ```
 
+### git config fields
+
+The `git` block supports these optional fields beyond `main-branch`, `require-jira-key-in-commits`, and `backend`:
+
+**`git.merge-strategy`** — a map of branch-pattern → merge strategy. Consumed by `git-manager finish` to resolve the intended merge strategy for the PR's target branch before opening the PR. Enforcement is always host-side (branch-protection rules or repository merge settings).
+
+```jsonc
+"git": { "merge-strategy": { "main": "squash", "release/*": "merge-commit", "prod": "merge-commit" } }
+```
+
+Valid values: `"squash"` | `"merge-commit"` | `"rebase"`.
+
+Matching is glob-based and order-independent:
+- Exact branch name beats any wildcard.
+- Among wildcards, the longest (most-specific) pattern wins.
+- Default when the map is absent or no pattern matches: `squash`.
+
+Omit this field if the repo uses a single uniform strategy — the `squash` default covers the common case.
+
 ---
 
 ## Phase 1.5 — Doc Scaffolding
