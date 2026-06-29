@@ -2,6 +2,15 @@
 
 ## In Progress
 
+- [ ] Git Workflow Hardening — host-agnostic PR contract (P1), per-worktree branch binding (P2), config-driven merge strategy, SDD commit-state verification, post-merge reindex, delivery-cadence PR-sizing. 25 tasks, 6 themes (A–F). Closes GitHub issues #66, #50, #54, #47, #71, #62, #56 + delivery-cadence gap. — [plan doc](plans/git-workflow-hardening/git-workflow-hardening-plan.md)
+  - [ ] Theme A — Host-adapter capability contract (Tasks 1–4)
+  - [ ] Theme B — Per-worktree branch binding + switch/clean-gone (Tasks 5–11)
+  - [ ] Theme C — Config-driven merge strategy (Tasks 12–15)
+  - [ ] Theme D — SDD commit-state verification gates (Tasks 16–17)
+  - [ ] Theme E — Post-merge codebase-graph reindex (Task 18)
+  - [ ] Theme F — Delivery-cadence PR-sizing discipline (Tasks 19–24)
+  - [ ] Docs — workflow-map + feature-doc update (Task 25)
+
 - [ ] Orchestration Layer Foundation — Phase 1A: generated component inventory + gate-map (harvest scanner over skills/agents/rules/hooks), then doc + audit Form-A sub-plans. Gives the workflow system its missing "code graph" for drift resistance. — [plan doc](plans/orchestration-layer-foundation/orchestration-layer-foundation-plan.md)
   - [x] Task 1 — Harvest scanner: component inventory from frontmatter
   - [x] Task 2 — Gate-edge extraction: first-cut gate-map + reverse-dependency lookup
@@ -12,7 +21,7 @@
 
 ## Up Next
 
-- [ ] Workflow Feedback Fixes — six triaged workflow-friction fixes. Closes GitHub issues #61, #49, #54, #50, #55, #48, #56, #57. — [plan doc](plans/workflow-feedback-fixes/workflow-feedback-fixes-plan.md)
+- [ ] Workflow Feedback Fixes — six triaged workflow-friction fixes. Closes GitHub issues #61, #49, #54, #50, #55, #48, #56, #57. **(Overlap: #54/#50/#56 are now covered by Git Workflow Hardening above — re-scope this item to its non-git slices [#61/#49 architect, #55 /handoff, #48 [pause] tag, #57 path correctness, secrets rule] when picked up.)** — [plan doc](plans/workflow-feedback-fixes/workflow-feedback-fixes-plan.md)
   - [ ] Architect external-behavior assumption sweep (#61, #49)
   - [ ] git-manager Bitbucket via API token, MCP removed (#54, #50)
   - [ ] `/handoff` skill (#55)
