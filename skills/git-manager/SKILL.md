@@ -68,6 +68,54 @@ Before first operation on any repo, run `git log --oneline -20` and `git branch 
 
 ---
 
+## Branch Binding (P2)
+
+The **expected-branch binding** records which branch a given worktree is supposed to be on, so downstream checks (the `commit` soft-warn, session-start, the SDD exit gate) can detect when HEAD has drifted to the wrong branch. The binding is stored in **native per-worktree git config** — not a `.claude` sidecar file. Native `--worktree` config scopes automatically per worktree, needs no keying, and covers the main/default worktree that `using-git-worktrees` never created a sidecar for.
+
+**Git-version floor.** `--worktree` config requires `git ≥ 2.20`. Preflight with `git --version`; if git is older, **skip the binding entirely** — set nothing, read nothing, warn nowhere. On older git the `--worktree` write silently falls back to local config, which defeats per-worktree isolation, so degrade to no-binding rather than write a broken shared binding.
+
+**Portable version-gate snippet (use this form — `sort -V` is GNU-only and fails on macOS BSD sort):**
+
+```bash
+# git >= 2.20 required for per-worktree config (extensions.worktreeConfig).
+# Strips the .windows.N suffix that git for Windows appends to its version string.
+v=$(git version | awk '{print $3}')          # e.g. 2.39.0  or  2.43.0.windows.1
+major=$(printf '%s' "$v" | cut -d. -f1)
+minor=$(printf '%s' "$v" | cut -d. -f2)
+if [ "${major:-0}" -gt 2 ] || { [ "${major:-0}" -eq 2 ] && [ "${minor:-0}" -ge 20 ]; }; then
+  # git >= 2.20 — safe to enable per-worktree config and set the binding
+  ...
+fi
+```
+
+**Enable (one-time, per-repo, idempotent).** `extensions.worktreeConfig` is a repo-wide setting that MUST live in the shared/common config, not a worktree-local one. Write it explicitly to the common config so it is correct even when run from inside a linked worktree:
+
+```bash
+git config --file "$(git rev-parse --git-common-dir)/config" extensions.worktreeConfig true
+```
+
+Ensure this is enabled before the first `--worktree` write in a repo.
+
+**Set:**
+
+```bash
+git config --worktree claude.expectedBranch <branch>
+```
+
+**Read:**
+
+```bash
+git config --worktree --get claude.expectedBranch
+```
+
+Empty output → no binding → **no warning anywhere.** This is the soft-warn contract every consumer relies on: an unset binding is silent, never an error.
+
+**Compare:** against the current branch from `git branch --show-current`. A mismatch is a soft-warn, never a block.
+
+**Accepted pitfall (documented, not engineered around).** A renamed or rebased branch staling the binding produces one ignorable soft-warn. The binding is refreshed by `switch`, by `start-work`, and by the `writing-plans` rename — so the stale warning self-heals on the next branch operation. Not worth the complexity of auto-detecting renames.
+
+---
+
 ## Workflows
 
 ### 1. `start-work` — Create branch and push
@@ -75,7 +123,8 @@ Before first operation on any repo, run `git log --oneline -20` and `git branch 
 1. `git fetch origin && git checkout main && git pull origin main`
 2. `git checkout -b <branch-name>` per naming pattern
 3. `git push -u origin <branch-name>`
-4. Report branch name and tracking ref.
+4. **Set the expected-branch binding (P2).** Use the portable version gate from § Branch Binding (POSIX integer comparison — not `sort -V`); if `git ≥ 2.20`, enable `extensions.worktreeConfig` then `git config --worktree claude.expectedBranch <branch-name>`. If git is older, skip silently — no binding.
+5. Report branch name and tracking ref.
 
 ---
 
