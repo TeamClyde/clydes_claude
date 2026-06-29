@@ -151,6 +151,15 @@ Empty output → no binding → **no warning anywhere.** This is the soft-warn c
    6. **Override token `[no-plan-update]`**: allows the commit to proceed. The validator does NOT write to the journal — that would bypass the three-edit atomic invariant owned by `plan-management:divergence`. If the caller wants the override recorded, they invoke `plan-management:divergence` separately. The journal is written only by `plan-management:divergence`, never by this skill.
    - Path-level matching is the MVP. Symbol-level (DocSync-style) is deferred.
    - This validator runs in addition to (not replacing) the existing bash `hooks/pre-commit`.
+5.5. **Branch soft-warn (P2)** (runs after all pre-commit validations, before `git commit`):
+   1. Read the expected-branch binding: `git config --worktree --get claude.expectedBranch`.
+   2. If the output is empty → **silent, proceed** (no binding = no warning; this is the soft-warn contract).
+   3. If a binding is set, read the current branch: `git branch --show-current`.
+   4. If current branch ≠ expected branch → surface a non-blocking warning, then **proceed with the commit**:
+      > "⚠ You are on `<current>` but the active plan's expected branch is `<expected>`. Committing here anyway. Run git-manager `switch` if this is unintended."
+   5. If current branch = expected branch → silent, proceed.
+   - **This warn is intentionally non-blocking.** It never refuses, never aborts. Contrast with Step 5 (Plan-state validator), which can refuse based on file scope — this step checks branch only.
+   - Requires `git ≥ 2.20` (per § Branch Binding (P2)). If the version gate was not met at binding-set time, `--worktree --get` returns empty → silent by the rule above.
 6. `git commit -m "<message>"`
 7. On hook rejection: surface full output, stop — never `--no-verify`
 8. Report commit hash on success
@@ -275,3 +284,4 @@ This skill does not: call Jira, read source code, decide which files to commit, 
 3. Do not push to main/master directly — always push a feature branch.
 4. The `files:` parameter must match the staged set exactly — Step 2.5 refuses if pre-staged files exist outside the listed set. The validator and pre-commit hooks inspect the staged set, so a mismatch would let them gate on a phantom set. To proceed: include the orphans in `files:`, or `git reset HEAD <orphan>` first. Never use `[no-plan-update]` to bypass this — that token only applies to plan-doc staleness, not pre-stage drift.
 5. Use `smoke-commit` (workflow 4b) when a caller needs a real commit purely to exercise downstream behavior (hooks, validator). Never instruct subagents to "commit then `git reset` afterward" — that pushes the cleanup contract onto the caller and breaks if the subagent is interrupted between the two steps. `smoke-commit` owns the revert.
+6. The branch soft-warn (Step 5.5 in `commit`) is intentionally non-blocking. It warns and proceeds — it never refuses a commit. A mismatch means you may be committing to the wrong branch, not that you must stop. Use git-manager `switch` to move to the correct branch before the next commit. This is distinct from the Plan-state validator (Step 5), which checks file scope and CAN refuse.
