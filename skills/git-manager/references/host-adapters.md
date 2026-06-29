@@ -154,6 +154,30 @@ Return the PR URL parsed from the `curl` response.
 
 **`read_pr`:** best-effort `GET /2.0/repositories/{workspace}/{repo}/pullrequests?q=source.branch.name="<branch>"` using the same credential-retrieval and `unset` discipline as `create_pr`, returning `{state, url}` from the response. Bitbucket does not expose the repo's allowed merge methods through this contract's reach, so return `merge_method: unavailable`. If the credential is missing or the request fails, return `unavailable`.
 
+### `gitlab` — transport: `glab` CLI
+
+> **Terminology note:** GitLab calls these "merge requests (MR)", not "pull requests". The contract normalizes both to `create_pr` / `read_pr` returning a URL.
+
+**`detect_host`:** remote matches `gitlab.com` (or `git.backend: gitlab` override). Parse `{namespace}` and `{repo}` from the `gitlab.com/<namespace>/<repo>.git` or `git@gitlab.com:<namespace>/<repo>.git` form, stripping any trailing `.git`. `api_base` is empty — this adapter drives GitLab through `glab` rather than raw REST.
+
+**`auth_preflight`:** verify the CLI is present — `command -v glab` (POSIX) / `Get-Command glab` (PowerShell). If absent, return `missing-cred` and **fall back to `manual`** with the install hint `https://gitlab.com/gitlab-org/cli`. If present, run `glab auth status`; a non-zero exit is `missing-cred` (the user must `glab auth login`).
+
+**`create_pr`:** open the MR, then parse the MR URL from `glab`'s own stdout format:
+
+```
+glab mr create --source-branch <src> --target-branch <dst> --title <title> --description <body> --yes
+```
+
+**gh-vs-glab divergence (flags are different):** `glab mr create` uses `--source-branch`/`--target-branch` and `--description` where `gh pr create` uses `--head`/`--base` and `--body`. The `glab` output format also differs from `gh` — this adapter owns its own stdout parsing; it does NOT reuse the `github` adapter's parser.
+
+**`read_pr`:** read the MR, then parse its output for state and URL:
+
+```
+glab mr view <branch>
+```
+
+`glab mr view` does not expose a structured flag equivalent to `gh pr view --json` for all fields. Parse `state` and the MR URL from the command's human-readable output. The repo's allowed merge method is not readily surfaced through `glab mr view`, so return `merge_method: unavailable` (field-level: the MR was found, but the project's allowed merge method could not be resolved — this adapter does not attempt a separate REST call for project settings). If `glab mr view` fails entirely (no MR found, CLI error), return `unavailable` (whole-return).
+
 ### `manual` — no transport
 
 **`detect_host`:** the fallback when no host matches and no override is set; `api_base` empty.
