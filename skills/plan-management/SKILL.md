@@ -7,7 +7,7 @@ description: >
   sub-plan is ready to close. Invoke after every ticket creation or status
   transition to keep TODO.md current; invoke for plan-doc state changes
   (divergence, spawn-subplan, close-subplan) independently of Jira.
-argument-hint: "status:created|in_progress|completed|backlog|reconcile|divergence|spawn-subplan|close-subplan ticket-key:PROJ-N plan-doc:plans/slug/<slug>-plan.md summary:'...'"
+argument-hint: "status:created|in_progress|completed|backlog|reconcile|divergence|spawn-subplan|close-subplan|repoint ticket-key:PROJ-N plan-doc:plans/slug/<slug>-plan.md summary:'...'"
 allowed-tools: Read, Write, Edit
 ---
 
@@ -44,9 +44,9 @@ Starting from the active plan's directory, walk up one directory level. If that 
 
 | Parameter | Required | Values |
 |-----------|----------|--------|
-| `status` | Always | `created` \| `in_progress` \| `completed` \| `backlog` \| `reconcile` \| `divergence` \| `spawn-subplan` \| `close-subplan` |
+| `status` | Always | `created` \| `in_progress` \| `completed` \| `backlog` \| `reconcile` \| `divergence` \| `spawn-subplan` \| `close-subplan` \| `repoint` |
 | `ticket-key` | Required for `created`, `in_progress`, `completed` **when `project.json` has `jira.enabled: true`** (omit entirely when `jira.enabled: false`); optional for `backlog`; **not applicable** for `divergence`, `spawn-subplan`, `close-subplan` | e.g. `PROJ-42` |
-| `plan-doc` | Required for `created`, `in_progress`, `completed`; required for `divergence`, `spawn-subplan`, `close-subplan` | e.g. `plans/slug/<slug>-plan.md` |
+| `plan-doc` | Required for `created`, `in_progress`, `completed`; required for `divergence`, `spawn-subplan`, `close-subplan`, `repoint` | e.g. `plans/slug/<slug>-plan.md` |
 | `summary` | Required for `completed`; required for `divergence` (description of the deviation); required for `close-subplan` (structured closeout — see below); optional for others | 1–2 sentences describing what was done |
 | `tag` | Required for `divergence` | One or more tags from the authoritative taxonomy (see `divergence` mode) |
 | `plan-section` | Required for `divergence` | The heading or line range in `<top>-plan.md` to surgically update |
@@ -285,6 +285,25 @@ See `close-subplan.md` for the full step sequence including ADR Promotion Scan (
 
 ---
 
+### `repoint` — Switch the active-plan marker to a different plan
+
+**Rationale:** When `git-manager switch` moves work from one branch to another, the active-plan marker must be updated to reflect the newly active plan. `repoint` is the sanctioned single-writer path for this transition — it switches the marker *between* two existing plans without closing either one.
+
+**Distinction from `close-subplan`:** `close-subplan` is the lifecycle-end path that clears (deletes) `.claude/active-plan` when a plan tree completes, and it runs the ADR Promotion Scan and Feature-Doc Synthesis Pass. `repoint` only moves the marker from one active plan to another — it does not close or archive anything. These are two distinct operations; `repoint` does not contradict the invariant in `rules/plan-docs.md` that states "`close-subplan` is the only path to clearing `.claude/active-plan`" — clearing and repointing are different acts.
+
+**Caller:** `git-manager switch` is the expected caller. `git-manager` owns the git half of a context switch (clean-tree check, checkout, branch rebind); it invokes `repoint` for the plan-management half (writing `.claude/active-plan` and refreshing the target handoff). `git-manager` must NOT write `.claude/active-plan` directly.
+
+#### Workflow
+
+1. **Validate input:** `plan-doc` is required. If absent, refuse: "`repoint` requires `plan-doc` — the path to the plan to activate."
+2. **Verify plan exists:** confirm the file at `plan-doc` exists. If not, refuse and surface the path — do not create a partial state.
+3. **Idempotency check:** Read `.claude/active-plan`. If it already contains the exact `plan-doc` path, skip steps 4–6 and report "already pointing at `<plan-doc>` — no change."
+4. **Write `.claude/active-plan`:** overwrite it with `plan-doc` (one line, no trailing newline).
+5. **Refresh target handoff:** locate the handoff file for the newly active plan (`<plan-doc>` sibling `<slug>-handoff.md`). If the handoff exists, update its `Status:` line to `Active` and `Last Updated:` to today's date (YYYY-MM-DD). If the handoff is absent, skip the refresh (do not create it — that is the plan-creation flow's responsibility).
+6. **Report:** old plan path (if any), new plan path, handoff refresh status (updated / absent-skipped).
+
+---
+
 ## Item Quality Rules
 
 - Every plan-backed item **must** link to both a Jira ticket key and a plan doc path. No orphaned entries. **When `project.json` has `jira.enabled: false`:** the plan doc path alone is sufficient; the Jira key portion is omitted. The Task Reference table's Jira Key column remains blank. Do not generate placeholder keys (e.g. `[CLAUDE-N]`) for jira-disabled repos.
@@ -323,6 +342,6 @@ See `close-subplan.md` for the full step sequence including ADR Promotion Scan (
 3. Do not move an item to History until all sub-tasks are checked — partial progress stays In Progress.
 4. `reconcile` surfaces keys to the caller — it does not call Jira directly.
 5. `divergence` must resolve the **top-level** journal/handoff even when a sub-plan is active — always walk up to the root of the plan tree before writing.
-6. `close-subplan` is the only path to clearing `.claude/active-plan`. Do not clear it manually or as part of another mode.
+6. `close-subplan` is the only path to **clearing** (deleting) `.claude/active-plan`. `repoint` **switches** the marker between two active plans — it does not clear it. These are distinct operations: clearing ends a plan tree's lifecycle; repointing moves the context pointer during a branch switch. Do not conflate them, and do not write `.claude/active-plan` outside of `spawn-subplan`, `close-subplan`, and `repoint`.
 7. All three new modes (`divergence`, `spawn-subplan`, `close-subplan`) are idempotent — re-running with the same arguments completes any remaining writes without duplicating already-written content.
 8. The tag taxonomy is closed-set for journal entries. Do not invent new tags; use the authoritative list in the `divergence` mode's Authoritative Tag Taxonomy table.

@@ -24,6 +24,8 @@ Caller owns decisions (files, message, timing). This skill owns safe, consistent
 | `description` | For `commit` | Subject line (imperative mood, max 72 chars) |
 | `jira-key` | Conditional (see table below) | Jira issue key (e.g. `PROJ-42`) |
 | `pr-body` | For `finish`, optional | Override PR description body |
+| `target-branch` | For `switch` | Branch name to check out |
+| `target-plan` | For `switch` | Plan doc path to activate (e.g. `plans/slug/<slug>-plan.md`); required — no branch→plan index exists |
 
 ---
 
@@ -233,6 +235,61 @@ How to verify. Note automated coverage.
 ## Linked Tickets
 - PROJ-N: Ticket summary
 ```
+
+---
+
+### 6. `switch` — Context-switch to a different branch and plan
+
+Inputs: `target-branch` (required), `target-plan` (required).
+
+**Delegation boundary:** `switch` owns the git half of a context switch (clean-tree check, checkout, branch rebind). The plan-management half (writing `.claude/active-plan` and refreshing the target handoff) is owned entirely by `plan-management repoint`. `switch` must NOT write `.claude/active-plan` directly.
+
+#### Step 0 — Required-input check
+
+If `target-plan` is not supplied, REFUSE immediately with:
+
+> "`switch` requires `target-plan` — the plan-doc path to activate (no branch→plan index exists). Find it under `plans/` or in `TODO.md` and re-invoke."
+
+Do not proceed past Step 0 without `target-plan`.
+
+#### Step 1 — Clean-tree check
+
+Run `git status --porcelain`. If the output is non-empty (dirty working tree or index), STOP. Offer the user two options:
+
+- **Stash:** `git stash push -m "claude-switch-<current-branch>"` — names the stash for easy recovery. After confirming, stash and proceed to Step 2.
+- **Abort:** cancel the switch entirely.
+
+Never auto-discard uncommitted changes. Wait for the user's explicit choice before proceeding.
+
+#### Step 2 — Checkout target branch
+
+Run `git checkout <target-branch>`.
+
+- **Branch exists locally:** checkout succeeds — continue.
+- **Branch absent locally, present on origin:** offer to create a local tracking branch: `git checkout -b <target-branch> origin/<target-branch>`. Confirm with the user before creating.
+- **Branch absent on both local and origin:** report not-found and stop. Do not create a new unrelated branch — that is the `start-work` workflow's responsibility.
+
+#### Step 3 — Refresh branch binding (P2)
+
+Set `claude.expectedBranch` for this worktree to `target-branch` using the portable version gate from § Branch Binding (P2):
+
+```bash
+git config --worktree claude.expectedBranch <target-branch>
+```
+
+Apply the `git ≥ 2.20` version gate (POSIX integer comparison — not `sort -V`). If git is older, skip silently — no binding.
+
+#### Step 4 — Repoint active plan
+
+Invoke `plan-management` with `status: repoint` and `plan-doc: <target-plan>`. This is the only sanctioned path for writing `.claude/active-plan` during a context switch — do not write the file directly.
+
+#### Step 5 — Report
+
+Surface:
+
+- New branch name and the checkout path taken (local / created-from-origin)
+- Stash name, if a stash was created in Step 1 (e.g. `claude-switch-<old-branch>`)
+- Repointed plan path, as confirmed by `plan-management repoint`
 
 ---
 
