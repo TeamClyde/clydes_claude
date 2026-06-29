@@ -280,6 +280,21 @@ This workflow is **host-blind**: it never branches on a host name. PR creation i
 
    - **On clean (zero exit):** report "Promotion merge previews clean." and continue.
 
+5c. **Host merge-method divergence check:** uses `<merge-strategy>` and `<dst>` from step 4b — no re-resolution. This step runs only when the **active** adapter (after any `auth_preflight` fallback in step 4) is `github`, `gitlab`, or `bitbucket` — not `manual`. If step 4's `auth_preflight` returned `missing-cred` and fell back to `manual`, skip this step entirely.
+
+   **Call `read_pr(<src>)`** per the contract in `references/host-adapters.md`, where `<src>` is the **source/feature branch being finished** (`git branch --show-current`) — NOT `<dst>`. (`read_pr` looks up the PR for its head/source branch: `gh pr view <src>`, `glab mr view <src>`, Bitbucket `source.branch.name="<src>"`; passing `<dst>` would query the wrong branch.) It returns a normalized `{ state, url, merge_method? }`. Do NOT inline adapter logic here — each adapter's `read_pr` block owns its own transport and normalization.
+
+   **Compare** the returned `merge_method` against `<merge-strategy>`:
+
+   - **On `merge_method: unavailable` (field-level) or whole-return `unavailable`** — skip silently. Do NOT warn. Missing or ambiguous data is not a divergence. This covers: `manual` host (no API), GitHub with multiple merge methods allowed, `glab` unable to surface project merge settings, Bitbucket (does not expose allowed merge methods via this contract), any read failure.
+
+   - **On a concrete `merge_method` that differs from `<merge-strategy>`** — surface a non-blocking warning, then proceed:
+     > "⚠ project.json requests `<merge-strategy>` for `<dst>` but the host is configured for `<host_method>`. The host enforces the actual merge — align branch-protection settings."
+
+   - **On a concrete `merge_method` that matches `<merge-strategy>`** — silent, proceed.
+
+   **git-manager requests the strategy and flags divergence; it does NOT enforce.** The host enforces the actual merge via branch-protection rules or repository merge settings. This check is advisory — it never blocks the PR.
+
 6. **`create_pr(title, body, src_branch, dst_branch)`:** open the PR through the detected adapter, where `dst_branch` is the resolved `<dst>` from step 4b — not separately derived. Pass the rendered title (`type: subject [PROJ-N]`) and body (from the template below, or the `pr-body` override). The adapter parses its host's output and returns a normalized **PR URL**; the `manual` adapter returns the sentinel `manual submission required`. The per-adapter `create_pr` blocks in `references/host-adapters.md` own all host-specific transport — `gh pr create` for GitHub, `glab mr create` for GitLab, the self-contained `git credential fill` + `curl` REST script for Bitbucket (which retrieves the credential non-interactively, builds the auth header in a variable, and unsets all secrets), and the rendered title/body for `manual`. Do not inline any of that here. All Bitbucket secret-handling guarantees live in that block.
 7. Report the PR URL returned by `create_pr` on success (or "manual submission required" with the rendered title/body for the `manual` path).
 
@@ -552,3 +567,4 @@ This skill does not: call Jira, read source code, decide which files to commit, 
 5. Use `smoke-commit` (workflow 4b) when a caller needs a real commit purely to exercise downstream behavior (hooks, validator). Never instruct subagents to "commit then `git reset` afterward" — that pushes the cleanup contract onto the caller and breaks if the subagent is interrupted between the two steps. `smoke-commit` owns the revert.
 6. The branch soft-warn (Step 5.5 in `commit`) is intentionally non-blocking. It warns and proceeds — it never refuses a commit. A mismatch means you may be committing to the wrong branch, not that you must stop. Use git-manager `switch` to move to the correct branch before the next commit. This is distinct from the Plan-state validator (Step 5), which checks file scope and CAN refuse.
 7. The promotion conflict preview (Step 5b in `finish`) is read-only — it uses `git merge-tree --write-tree` and makes no working-tree mutation, no staged changes, no half-merged state. It is gated on `<merge-strategy>` being `merge-commit` (skipped for `squash` and `rebase`) and on git ≥ 2.38. On older git it degrades with a warning and never blocks the PR. It is advisory — the PR opens regardless of conflict findings.
+8. The host merge-method divergence check (Step 5c in `finish`) is advisory and non-blocking. It warns when `read_pr` returns a concrete `merge_method` that differs from the `project.json`-resolved `<merge-strategy>`. It stays silent for any `unavailable` result (whole-return or field-level) — missing data is not a divergence. git-manager flags; the host enforces.
