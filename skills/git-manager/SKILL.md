@@ -146,58 +146,19 @@ Use when a caller (typically a smoke-test subagent) needs to actually create a c
 
 ---
 
-### 5. `finish` — Open PR (multi-backend dispatch)
+### 5. `finish` — Open PR (host-blind via the adapter contract)
+
+This workflow is **host-blind**: it never branches on a host name. PR creation is delegated to the host-adapter contract in `references/host-adapters.md`, whose four operations (`detect_host`, `auth_preflight`, `create_pr`, `read_pr`) each parse their own host's output and return a **normalized** value. Adding a host means writing one adapter block in that file — never editing this procedure.
 
 1. Run `publish` workflow first
 2. If WIP/debug commits flagged: surface to user, suggest squash rebase (only safe pre-PR)
-3. **Detect backend:**
-   1. If `project.json` has `git.backend` set, use that value (`github` | `bitbucket` | `manual`). This wins over auto-detection — use it for enterprise hosts (`github.mycompany.com`, Bitbucket Data Center) where the URL doesn't match the public host.
-   2. Otherwise, run `git remote get-url origin` and match:
-      - `github.com/...` or `git@github.com:...` → backend `github`
-      - `bitbucket.org/...` or `git@bitbucket.org:...` → backend `bitbucket`
-      - Anything else → backend `manual`
-4. **Preflight:**
-   - `github`: verify `gh` CLI is available (`command -v gh` on POSIX, `Get-Command gh` on PowerShell). If absent → fall back to `manual` and surface: "GitHub backend detected but `gh` CLI is not installed. Install via https://cli.github.com/ and re-run, or submit the PR manually using the title and body below."
-   - `bitbucket`: verify `curl` and a base64 encoder (`openssl` or `base64`) are available. The API token itself is checked inside the REST script (Step 6) via `git credential fill`. If `curl` is absent → fall back to `manual` with a similar message.
-   - `manual`: no preflight needed.
-5. **Diff inspection:** fetch the branch diff (via the detected backend's API, or `git diff origin/main...HEAD` for `manual`); flag unrelated changes before opening the PR.
-6. **Open PR:**
-   - **`github`:**
-     ```
-     gh pr create --base main --title "type: subject [PROJ-N]" --body "$(<from template below or pr-body override>)"
-     ```
-     Squash-merge is set repo-side via branch protection (not per-PR), so no flag needed.
-   - **`bitbucket`:** create the PR with a single self-contained REST script (one script, so the secret never persists between steps). No MCP. The script:
-     1. **Retrieve the credential non-interactively** — pipe the host only (no path) into `git credential fill`:
-        ```bash
-        cred=$(printf 'protocol=https\nhost=bitbucket.org\n\n' | git credential fill)
-        user=$(printf '%s\n' "$cred" | sed -n 's/^username=//p')
-        pass=$(printf '%s\n' "$cred" | sed -n 's/^password=//p')
-        ```
-        `user` is the Atlassian account email; `pass` is the API token.
-     2. **If `user` or `pass` is empty** (no credential helper configured), STOP and tell the user to set up their Bitbucket credential — point them at the `secrets-handling` rule (create an API token, then store it by running an authenticated git operation so the OS credential manager captures it). Do not fall into an interactive prompt.
-     3. **Validate** that `user` contains `@` — an API token must pair with the Atlassian email, not a legacy Bitbucket username. If not, surface a clear error.
-     4. **Derive `{workspace}` and `{repo}`** from the `git remote get-url origin` value obtained during backend detection — parse the HTTPS form `https://bitbucket.org/<workspace>/<repo>.git` or the SSH form `git@bitbucket.org:<workspace>/<repo>.git`, stripping any trailing `.git`.
-     5. **Build the auth header in a shell variable** — never pass the token via `curl -u` or any argv position:
-        ```bash
-        b64=$(printf '%s:%s' "$user" "$pass" | openssl base64 -A)   # fallback if no openssl: base64 -w0  (or: base64 | tr -d '\n')
-        auth="Authorization: Basic $b64"
-        ```
-        Native-PowerShell variant (if documenting one): `$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${user}:${pass}"))`.
-     6. **POST the pull request**, passing the header via `-H "$auth"`:
-        ```bash
-        curl -sS -X POST -H "$auth" -H 'Content-Type: application/json' \
-          "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pullrequests" \
-          -d "{\"title\":\"$title\",\"source\":{\"branch\":{\"name\":\"$source_branch\"}},\"destination\":{\"branch\":{\"name\":\"$target_branch\"}},\"description\":\"$description\"}"
-        ```
-        Print only the resulting PR URL / status — never echo `$pass`, `$b64`, or `$auth`.
-     7. **On HTTP 401**, advise the user their API token may be invalid or lack pull-request scope.
-     8. **Unset the secrets** so they do not linger in the shell environment: `unset cred user pass b64 auth`.
-     - **Authentication note:** Bitbucket app passwords are being retired — use an API token paired with your Atlassian account email.
-   - **`manual`:** output the title and body to the user; they submit via the host's web UI or their own CLI.
-7. Report PR URL on success (or "manual submission required" with the rendered title/body for the `manual` path).
+3. **`detect_host`:** resolve the target host per the contract. The `project.json` `git.backend` override wins over auto-detection when set (`github` | `gitlab` | `bitbucket` | `manual`) — use it for enterprise hosts (`github.mycompany.com`, self-hosted GitLab, Bitbucket Data Center) where the URL doesn't match a public host. Otherwise `git remote get-url origin` is matched: `github.com` → `github`, `gitlab.com` → `gitlab`, `bitbucket.org` → `bitbucket`, anything else → `manual`. Returns the normalized `{ host, owner_or_workspace, repo, api_base }`. See `references/host-adapters.md` § `detect_host` and the per-adapter `detect_host` blocks for the parsing rules.
+4. **`auth_preflight`:** confirm a usable credential per the contract; returns `ok` or `missing-cred`. On `missing-cred`, fall back to `manual` and surface the adapter's one-line remediation (e.g. install `gh`/`glab`, or set up the Bitbucket API token). See `references/host-adapters.md` § `auth_preflight` and each adapter's block.
+5. **Diff inspection:** fetch the branch diff (`git diff origin/main...HEAD`); flag unrelated changes before opening the PR.
+6. **`create_pr(title, body, src_branch, dst_branch)`:** open the PR through the detected adapter, passing the rendered title (`type: subject [PROJ-N]`) and body (from the template below, or the `pr-body` override). The adapter parses its host's output and returns a normalized **PR URL**; the `manual` adapter returns the sentinel `manual submission required`. The per-adapter `create_pr` blocks in `references/host-adapters.md` own all host-specific transport — `gh pr create` for GitHub, `glab mr create` for GitLab, the self-contained `git credential fill` + `curl` REST script for Bitbucket (which retrieves the credential non-interactively, builds the auth header in a variable, and unsets all secrets), and the rendered title/body for `manual`. Do not inline any of that here. All Bitbucket secret-handling guarantees live in that block.
+7. Report the PR URL returned by `create_pr` on success (or "manual submission required" with the rendered title/body for the `manual` path).
 
-**Backend scope.** Currently supports `github` and `bitbucket` as first-class backends. GitLab, Gitea, Azure DevOps, and self-hosted variants require explicit additions to this workflow's step 6 — there is no plugin registry. Until added, those repos use the `manual` fallback (or override via `project.json` `git.backend: manual` to make it explicit).
+**Backend scope.** `github`, `gitlab`, and `bitbucket` are first-class adapters in `references/host-adapters.md`. Gitea, Azure DevOps, and other self-hosted variants use the `manual` fallback (or override via `project.json` `git.backend: manual` to make it explicit) until an adapter block is added for them — see the Extension Recipe in `references/host-adapters.md` (write one adapter block filling the four operations; no edit to this procedure is needed).
 
 **PR description template:**
 
@@ -230,8 +191,8 @@ Stop immediately and surface to the user:
 | Secrets/credentials in staged diff | Do not commit. Surface what was found. |
 | Uncommitted changes when switching branches | Stash or ask user |
 | Merge conflicts | List files, do not auto-resolve |
-| Bitbucket credential missing (empty `git credential fill`) | Stop; direct the user to set up their API token per the `secrets-handling` rule. Do not prompt interactively. |
-| Bitbucket HTTP 401 on PR create | Token may be invalid or lack pull-request scope. Surface the status; do not retry blindly. |
+| Bitbucket credential missing (empty `git credential fill`) | Stop; direct the user to set up their API token per the `secrets-handling` rule. Do not prompt interactively. The check itself lives in the `bitbucket` adapter's `create_pr` in `references/host-adapters.md`. |
+| Bitbucket HTTP 401 on PR create | Token may be invalid or lack pull-request scope. Surface the status; do not retry blindly. Handled inside the `bitbucket` adapter's `create_pr` in `references/host-adapters.md`. |
 
 ---
 
