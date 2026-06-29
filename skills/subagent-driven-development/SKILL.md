@@ -46,7 +46,7 @@ digraph process {
 
     subgraph cluster_per_task {
         label="Per Task";
-        "Assert entry gate (E1-E3)" [shape=box style=filled fillcolor=lightyellow];
+        "Assert entry gate (E1-E5)" [shape=box style=filled fillcolor=lightyellow];
         "Dispatch implementer subagent (./implementer-prompt.md)" [shape=box];
         "Implementer subagent asks questions?" [shape=diamond];
         "Answer questions, provide context" [shape=box];
@@ -69,8 +69,8 @@ digraph process {
     "Dispatch final code reviewer subagent for entire implementation" [shape=box];
     "Use finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
-    "Read plan, extract all tasks with full text, note context, create TodoWrite" -> "Assert entry gate (E1-E3)";
-    "Assert entry gate (E1-E3)" -> "Dispatch implementer subagent (./implementer-prompt.md)";
+    "Read plan, extract all tasks with full text, note context, create TodoWrite" -> "Assert entry gate (E1-E5)";
+    "Assert entry gate (E1-E5)" -> "Dispatch implementer subagent (./implementer-prompt.md)";
     "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
     "Implementer subagent asks questions?" -> "Answer questions, provide context" [label="yes"];
     "Answer questions, provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
@@ -89,7 +89,7 @@ digraph process {
     "Mark Task Reference row ✅ + pulser if skill created" -> "Assert exit gate (X1-X4)";
     "Assert exit gate (X1-X4)" -> "Mark task complete in TodoWrite";
     "Mark task complete in TodoWrite" -> "More tasks remain?";
-    "More tasks remain?" -> "Assert entry gate (E1-E3)" [label="yes"];
+    "More tasks remain?" -> "Assert entry gate (E1-E5)" [label="yes"];
     "More tasks remain?" -> "Dispatch final code reviewer subagent for entire implementation" [label="no"];
     "Dispatch final code reviewer subagent for entire implementation" -> "Use finishing-a-development-branch";
 }
@@ -206,8 +206,36 @@ Before dispatching the implementer for a task, assert all of the following. **If
 - [ ] **E2 — Previous task ✅:** The previous task's row in the plan's Task Reference table is marked ✅ (or this is Task 1 and no prior row exists). If the prior task row is not ✅, do not start the new task — mark the prior task complete first.
 - [ ] **E3 — Task prompt read:** The dispatch prompt for this task has been read in full before any implementation begins.
 
+#### Micro entry gate — baseline capture (per task, before dispatch)
+
+After E1–E3 pass, the orchestrator captures two truth sources **before** dispatching the implementer. These values are held by the orchestrator and are independent of anything the implementer reports — the implementer never authors them.
+
+**E4 — Capture baseline SHA:**
+
+Record the current HEAD commit as `BASELINE` (shell-neutral — bash `BASELINE=$(git rev-parse HEAD)`; PowerShell `$BASELINE = git rev-parse HEAD`):
+
+```
+git rev-parse HEAD
+```
+
+This is a read-only git query — the orchestrator observing the current commit state, not mutating it. (The "route git through git-manager" rule governs mutating operations such as commits, branches, and pushes; read-only inspection is exempt.) `BASELINE` records the exact commit the implementer will build on top of.
+
+**E5 — Capture in-scope file list:**
+
+Record the list of files the task is scoped to touch, read from the plan doc — the task's `Scope` column in the Task Reference table and/or its `Files affected:` list in the task detail section (whichever the plan provides). This list comes from the plan doc, not from the implementer. If the task lists no in-scope files (e.g. a journal-note-only task, or a plan predating the convention), record an empty list — this is not an error.
+
+**Why these two values matter:**
+
+Both are captured by the orchestrator before the implementer runs. They are the inputs the **exit gate added next** consumes to verify the task landed correctly — checking observed git state rather than relying on the implementer's self-report.
+
+**Micro vs. macro entry gate:**
+
+This is the **micro entry gate** — it runs once per task, immediately before each implementer dispatch. It is distinct from the **macro entry gate**: the one-time branch establishment that happens at brainstorming start (the `claude.expectedBranch` / fresh-branch setup that ensures the session is on the correct feature branch before any work begins). Do not conflate the two.
+
 **Entry gate failure message format:**
 > ENTRY GATE FAILED — [E1 | E2 | E3]: [specific reason]. Cannot start Task N until this is resolved.
+
+The failure format covers E1–E3 only — these are the assertions that can stop the task. E4/E5 are deterministic captures, not stop-conditions (an empty in-scope list is recorded, not failed; if `git rev-parse HEAD` itself errors, the repo is in an E1-class invalid state).
 
 ---
 
