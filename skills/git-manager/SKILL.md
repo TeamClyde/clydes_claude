@@ -239,6 +239,47 @@ This workflow is **host-blind**: it never branches on a host name. PR creation i
    **Scope of this step:** This step resolves and records the intended merge strategy for `<dst>`. It does NOT enforce it. Enforcement is host-side (branch-protection rules or repository merge settings — see `## Merge Strategy`). The promotion conflict preview and the host merge-method divergence check (both added to this workflow next) consume `<merge-strategy>` and `<dst>`.
 
 5. **Diff inspection:** fetch the branch diff (`git diff origin/<dst>...HEAD`, where `<dst>` is the PR target branch resolved in step 4b); flag unrelated changes before opening the PR.
+5b. **Promotion conflict preview:** uses `<merge-strategy>` and `<dst>` from step 4b — no re-resolution.
+
+   **Gate on strategy:** run this step ONLY when `<merge-strategy>` is `merge-commit`. For `squash` or `rebase`, skip it entirely.
+
+   **Version floor — git ≥ 2.38** (required for `merge-tree --write-tree`). Before running, check the git version using the portable POSIX version-gate (mirrors the style from § Branch Binding (P2) — `sort -V` is GNU-only and fails on macOS BSD sort; strip the `.windows.N` suffix):
+
+   ```bash
+   # git >= 2.38 required for merge-tree --write-tree.
+   # Strips the .windows.N suffix that git for Windows appends to its version string.
+   v=$(git version | awk '{print $3}')          # e.g. 2.38.0  or  2.43.0.windows.1
+   v=$(printf '%s' "$v" | cut -d. -f1,2)        # strip patch + any .windows.N suffix → e.g. 2.38
+   major=$(printf '%s' "$v" | cut -d. -f1)
+   minor=$(printf '%s' "$v" | cut -d. -f2)
+   if [ "${major:-0}" -gt 2 ] || { [ "${major:-0}" -eq 2 ] && [ "${minor:-0}" -ge 38 ]; }; then
+     # git >= 2.38 — safe to run merge-tree --write-tree
+     ...
+   else
+     echo "promotion conflict preview requires git >= 2.38; skipping"
+   fi
+   ```
+
+   If git is older than 2.38, **skip the preview and warn** — degrade, do NOT block the PR.
+
+   **Read-only in-memory merge — do NOT mutate the working tree.** The command is:
+
+   ```bash
+   git merge-tree --write-tree --name-only origin/<dst> HEAD
+   ```
+
+   This computes the merge of `HEAD` (the source being promoted) and `origin/<dst>` (the target) entirely in memory. It exits **non-zero and lists the conflicted paths on stdout** when there are conflicts; exits zero when clean. Explicitly: **no `git merge`, no `--no-commit`/`--no-ff`, no `git merge --abort`, no working-tree mutation, no dirty or half-merged state possible.** This read-only approach deliberately replaces an older `--no-commit --no-ff` + abort approach, which mutated the tree and risked leaving a half-merged state on interruption.
+
+   Note on argument order: for conflict-path detection via `--name-only`, the result is symmetric in the two refs — argument order does not change which conflicts are found; it only affects which side reads as "ours" in a hunk, which `--name-only` does not surface.
+
+   **Outcomes:**
+
+   - **On conflict (non-zero exit):** key this branch on the **exit code**, not on the path list being non-empty — `merge-tree` can exit non-zero with an *empty* `--name-only` list for conflicts that are not per-file (e.g. directory-rename conflicts), so an empty list is still a conflict. Surface the conflicted file list (or, when the list is empty, "conflict has no per-file paths — inspect manually") and a short resolution recipe:
+     > "Promotion merge preview found conflicts in: [list of paths, or 'no per-file paths — inspect manually']. The promotion will need manual conflict resolution or a rebase before merging. Note: a prior squash onto a promotion branch stales the merge-base, so `merge-commit` strategy is recommended for promotion branches going forward. Proceeding to open the PR — resolve conflicts before merging."
+     Then proceed (this preview is advisory; it does not hard-block the PR, but the conflict is made visible so the user can decide).
+
+   - **On clean (zero exit):** report "Promotion merge previews clean." and continue.
+
 6. **`create_pr(title, body, src_branch, dst_branch)`:** open the PR through the detected adapter, where `dst_branch` is the resolved `<dst>` from step 4b — not separately derived. Pass the rendered title (`type: subject [PROJ-N]`) and body (from the template below, or the `pr-body` override). The adapter parses its host's output and returns a normalized **PR URL**; the `manual` adapter returns the sentinel `manual submission required`. The per-adapter `create_pr` blocks in `references/host-adapters.md` own all host-specific transport — `gh pr create` for GitHub, `glab mr create` for GitLab, the self-contained `git credential fill` + `curl` REST script for Bitbucket (which retrieves the credential non-interactively, builds the auth header in a variable, and unsets all secrets), and the rendered title/body for `manual`. Do not inline any of that here. All Bitbucket secret-handling guarantees live in that block.
 7. Report the PR URL returned by `create_pr` on success (or "manual submission required" with the rendered title/body for the `manual` path).
 
@@ -510,3 +551,4 @@ This skill does not: call Jira, read source code, decide which files to commit, 
 4. The `files:` parameter must match the staged set exactly — Step 2.5 refuses if pre-staged files exist outside the listed set. The validator and pre-commit hooks inspect the staged set, so a mismatch would let them gate on a phantom set. To proceed: include the orphans in `files:`, or `git reset HEAD <orphan>` first. Never use `[no-plan-update]` to bypass this — that token only applies to plan-doc staleness, not pre-stage drift.
 5. Use `smoke-commit` (workflow 4b) when a caller needs a real commit purely to exercise downstream behavior (hooks, validator). Never instruct subagents to "commit then `git reset` afterward" — that pushes the cleanup contract onto the caller and breaks if the subagent is interrupted between the two steps. `smoke-commit` owns the revert.
 6. The branch soft-warn (Step 5.5 in `commit`) is intentionally non-blocking. It warns and proceeds — it never refuses a commit. A mismatch means you may be committing to the wrong branch, not that you must stop. Use git-manager `switch` to move to the correct branch before the next commit. This is distinct from the Plan-state validator (Step 5), which checks file scope and CAN refuse.
+7. The promotion conflict preview (Step 5b in `finish`) is read-only — it uses `git merge-tree --write-tree` and makes no working-tree mutation, no staged changes, no half-merged state. It is gated on `<merge-strategy>` being `merge-commit` (skipped for `squash` and `rebase`) and on git ≥ 2.38. On older git it degrades with a warning and never blocks the PR. It is advisory — the PR opens regardless of conflict findings.
