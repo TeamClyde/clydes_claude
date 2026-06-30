@@ -333,6 +333,21 @@ Use this style when a task's execution is delegating to a specialist skill rathe
 
 Both styles end with a commit step via `git-manager`. Inline-code tasks commit source files; dispatch-style tasks commit the files the specialist produced or modified.
 
+## Expected PR Size (Planning Consideration)
+
+While writing each task, consider its projected PR size. The measure is **logical change + file count + intent** — not raw line count (consistent with `rules/delivery-cadence.md`). Ask: "how much new behavior or structure does this task introduce?"
+
+The ceiling comes from `project.json` `git.pr-sizing.ceiling-loc` (default `400` when absent). When a task looks likely to exceed that ceiling, note it inline in the task section:
+
+```markdown
+> **Expected PR size:** Projected over the ceiling — consider vertical-slicing this task.
+> Slice suggestion: [e.g., "deliver the data layer first, then the UI wiring as a follow-on task"]
+```
+
+This is a **planning-time flag for the plan author** — not a mandatory column in the Task Reference table, not a hard block, and not a gate condition. The architect review (via its slicing lens — `agents/architect.md` Criterion 7(e)) and plan-gate will surface the same concern during the gate sequence, so this flag is simply a head-start: identify the problem at authoring time rather than discovering it during review.
+
+**When to flag:** a task is large when it touches many files across multiple layers, introduces a significant amount of new behavior, or is clearly non-trivial to review as a single PR. When unsure, don't flag — the architect's slicing lens will catch it.
+
 ## No Placeholders
 
 Every step must contain the actual content an engineer needs. These are **plan failures** — never write them:
