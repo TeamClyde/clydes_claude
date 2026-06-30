@@ -176,6 +176,19 @@ Matching is glob-based and order-independent:
 
 Omit this field if the repo uses a single uniform strategy — the `squash` default covers the common case.
 
+**`git.pr-sizing`** — PR size guidance thresholds and enforcement posture. Consumed by `git-manager` and `plan-gate` to surface soft warnings or escalation markers when PRs exceed size targets. See `rules/delivery-cadence.md` for the full policy (thresholds, slicing patterns, cadence semantics).
+
+```jsonc
+"git": { "pr-sizing": { "posture": "new" | "ongoing", "target-loc": 200, "ceiling-loc": 400 } }
+```
+
+- `posture: "new"` — sizing conventions applied from the start; every PR expected to fit thresholds.
+- `posture: "ongoing"` — advisory ratchet; thresholds inform but never block.
+- `target-loc` / `ceiling-loc` — default to `200` / `400` if omitted.
+- **Absent `git.pr-sizing` entirely** — advisory-only behavior; no plan-gate escalation surfacing, but git-time size soft-warn remains available at defaults (200/400).
+
+Omit this field to accept advisory-only behavior with default thresholds.
+
 ---
 
 ## Phase 1.5 — Doc Scaffolding
