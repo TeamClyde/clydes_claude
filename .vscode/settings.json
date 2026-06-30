@@ -222,6 +222,21 @@
     "OpenAI",
     "steelman",
     "LLM",
-    "LLMs"
+    "LLMs",
+    "booleans",
+    "Gitea",
+    "gitea",
+    "gitlab",
+    "glab",
+    "gh",
+    "pushable",
+    "url",
+    "urls",
+    "unstage",
+    "unstaged",
+    "implementer",
+    "implementer→orchestrator",
+    "branch→plan",
+    "WIP→canonical"
   ]
 }
