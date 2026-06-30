@@ -10,6 +10,10 @@ _archive/
 plans/
 tests/
 skills/git-manager-workspace/
+research/
+
+# Local navigation registry — working artifact, not a committed deliverable
+/TODO.md
 
 # Test harness for setup script
 scripts/setup-test.sh
