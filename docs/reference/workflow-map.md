@@ -3,7 +3,7 @@
 Canonical reference for how skills, agents, rules, hooks, and plugins connect in the
 Claude workflow. Update this file whenever a component is added, removed, or rewired.
 
-Last updated: 2026-06-16
+Last updated: 2026-06-29
 
 ---
 
@@ -94,11 +94,11 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 
 | Skill | When it fires | Hands off to |
 |-------|--------------|--------------|
-| `brainstorming` | M/L work, design-first path | `writing-plans` |
+| `brainstorming` | M/L work, design-first path | `writing-plans`. Also establishes a provisional `wip/*` branch and sets `claude.expectedBranch` binding (macro entry gate) before any research begins. |
 | `writing-plans` | After brainstorming, or directly for S/M | `plan-gate` (auto) |
-| `plan-gate` | Auto after `writing-plans` | `architect`, `test-strategy`, `test-builder` agents |
+| `plan-gate` | Auto after `writing-plans` | `architect`, `test-strategy`, `test-builder` agents. Surfaces oversized tasks to the architect via the PR-sizing slicing lens (`project.json git.pr-sizing`). |
 | `executing-plans` | When plan is approved and work begins | `git-manager`, `jira-workflow-manager`, `plan-management` per task |
-| `subagent-driven-development` | Alternative to `executing-plans` for parallelizable tasks | Same as executing-plans |
+| `subagent-driven-development` | Alternative to `executing-plans` for parallelizable tasks | Same as executing-plans. Adds micro entry gate (captures `BASELINE` SHA + in-scope file list before each implementer dispatch) and micro exit gate (observed-state checks X5–X8: verify commits landed, in-scope files clean, branch unchanged — checking observed git state rather than implementer self-report). |
 | `finishing-a-development-branch` | After all tasks complete | Presents merge/PR/keep/discard options |
 
 ### Component creation
@@ -133,7 +133,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | Skill | When it fires | Purpose |
 |-------|--------------|---------|
 | `handoff` | User-invoked mid-work to start a fresh session that continues the current work (e.g. context filling up) | Standalone skill (not a `plan-management` mode). Always emits a copy-pasteable next-session prompt (docs to read + current work + next step) inside a code fence. If `.claude/active-plan` exists, also refreshes that plan tree's live `<slug>-handoff.md` in place — no journal append, no active-plan write. Reads `.claude/active-plan`; never writes it. |
-| `git-manager` | Every commit, push, PR | All git operations — never use Bash git directly. Includes plan-state validator (Task 11): refuses commits on in-scope files if `.claude/active-plan` points to a plan doc that is not staged. Includes pre-staged invariant check (Step 2.5): refuses commits when the staged set doesn't match the `files:` parameter, protecting the validator and pre-commit hook from gating on a phantom set. Finish workflow is multi-backend: auto-detects from `git remote get-url origin` (github → `gh pr create`, bitbucket → REST API with an API token retrieved via `git credential fill`, else manual) with optional `git.backend` override in `project.json`. Includes `smoke-commit` workflow (4b) — disposable commit for validation tests with mandatory auto-revert; replaces the old "caller remembers to reset" contract. |
+| `git-manager` | Every commit, push, PR, branch switch, or post-merge cleanup | All git operations — never use Bash git directly. Includes plan-state validator: refuses commits on in-scope files if `.claude/active-plan` points to a plan doc that is not staged. Includes pre-staged invariant check (Step 2.5): refuses commits when the staged set doesn't match the `files:` parameter. **Branch binding (P2):** stores `claude.expectedBranch` in native per-worktree git config (git ≥ 2.20); the `commit` Step 5.5 soft-warn fires when current branch ≠ expected branch (non-blocking). **`switch` workflow:** context-switches branch + rebinds `claude.expectedBranch`; delegates plan repointing to `plan-management repoint`. **`clean-gone` workflow:** prunes local tracking branches whose upstream was deleted post-merge; triggers post-merge codebase-graph reindex when `.claude-init/CODEBASE.md` exists. **`finish` workflow:** host-blind PR creation via the host-adapter contract in `references/host-adapters.md` (four operations: `detect_host`, `auth_preflight`, `create_pr`, `read_pr`; adapters: `github`/`gitlab`/`bitbucket`/`manual`; adding a host = one adapter block, no edit to `finish`). Resolves merge strategy from `project.json git.merge-strategy` (glob map → squash/merge-commit/rebase; default squash); previews promotion conflicts via read-only `git merge-tree` dry-run (merge-commit strategy, git ≥ 2.38); checks host merge-method divergence via `read_pr`. **PR-size soft-warn** in `publish` and `finish`: advisory when diff exceeds `project.json git.pr-sizing.ceiling-loc`; posture `new` vs `ongoing` controls tone; never blocks. Includes `smoke-commit` workflow — disposable commit for validation tests with mandatory auto-revert. |
 | `plan-management` | After every Jira ticket creation or status transition | Keeps TODO.md current. Modes: `divergence` (atomic three-write: journal append + plan edit + handoff refresh), `spawn-subplan` (scaffold child plan + journal entry + update active-plan), `close-subplan` (rollup closeout entry + revert active-plan). |
 | `plan-gate` | Auto after `writing-plans` | Adherence audit runs in parallel with architect review (Task 12). Jira ticket creation and test-builder steps are skipped when `jira.enabled=false` or `tdd=false` in `project.json`. **Sub-plan mode:** detected by plan-doc path shape (3+ segments under `plans/` → Form A sub-plan); architect + adherence-audit run, but test-strategy, test-builder, Jira creation, and TODO.md registration skip. Optional `mode: minimal` argument runs architect only. **Plan-type frontmatter:** if `plan-type: test-suite-addition` in plan's frontmatter, Step 3 (test-builder) skips because the deliverable IS the test suite. |
 | `using-git-worktrees` | Feature work needing isolation | Creates worktrees; pairs with `finishing-a-development-branch`. Captures the base branch at invocation (`git symbolic-ref --short HEAD`, or SHA with `sha:` prefix on detached HEAD) and persists per-worktree to `.claude/worktrees/<wt-name>/base-branch` so cleanup restores the original context. Accepts optional `BASE` parameter override. Pattern mirrors git's own per-worktree metadata in `.git/worktrees/<name>/`. |
