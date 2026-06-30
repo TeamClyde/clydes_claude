@@ -6,7 +6,7 @@ description: >
   state, or when a plan deviation is discovered, a sub-plan is spawned, or a
   sub-plan is ready to close. Invoke after every ticket creation or status
   transition to keep TODO.md current; invoke for plan-doc state changes
-  (divergence, spawn-subplan, close-subplan) independently of Jira.
+  (divergence, spawn-subplan, close-subplan, repoint) independently of Jira.
 argument-hint: "status:created|in_progress|completed|backlog|reconcile|divergence|spawn-subplan|close-subplan|repoint ticket-key:PROJ-N plan-doc:plans/slug/<slug>-plan.md summary:'...'"
 allowed-tools: Read, Write, Edit
 ---
