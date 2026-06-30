@@ -219,7 +219,10 @@ X5–X7 are stop-conditions: any failure blocks the task's ✅. X8 failure is lo
 
 ## Decisions
 
-No accepted ADRs yet.
+- [ADR-0007: Host-adapter capability contract for PR creation](../adr/0007-host-adapter-capability-contract.md) — PR creation goes through a four-operation host-adapter contract (`detect_host`/`auth_preflight`/`create_pr`/`read_pr`); `finish` is host-blind and adding a forge is one adapter block.
+- [ADR-0008: git-manager requests merge strategy; the host enforces](../adr/0008-git-manager-requests-host-enforces-merge-strategy.md) — git-manager resolves `git.merge-strategy`, previews promotion conflicts, and flags host-method divergence, but the host (branch-protection) enforces the actual merge.
+- [ADR-0009: Verify observed git state, not the actor's reported commit](../adr/0009-observed-state-commit-verification.md) — the SDD exit gate (X5–X8) checks observed git state against the captured BASELINE + in-scope files rather than trusting the implementer's self-reported hash.
+- [ADR-0010: Establish the working branch at brainstorming start](../adr/0010-branch-established-at-brainstorming-start.md) — a macro entry-gate creates a provisional `wip/<slug>` branch and the per-worktree `claude.expectedBranch` binding before any design/early work begins.
 
 ## Known Issues & Gotchas
 
