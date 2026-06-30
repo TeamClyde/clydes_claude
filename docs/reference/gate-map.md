@@ -8,11 +8,17 @@ flowchart LR
   ai_tool_security_reviewer --> vet_security
   architect --> researcher
   architect --> subagent_driven_development
+  brainstorming --> dispatching_parallel_agents
+  brainstorming --> librarian
   brainstorming --> researcher
+  brainstorming --> using_git_worktrees
   brainstorming --> writing_plans
   creating_tools --> writing_agents
   creating_tools --> writing_rules
   creating_tools --> writing_skills
+  delivery_cadence --> architect
+  delivery_cadence --> git_manager
+  delivery_cadence --> plan_gate
   dispatching_parallel_agents --> librarian
   dispatching_parallel_agents --> review_workflow
   doc_author --> architecture_decision_records
@@ -39,7 +45,11 @@ flowchart LR
   executing_plans --> test_runner
   finishing_a_development_branch --> git_manager
   finishing_a_development_branch --> infra_init
+  git_manager --> infra_init
+  git_manager --> plan_management
   git_manager --> secrets_handling
+  git_manager --> using_git_worktrees
+  git_manager --> writing_plans
   handoff --> plan_management
   install_vetting --> vet_capability_fit
   install_vetting --> vet_install
@@ -97,7 +107,9 @@ flowchart LR
   plugin_lifecycle --> creating_tools
   plugin_lifecycle --> using_superpowers
   project_setup --> e2e_init
+  project_setup --> git_manager
   project_setup --> infra_init
+  project_setup --> plan_gate
   project_setup --> vet_install
   project_setup --> vet_reputation
   requesting_code_review --> dispatching_parallel_agents
@@ -111,6 +123,7 @@ flowchart LR
   stack_hats --> project_setup
   stack_hats --> subagent_driven_development
   subagent_driven_development --> dispatching_parallel_agents
+  subagent_driven_development --> executing_plans
   subagent_driven_development --> jira_workflow_manager
   subagent_driven_development --> plan_management
   subagent_driven_development --> researcher
@@ -123,6 +136,7 @@ flowchart LR
   test_runner --> systematic_debugging
   using_git_worktrees --> finishing_a_development_branch
   using_git_worktrees --> infra_init
+  using_git_worktrees --> writing_plans
   using_superpowers --> architect
   using_superpowers --> creating_tools
   using_superpowers --> git_manager
@@ -166,11 +180,17 @@ flowchart LR
 | ai-tool-security-reviewer | vet-security |
 | architect | researcher |
 | architect | subagent-driven-development |
+| brainstorming | dispatching-parallel-agents |
+| brainstorming | librarian |
 | brainstorming | researcher |
+| brainstorming | using-git-worktrees |
 | brainstorming | writing-plans |
 | creating-tools | writing-agents |
 | creating-tools | writing-rules |
 | creating-tools | writing-skills |
+| delivery-cadence | architect |
+| delivery-cadence | git-manager |
+| delivery-cadence | plan-gate |
 | dispatching-parallel-agents | librarian |
 | dispatching-parallel-agents | review-workflow |
 | doc-author | architecture-decision-records |
@@ -197,7 +217,11 @@ flowchart LR
 | executing-plans | test-runner |
 | finishing-a-development-branch | git-manager |
 | finishing-a-development-branch | infra-init |
+| git-manager | infra-init |
+| git-manager | plan-management |
 | git-manager | secrets-handling |
+| git-manager | using-git-worktrees |
+| git-manager | writing-plans |
 | handoff | plan-management |
 | install-vetting | vet-capability-fit |
 | install-vetting | vet-install |
@@ -255,7 +279,9 @@ flowchart LR
 | plugin-lifecycle | creating-tools |
 | plugin-lifecycle | using-superpowers |
 | project-setup | e2e-init |
+| project-setup | git-manager |
 | project-setup | infra-init |
+| project-setup | plan-gate |
 | project-setup | vet-install |
 | project-setup | vet-reputation |
 | requesting-code-review | dispatching-parallel-agents |
@@ -269,6 +295,7 @@ flowchart LR
 | stack-hats | project-setup |
 | stack-hats | subagent-driven-development |
 | subagent-driven-development | dispatching-parallel-agents |
+| subagent-driven-development | executing-plans |
 | subagent-driven-development | jira-workflow-manager |
 | subagent-driven-development | plan-management |
 | subagent-driven-development | researcher |
@@ -281,6 +308,7 @@ flowchart LR
 | test-runner | systematic-debugging |
 | using-git-worktrees | finishing-a-development-branch |
 | using-git-worktrees | infra-init |
+| using-git-worktrees | writing-plans |
 | using-superpowers | architect |
 | using-superpowers | creating-tools |
 | using-superpowers | git-manager |

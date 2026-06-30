@@ -160,6 +160,13 @@
     },
     {
       "type": "rule",
+      "name": "delivery-cadence",
+      "description": "Short-lived branches, frequent pushes, trunk stays deployable. This rule covers how to size PRs and slice work so that principle holds in practice.",
+      "title": "Delivery Cadence — PR Sizing and Branch Lifecycle",
+      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\delivery-cadence.md"
+    },
+    {
+      "type": "rule",
       "name": "doc-tools",
       "description": "| Quadrant | Location | User need | |---|---|---| | Tutorials | docs/tutorials/ | Learning | | How-To | docs/how-to/ | Doing | | Reference | docs/reference/ | Information | | Explanation | docs/explanation/ | Understanding |",
       "title": "Doc Tools",
@@ -521,7 +528,19 @@
     },
     {
       "from": "brainstorming",
+      "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "brainstorming",
+      "to": "librarian"
+    },
+    {
+      "from": "brainstorming",
       "to": "researcher"
+    },
+    {
+      "from": "brainstorming",
+      "to": "using-git-worktrees"
     },
     {
       "from": "brainstorming",
@@ -538,6 +557,18 @@
     {
       "from": "creating-tools",
       "to": "writing-skills"
+    },
+    {
+      "from": "delivery-cadence",
+      "to": "architect"
+    },
+    {
+      "from": "delivery-cadence",
+      "to": "git-manager"
+    },
+    {
+      "from": "delivery-cadence",
+      "to": "plan-gate"
     },
     {
       "from": "dispatching-parallel-agents",
@@ -645,7 +676,23 @@
     },
     {
       "from": "git-manager",
+      "to": "infra-init"
+    },
+    {
+      "from": "git-manager",
+      "to": "plan-management"
+    },
+    {
+      "from": "git-manager",
       "to": "secrets-handling"
+    },
+    {
+      "from": "git-manager",
+      "to": "using-git-worktrees"
+    },
+    {
+      "from": "git-manager",
+      "to": "writing-plans"
     },
     {
       "from": "handoff",
@@ -877,7 +924,15 @@
     },
     {
       "from": "project-setup",
+      "to": "git-manager"
+    },
+    {
+      "from": "project-setup",
       "to": "infra-init"
+    },
+    {
+      "from": "project-setup",
+      "to": "plan-gate"
     },
     {
       "from": "project-setup",
@@ -933,6 +988,10 @@
     },
     {
       "from": "subagent-driven-development",
+      "to": "executing-plans"
+    },
+    {
+      "from": "subagent-driven-development",
       "to": "jira-workflow-manager"
     },
     {
@@ -978,6 +1037,10 @@
     {
       "from": "using-git-worktrees",
       "to": "infra-init"
+    },
+    {
+      "from": "using-git-worktrees",
+      "to": "writing-plans"
     },
     {
       "from": "using-superpowers",

@@ -159,6 +159,13 @@
   },
   {
     "type": "rule",
+    "name": "delivery-cadence",
+    "description": "Short-lived branches, frequent pushes, trunk stays deployable. This rule covers how to size PRs and slice work so that principle holds in practice.",
+    "title": "Delivery Cadence — PR Sizing and Branch Lifecycle",
+    "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\delivery-cadence.md"
+  },
+  {
+    "type": "rule",
     "name": "doc-tools",
     "description": "| Quadrant | Location | User need | |---|---|---| | Tutorials | docs/tutorials/ | Learning | | How-To | docs/how-to/ | Doing | | Reference | docs/reference/ | Information | | Explanation | docs/explanation/ | Understanding |",
     "title": "Doc Tools",

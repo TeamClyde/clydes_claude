@@ -28,6 +28,7 @@
 | hook | stack-hat-directive | sessionStart |  |
 | hook | subagent-prefix-prepend | preToolUse |  |
 | rule | cspell |  | When you encounter a spellcheck false positive for a technical term, add it to **both** of the follo |
+| rule | delivery-cadence |  | Short-lived branches, frequent pushes, trunk stays deployable. This rule covers how to size PRs and  |
 | rule | doc-tools |  | \| Quadrant \| Location \| User need \| \|---\|---\|---\| \| Tutorials \| docs/tutorials/ \| Learnin |
 | rule | filesystem/efficiency |  | Before reading or searching files, identify the minimum set needed. Do not read files speculatively. |
 | rule | filesystem/path-portability |  | Skills, agents, and scripts run in a shell, but the paths they produce are often consumed by **nativ |
