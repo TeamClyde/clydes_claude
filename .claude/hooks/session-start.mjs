@@ -131,17 +131,50 @@ try {
     process.stderr.write(`session-start: stale-check failed: ${err.message}\n`);
   }
 
-  // ── Step 5 & 6: Build and emit output ────────────────────────────────────
-  const conflictPrompt =
-    'If your work today targets a different plan, edit .claude/active-plan to point at the correct plan.md, or invoke /switch-plan when available.';
+  // ── Step 5: Branch-mismatch warning ─────────────────────────────────────
+  let branchWarning = '';
+  try {
+    const currentBranch = execFileSync(
+      'git',
+      ['-C', REPO_ROOT, 'branch', '--show-current'],
+      { encoding: 'utf8', timeout: 10_000 }
+    ).trim();
 
-  const output = [
+    if (currentBranch) {
+      let expectedBranch = '';
+      try {
+        expectedBranch = execFileSync(
+          'git',
+          ['-C', REPO_ROOT, 'config', '--worktree', '--get', 'claude.expectedBranch'],
+          { encoding: 'utf8', timeout: 10_000 }
+        ).trim();
+      } catch {
+        // Key unset or non-zero exit — no binding, skip silently.
+      }
+
+      if (expectedBranch && currentBranch !== expectedBranch) {
+        branchWarning = `⚠ Active plan expects branch '${expectedBranch}' but you are on '${currentBranch}'.`;
+      }
+    }
+  } catch {
+    // Branch detection failure is non-fatal — skip silently.
+  }
+
+  // ── Step 6: Build and emit output ────────────────────────────────────────
+  const conflictPrompt =
+    'If your work today targets a different plan, edit .claude/active-plan to point at the correct plan.md, or use the git-manager switch workflow.';
+
+  const outputParts = [
     `${staleWarning}📋 Active plan: ${activePlanDisplay}\n`,
     handoffContent,
     `\n---\n${conflictPrompt}`,
-  ].join('\n');
+  ];
 
-  process.stdout.write(output + '\n');
+  if (branchWarning) {
+    outputParts.push(branchWarning);
+  }
+
+  process.stdout.write(outputParts.join('\n') + '\n');
   process.exit(0);
 } catch (err) {
   process.stderr.write(`session-start hook error: ${err.message}\n`);

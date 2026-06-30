@@ -40,7 +40,7 @@ Apply these overrides:
 
 ## Gate Chain — Watchdog Wrapper
 
-The gate chain (Steps 1 → 2 → Checkpoint → 3 → 4 → 5 → 6) runs as a **Shape C — Sequential chain** (per `dispatching-parallel-agents` §"Dispatching in prose" Shape C — Sequential chain). The chain halts on the first ABANDONED step.
+The gate chain (Steps 1 → 1a → 2 → Checkpoint → 3 → 4 → 5 → 6) runs as a **Shape C — Sequential chain** (per `dispatching-parallel-agents` §"Dispatching in prose" Shape C — Sequential chain). The chain halts on the first ABANDONED step.
 
 **Per-step watchdog rule:** Every Agent/Skill dispatch in the gate chain carries a bounded per-step expectation. If a step does not complete within that bound it is declared **ABANDONED**: halt the chain immediately and surface the partial gate state to the user (which steps completed, which step timed out). Do not skip ahead. Do not silently drop the hang.
 
@@ -76,7 +76,43 @@ Step 1 dispatches a **7-criterion architect panel** (Shape A — Dimensional-rev
 
 `warning` / `Strengths` findings are informational only; plan-gate proceeds.
 
-**On APPROVED** → proceed to Step 2.
+**On APPROVED** → proceed to Step 1a.
+
+---
+
+### Step 1a — PR-Size Surface (Non-Blocking)
+
+**Never blocks the gate.** This step only surfaces information — the plan always proceeds to Step 2 regardless of what is found here.
+
+After the architect panel produces its APPROVED verdict, collect any tasks flagged with a slicing concern. Two sources produce these flags:
+
+1. **Architect slicing lens** — Criterion 7 of the architect panel flags oversized tasks as `warning`-severity and proposes vertical-slice decompositions. If any `warning` findings reference task size or slicing, they are already in the architect's output.
+2. **Plan-author flag** — the plan doc's per-task sections may contain an `> **Expected PR size:** Projected over the ceiling` note (written at authoring time per `skills/writing-plans/SKILL.md` § Expected PR Size).
+
+**Posture-aware behavior:** read `project.json` `git.pr-sizing.posture`:
+
+| Posture | Behavior |
+|---------|----------|
+| `new` | Surface each flagged task with a slicing prompt (see below). |
+| `ongoing` | Surface in advisory tone only — no prompt, one-line mention per flagged task. |
+| absent (default) | Same as `ongoing` — advisory only. |
+
+**Surface format (when `posture: new` or any flag exists):**
+
+After the APPROVED verdict and before moving to Step 2, output a short, non-blocking notice:
+
+> "One or more tasks are projected over the PR-size ceiling (see `rules/delivery-cadence.md`):
+> - **Task [name]** — [architect's slicing note or plan-author flag]. Consider vertical-slicing this.
+>
+> This is advisory — execution continues automatically. If you have a slicing suggestion, share it now and it will be recorded; otherwise the plan proceeds to the next gate step."
+
+**Do not wait for a reply** — proceed to Step 2 immediately after surfacing the notice. The prompt is informational, not a gate condition. If the user replies with a slicing instruction before Step 2 begins, record their response as a plan-management divergence note; otherwise continue.
+
+**When nothing is flagged:** skip this step entirely — do not output a notice.
+
+This step is the surface point; it is not detection. Detection belongs to the architect slicing lens (during review) and the plan author (at authoring time). plan-gate does not re-analyze task scope here.
+
+See also: `rules/delivery-cadence.md` § Cross-References for the full consumer list.
 
 ---
 
@@ -175,6 +211,7 @@ When plan-gate is invoked on a **Form-A sub-plan**, a reduced gate runs: the par
 | Step | Standard mode | Sub-plan mode |
 |------|---------------|---------------|
 | 1 — Architect | run | **run** — hard-gate on `error` findings, 3-round cap (identical to standard) |
+| 1a — PR-size surface | run (non-blocking) | **run** — advisory only regardless of posture; sub-plans are part of a larger flow, so posture is always treated as `ongoing` |
 | Adherence soft-gate | — | **run** — after architect APPROVED, dispatch `Skill { skill: "adherence-audit", args: "plan-doc: plans/<parent>/<child>/<child>-plan.md" }`. Its Phase 9 surfaces drift the sub-plan would introduce. `[Plan-Introduced]` `error` findings are surfaced and resolved before execution; `warning`/`note` are informational. **Soft-gate — never deadlocks the gate.** |
 | 2 — Test strategy | run | **skip** — the parent plan owns the `## Testing Plan` |
 | 3 — Test builder | run | **skip** |

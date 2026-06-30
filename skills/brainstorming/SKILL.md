@@ -23,6 +23,7 @@ Every project goes through this process. A todo list, a single-function utility,
 You MUST create a task for each of these items and complete them in order:
 
 1. **Explore project context** — read project.json → read codebase-entry file if set → read plan doc if one exists → stop (see Orientation Protocol in using-superpowers)
+1.5. **Establish branch context** (new top-level design work only) — ensure a fresh isolated branch exists before design begins, so design and early work never land on the previous epic's branch. See the Establish Branch Context section below. SKIP entirely for sub-plans, for continuing an active in-progress plan, and when already on a fresh feature branch whose `claude.expectedBranch` is unset or points to a non-completed plan.
 2. **Offer visual companion** (if topic will involve visual questions) — this is its own message, not combined with a clarifying question. See the Visual Companion section below.
 3. **Dispatch light-research subagent** — `subagent_type: general-purpose`, `model: haiku`; append result to Research appendix. Skip if `[skip-research]` in info dump. See Research Bookends section below.
 4. **User gate — review light research** — "Light research complete. Review before I ask questions?" Wait for user input before proceeding.
@@ -75,6 +76,8 @@ You MUST create a task for each of these items and complete them in order:
 ```dot
 digraph brainstorming {
     "Orient to repo context" [shape=box];
+    "Step 1.5 — new top-level design work?\n(skip for sub-plan / continued plan)" [shape=diamond];
+    "Establish branch context\nwip/<provisional-slug> off fresh main\n(confirm first)" [shape=box];
     "Visual questions ahead?" [shape=diamond];
     "Offer Visual Companion\n(own message, no other content)" [shape=box];
     "[skip-research] in info dump?" [shape=diamond];
@@ -92,7 +95,10 @@ digraph brainstorming {
     "User reviews spec?" [shape=diamond];
     "Invoke writing-plans skill" [shape=doublecircle];
 
-    "Orient to repo context" -> "Visual questions ahead?";
+    "Orient to repo context" -> "Step 1.5 — new top-level design work?\n(skip for sub-plan / continued plan)";
+    "Step 1.5 — new top-level design work?\n(skip for sub-plan / continued plan)" -> "Establish branch context\nwip/<provisional-slug> off fresh main\n(confirm first)" [label="yes — fire"];
+    "Step 1.5 — new top-level design work?\n(skip for sub-plan / continued plan)" -> "Visual questions ahead?" [label="no — skip"];
+    "Establish branch context\nwip/<provisional-slug> off fresh main\n(confirm first)" -> "Visual questions ahead?";
     "Visual questions ahead?" -> "Offer Visual Companion\n(own message, no other content)" [label="yes"];
     "Visual questions ahead?" -> "[skip-research] in info dump?" [label="no"];
     "Offer Visual Companion\n(own message, no other content)" -> "[skip-research] in info dump?";
@@ -116,6 +122,61 @@ digraph brainstorming {
 ```
 
 **The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.
+
+## Establish Branch Context
+
+This is the **MACRO entry-gate** — it establishes a fresh isolated branch at the start of a *new top-level design effort* so design and early work never land on the previous epic's branch. It runs once, right after orientation, before any research or visual-companion offer. It is distinct from the MICRO per-task entry gate that lives in subagent-driven-development.
+
+This step sets up git context only. It does **not** write code, scaffold, or invoke any implementation skill — the `<HARD-GATE>` above is fully intact through this step.
+
+### Guard — fire only for new top-level design work
+
+Determine whether to fire from the orientation context (Step 1) plus a few read-only git signals. When in doubt, SKIP — a missed branch is recoverable (writing-plans still branches), but branching mid-plan is disruptive.
+
+**SKIP this step when any of the following hold:**
+
+- **Continuing an active in-progress plan** — `.claude/active-plan` is set and the user's intent is to keep working that plan. Brainstorming here is refining existing work, not starting a new epic.
+- **Brainstorming a sub-plan** — the info dump references a parent plan, or `.claude/active-plan` points to an in-progress plan being extended (orientation determined this is sub-plan work). Sub-plans inherit the parent epic's branch; they never branch fresh.
+- **Already on a fresh feature branch** — the current branch is not `main`/`master`, and its `claude.expectedBranch` binding is unset OR points to a plan that is **not** completed/closed. You are already isolated on live work; do nothing.
+
+**FIRE this step when any of the following hold:**
+
+- Current branch is `main` or `master`, OR
+- `claude.expectedBranch` points to a completed/closed plan (the prior epic shipped and you're still parked on its branch), OR
+- The current branch's upstream is gone / its PR is merged (the prior epic shipped via PR).
+
+**Determining "the prior PR is merged" — pure-git first.** Brainstorming MUST work offline and on `manual` hosts, so derive this from git alone as the primary path:
+
+- `git branch -vv` shows `: gone]` next to the current branch → its upstream was deleted (the standard post-merge cleanup signal), OR
+- `git branch --merged origin/<base>` lists the current branch → it is fully contained in `origin/<base>` and has therefore landed. (`<base>` = `project.json` `git.main-branch`, default `main`)
+
+Either signal alone is sufficient to treat the prior work as shipped.
+
+**Optional corroboration (never load-bearing).** Only if the P1 `read_pr` host-adapter is readily available AND the resolved host is not `manual`, you MAY call it to corroborate a merged/closed state. Treat its result as a tiebreaker for an ambiguous pure-git read — never a dependency. Do NOT call it on `manual` hosts (it returns `unavailable`) and do NOT block, wait, or error on it when offline or when auth is missing. The pure-git signals decide; `read_pr` only confirms. The adapter contract (`read_pr` operation, `{state, url, merge_method?}` / `unavailable` return shape) is defined in `references/host-adapters.md`; git-manager's § 5 `finish` is the consumer that calls it.
+
+### Confirm + create
+
+When the guard fires, ask the user **one** brief confirm line and wait:
+
+> "Starting new work — I'll branch off fresh `<base>` as `wip/<provisional-slug>`. OK?"
+
+`<provisional-slug>` is a kebab-case short form derived from the user's info-dump topic (e.g. an info dump about host-agnostic git handling → `wip/host-agnostic-git`). It is provisional — `writing-plans` renames it to the canonical branch once the real slug is born (see below).
+
+On **yes**:
+
+1. `git fetch origin && git checkout <base> && git pull origin <base>`
+2. `git checkout -b wip/<provisional-slug>` — a **lightweight branch in the current working directory**. Do NOT create a worktree or a new directory here; `using-git-worktrees` may later move execution into a worktree, carrying the binding with it.
+3. Enable the per-worktree binding and set `claude.expectedBranch` to `wip/<provisional-slug>` **per git-manager's § Branch Binding (P2)** — that section owns the `git ≥ 2.20` version gate, the one-time `extensions.worktreeConfig` enable, and the `git config --worktree` set. Reference it; do not re-specify the commands here. On git `< 2.20` the binding is skipped silently (no binding), exactly as that section prescribes — branch creation still succeeds.
+
+On **no**: respect the user's choice, stay on the current branch, and proceed to Step 2 without branching.
+
+### Provisional → canonical handoff
+
+The `wip/<provisional-slug>` branch is intentionally throwaway-named. Once the design is approved and `writing-plans` mints the real slug, **`writing-plans` renames this branch to the canonical `<slug>` branch and refreshes the `claude.expectedBranch` binding** (cross-reference: writing-plans § branch rename). Do not pre-empt that rename here — leave the `wip/` name in place.
+
+### Respect existing brainstorming controls
+
+This step honours the same controls as the rest of the checklist: it does **not** fire when the user passes a `[skip-research]`-style continuation marker signalling resumed work, nor when orientation (Step 1) already determined this is a sub-plan. Those are SKIP conditions, identical in spirit to the research opt-outs.
 
 ## The Process
 

@@ -66,6 +66,8 @@ Ask these questions one at a time. Record answers for Phase 3.
 
 3b. **Git** — PR backend? Auto-detected from `git remote get-url origin` if you skip this — only set it explicitly for enterprise hosts (e.g. `github.mycompany.com`, self-hosted Bitbucket Data Center). Options: `github` | `bitbucket` | `manual`. Omit the field unless the auto-detection would get it wrong.
 
+3c. **Git** — PR size posture? Heuristic: brand-new / empty repo → `new`; existing codebase with history → `ongoing`. See `rules/delivery-cadence.md` for the full policy (thresholds, slicing patterns, cadence semantics). Propose the detected value and ask the user to confirm — never silently write. On confirm, write `git.pr-sizing.posture` to `project.json`.
+
 4. **Workflow** — Enable architect review before execution? (default: yes)
 
 5. **Workflow** — Enable TDD for this repo? (default: yes — set to no for config/infra/markdown-only repos)
@@ -156,6 +158,38 @@ After writing, validate:
 ```bash
 python -m json.tool project.json
 ```
+
+### git config fields
+
+The `git` block supports these optional fields beyond `main-branch`, `require-jira-key-in-commits`, and `backend`:
+
+**`git.merge-strategy`** — a map of branch-pattern → merge strategy. Consumed by `git-manager finish` to resolve the intended merge strategy for the PR's target branch before opening the PR. Enforcement is always host-side (branch-protection rules or repository merge settings).
+
+```jsonc
+"git": { "merge-strategy": { "main": "squash", "release/*": "merge-commit", "prod": "merge-commit" } }
+```
+
+Valid values: `"squash"` | `"merge-commit"` | `"rebase"`.
+
+Matching is glob-based and order-independent:
+- Exact branch name beats any wildcard.
+- Among wildcards, the longest (most-specific) pattern wins.
+- Default when the map is absent or no pattern matches: `squash`.
+
+Omit this field if the repo uses a single uniform strategy — the `squash` default covers the common case.
+
+**`git.pr-sizing`** — PR size guidance thresholds and enforcement posture. Consumed by `git-manager` and `plan-gate` to surface soft warnings or escalation markers when PRs exceed size targets. See `rules/delivery-cadence.md` for the full policy (thresholds, slicing patterns, cadence semantics).
+
+```jsonc
+"git": { "pr-sizing": { "posture": "new" | "ongoing", "target-loc": 200, "ceiling-loc": 400 } }
+```
+
+- `posture: "new"` — sizing conventions applied from the start; every PR expected to fit thresholds.
+- `posture: "ongoing"` — advisory ratchet; thresholds inform but never block.
+- `target-loc` / `ceiling-loc` — default to `200` / `400` if omitted.
+- **Absent `git.pr-sizing` entirely** — advisory-only behavior; no plan-gate escalation surfacing, but git-time size soft-warn remains available at defaults (200/400).
+
+Omit this field to accept advisory-only behavior with default thresholds.
 
 ---
 

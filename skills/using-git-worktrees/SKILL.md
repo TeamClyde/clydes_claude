@@ -123,7 +123,25 @@ cd "$path"
 wt_name=$(basename "$path")
 mkdir -p ".claude/worktrees/$wt_name"
 printf '%s\n' "$base_ref" > ".claude/worktrees/$wt_name/base-branch"
+
+# Set the expected-branch binding (P2) for this worktree — native per-worktree
+# git config, NOT a sidecar. Downstream checks (session-start, SDD exit gate)
+# warn when HEAD drifts off this branch. Requires git >= 2.20; on older git the
+# --worktree write falls back to local config, so skip silently and bind nothing.
+# Portable version check (POSIX integer comparison — avoids GNU-only sort -V;
+# strips the .windows.N suffix that git for Windows appends).
+v=$(git version | awk '{print $3}')          # e.g. 2.39.0  or  2.43.0.windows.1
+major=$(printf '%s' "$v" | cut -d. -f1)
+minor=$(printf '%s' "$v" | cut -d. -f2)
+if [ "${major:-0}" -gt 2 ] || { [ "${major:-0}" -eq 2 ] && [ "${minor:-0}" -ge 20 ]; }; then
+  git config --file "$(git rev-parse --git-common-dir)/config" extensions.worktreeConfig true
+  git config --worktree claude.expectedBranch "$BRANCH_NAME"
+fi
 ```
+
+The `base-branch` sidecar above is retained — it serves a different purpose (cleanup restore by `finishing-a-development-branch`) and is not replaced by this binding.
+
+**Accepted pitfall:** a later branch rename or rebase stales the binding, producing one ignorable soft-warn downstream; it self-heals on the next `switch`/`start-work`/`writing-plans` rename. Documented, not engineered around.
 
 ### 3. Run Project Setup
 

@@ -114,6 +114,21 @@ Then: Cleanup worktree (Step 5)
 
 #### Option 2: Push and Create PR
 
+Before delegating, surface two branch-health signals alongside each other:
+
+**Branch age:** `git log --oneline | wc -l` commits; age from `git log --format="%ar" | tail -1`. If the branch has been open more than 5 days, note it.
+
+**Branch size (advisory):** Run `git diff --stat origin/<base-branch>...HEAD` and note the lines and file count. If the diff exceeds `git.pr-sizing.ceiling-loc` from `project.json` (default 400 lines) OR exceeds 50 files, surface an advisory suggesting a split before opening the PR. This is a heuristic proxy for logical change size (see `rules/delivery-cadence.md`) — it is informational, never a block.
+
+Example (combine into a single status note when both signals are present):
+```
+Branch health: 8 days old, ~620 lines changed across 14 files (--stat is a heuristic proxy).
+Consider splitting before opening the PR — see rules/delivery-cadence.md for slicing patterns.
+Proceeding to open the PR.
+```
+
+These signals are advisory only — surface them, then continue to the Skill call. Do not gate or wait for confirmation on them (the user already chose Option 2). If neither signal is triggered, proceed silently to the Skill call.
+
 Delegate to the `git-manager` skill's `finish` workflow — it handles push + PR creation with multi-backend dispatch (GitHub / Bitbucket / manual fallback) and the preflight check for backend tooling:
 
 ```
@@ -186,7 +201,7 @@ After **Option 1 (Merge Locally)** — once the feature branch has actually merg
 - Pass the **correct, fully-qualified absolute path** of the repository to `index_repository` so the index persists against the right project.
 - **Confirm persistence:** after indexing, call `list_projects()` and verify an entry matches this repository. If none matches, surface that to the user rather than reporting success.
 
-Do **not** reindex for **Option 2 (Push and Create PR)** — the code has not merged into the base branch yet (the PR is still open), so indexing would capture unmerged feature-branch state. Tell the user to re-run `/infra-init` after the PR is merged. Skip entirely for Option 3 (Keep As-Is) and Option 4 (Discard).
+Do **not** reindex for **Option 2 (Push and Create PR)** — the code has not merged yet (the PR is still open), so indexing would capture unmerged feature-branch state. No separate reindex step is needed: when you next run `git-manager clean-gone` after the PR merges (which prunes the merged branch), it detects the merged deletion and reindexes the codebase graph as part of that cleanup. Skip entirely for Option 3 (Keep As-Is) and Option 4 (Discard).
 
 ## Quick Reference
 

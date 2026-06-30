@@ -102,6 +102,55 @@ plans/<slug>/<slug>-plan.md
 
 Create the file if it doesn't exist. Overwrite if it does.
 
+### Branch Promotion (`wip/*` → canonical)
+
+This step runs **only for top-level plans** (skip for sub-plans — see Sub-Plan Exception below).
+
+After the slug and plan type are known, promote the provisional brainstorming branch to the canonical name and refresh the binding.
+
+**Determine plan type** from the plan's nature (use one of: `feature`, `fix`, `chore`, `docs`). The canonical branch name is `<type>/<slug>`.
+
+**Step 1 — Rename (only if current branch is `wip/*`)**
+
+```bash
+current=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$current" == wip/* ]]; then
+  git branch -m "$current" <type>/<slug>
+fi
+```
+
+If the current branch is NOT a `wip/*` branch (e.g., brainstorming's establish step was skipped because work was already on a feature branch), skip the rename entirely.
+
+**Step 2 — Remote cleanup (only if the `wip/*` branch was pushed)**
+
+The `wip/*` branch is normally LOCAL only — brainstorming does not push it. Only run this block if the old branch had a remote tracking ref:
+
+```bash
+# Check for a remote tracking ref on the old provisional branch name
+if git ls-remote --heads origin "$current" | grep -q .; then
+  git push origin --delete "$current"
+  git push -u origin <type>/<slug>
+fi
+```
+
+Skip this block entirely if the `wip/*` branch was local-only (the common case). No spurious `git push --delete` on a branch that was never pushed.
+
+**Step 3 — Refresh the binding**
+
+The worktree already has `extensions.worktreeConfig` enabled (brainstorming's establish step did this). Just update the value — do NOT re-run the enable or version gate:
+
+```bash
+git config --worktree claude.expectedBranch <type>/<slug>
+```
+
+For the full `git config --worktree` command, see `skills/git-manager/SKILL.md` § Branch Binding (P2).
+
+**Step 4 — Update the handoff `Branch:` field**
+
+In the just-scaffolded `<slug>-handoff.md`, replace the `[branch name]` placeholder in the `**Branch:**` line with the canonical branch name `<type>/<slug>`.
+
+**No-op guard:** if the current branch is NOT `wip/*`, skip Steps 1–2. Still run Steps 3–4 to ensure `claude.expectedBranch` matches the current branch (whatever it is) and the handoff `Branch:` field reflects it accurately.
+
 ---
 
 ## Sub-Plan Exception (Form A)
@@ -283,6 +332,21 @@ Use this style when a task's execution is delegating to a specialist skill rathe
 ````
 
 Both styles end with a commit step via `git-manager`. Inline-code tasks commit source files; dispatch-style tasks commit the files the specialist produced or modified.
+
+## Expected PR Size (Planning Consideration)
+
+While writing each task, consider its projected PR size. The measure is **logical change + file count + intent** — not raw line count (consistent with `rules/delivery-cadence.md`). Ask: "how much new behavior or structure does this task introduce?"
+
+The ceiling comes from `project.json` `git.pr-sizing.ceiling-loc` (default `400` when absent). When a task looks likely to exceed that ceiling, note it inline in the task section:
+
+```markdown
+> **Expected PR size:** Projected over the ceiling — consider vertical-slicing this task.
+> Slice suggestion: [e.g., "deliver the data layer first, then the UI wiring as a follow-on task"]
+```
+
+This is a **planning-time flag for the plan author** — not a mandatory column in the Task Reference table, not a hard block, and not a gate condition. The architect review (via its slicing lens — `agents/architect.md` Criterion 7(e)) and plan-gate will surface the same concern during the gate sequence, so this flag is simply a head-start: identify the problem at authoring time rather than discovering it during review.
+
+**When to flag:** a task is large when it touches many files across multiple layers, introduces a significant amount of new behavior, or is clearly non-trivial to review as a single PR. When unsure, don't flag — the architect's slicing lens will catch it.
 
 ## No Placeholders
 

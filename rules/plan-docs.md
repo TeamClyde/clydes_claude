@@ -59,7 +59,7 @@ Sizing rule: Form A when the sub-plan is itself L-sized; Form B otherwise. See `
 `.claude/active-plan` holds the relative path (from repo root) to the currently active `<slug>-plan.md`.
 
 - Single source of truth for "what am I working on right now."
-- Updated by `plan-management:spawn-subplan` (set to child) and `plan-management:close-subplan` (reverted to parent).
+- Updated by `plan-management:spawn-subplan` (set to child), `plan-management:close-subplan` (reverted to parent / cleared at tree completion), and `plan-management:repoint` (switched to a different active plan during a context switch — moves the marker, never clears it). `repoint` does not contradict the "close-subplan is the only path to clear the marker" invariant: it relocates the pointer, it does not clear it.
 - Set on plan creation; cleared on plan tree completion.
 - All triggers and hooks consult this file — never guess from heuristics.
 
