@@ -66,6 +66,8 @@ Ask these questions one at a time. Record answers for Phase 3.
 
 3b. **Git** — PR backend? Auto-detected from `git remote get-url origin` if you skip this — only set it explicitly for enterprise hosts (e.g. `github.mycompany.com`, self-hosted Bitbucket Data Center). Options: `github` | `bitbucket` | `manual`. Omit the field unless the auto-detection would get it wrong.
 
+3c. **Git** — PR size posture? Heuristic: brand-new / empty repo → `new`; existing codebase with history → `ongoing`. See `rules/delivery-cadence.md` for the full policy (thresholds, slicing patterns, cadence semantics). Propose the detected value and ask the user to confirm — never silently write. On confirm, write `git.pr-sizing.posture` to `project.json`.
+
 4. **Workflow** — Enable architect review before execution? (default: yes)
 
 5. **Workflow** — Enable TDD for this repo? (default: yes — set to no for config/infra/markdown-only repos)

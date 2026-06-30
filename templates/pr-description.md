@@ -34,3 +34,7 @@ feat(scope): brief description [PROJ-N]
 <!-- One bullet per Jira ticket referenced by this PR.                                  -->
 <!-- Format: - PROJ-N: Ticket summary (copy the ticket title verbatim)                 -->
 - PROJ-N: Ticket summary
+
+## Checklist
+
+- [ ] This PR is under the size ceiling (or explains why it isn't) — see `rules/delivery-cadence.md`
