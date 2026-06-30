@@ -477,7 +477,7 @@ git branch --merged origin/<base>
 ```
 
 - **If the branch appears in this output (merged into `origin/<base>`):**
-  Delete safely: `git branch -d <branch>`. (`-d` refuses if the branch is not fully merged, providing a backstop.)
+  Delete safely: `git branch -d <branch>`. (`-d` refuses if the branch is not fully merged, providing a backstop.) On successful deletion, set `reindex_needed = true`. (`<base>` here is the value resolved in Step 1 — the configured `git.main-branch`, defaulting to `main`. Promotion bases beyond main are out of scope for this trigger.)
 
 - **If the branch does NOT appear (not merged):**
   Flag it explicitly and require a per-branch explicit confirmation before force-deleting:
@@ -488,7 +488,7 @@ git branch --merged origin/<base>
   Type 'force-delete <branch>' to confirm.
   ```
 
-  Wait for exact typed confirmation. If confirmed: `git branch -D <branch>`. If not confirmed: skip this branch and note it in the final report.
+  Wait for exact typed confirmation. If confirmed: `git branch -D <branch>`. If not confirmed: skip this branch and note it in the final report. **Do NOT set `reindex_needed`** for force-deleted unmerged branches — that work never landed in the base branch, so the graph has not changed.
 
 If the branch has NO associated worktree: proceed directly to 6c (branch deletion). No worktree step.
 
@@ -509,9 +509,55 @@ Skipped (unmerged, not confirmed):
 
 Skipped (worktree has uncommitted changes — manual cleanup required):
   <branch-5>  (worktree at <path>)
+
+Codebase graph: <reindex triggered | skipped — no merged branches | skipped — no .claude-init/CODEBASE.md>
 ```
 
-If nothing was pruned, say so. Always report what was skipped and why.
+If nothing was pruned, say so. Always report what was skipped and why. The `Codebase graph` line is finalized by Step 8 below — assemble this summary in Step 7 but emit it once, after Step 8 completes, so the reindex outcome is included.
+
+#### Step 8 — Post-prune reindex (fires once, after the full loop)
+
+**Gate:** this step runs only when BOTH conditions are true:
+
+1. `reindex_needed` is `true`. The flag starts `false` (initialize it before the Step 6 per-branch loop) and is set `true` only by a successful merged `-d` delete in Step 6c — never by an unmerged `-D` force-delete.
+2. `.claude-init/CODEBASE.md` exists at the repo root.
+
+If either condition is false, skip this step entirely and silently — the `Codebase graph` line in the final report then states the skip reason (`skipped — no merged branches` or `skipped — no .claude-init/CODEBASE.md`).
+
+**When both conditions are met:**
+
+**Resolve the repo root in native OS form** (required — a bare `pwd` MSYS path breaks the codebase-memory MCP on Windows):
+
+```bash
+repo_root=$(git rev-parse --show-toplevel)
+```
+
+`git rev-parse --show-toplevel` emits `C:/Users/...` on Windows and `/Users/...` or `/home/...` on macOS/Linux — the correct native absolute path on every platform. Do NOT use `pwd` or `pwd -P` here; those produce MSYS-format paths on Windows that the native MCP server cannot resolve.
+
+**Resolve the project name** (required — every codebase-memory graph tool requires a `project` argument):
+
+1. Read the repo's `CLAUDE.md` and look for a "Codebase Knowledge Graph" section. Use the project name listed there.
+2. If that section is absent, call `list_projects()` (codebase-memory MCP) and find the entry whose `repo_path` matches `$repo_root`. Use its name.
+3. Do NOT derive the name from the path by hand — the slashes-to-hyphens conversion preserves internal underscores in unintuitive ways and is not reliable.
+
+**Trigger the reindex — exactly once:**
+
+Call `index_repository` (codebase-memory MCP) with:
+- `repo_path`: the native absolute path from `git rev-parse --show-toplevel` above.
+- `project`: the name resolved above.
+
+Do NOT call `index_repository` inside the per-branch loop. This is a single call made once, after all branches have been processed, using the boolean set during the loop.
+
+**Poll to completion** (inline — do not cross-reference `infra-init`):
+
+After `index_repository` returns, poll `index_status` (codebase-memory MCP, same `project` argument) in a bounded loop:
+
+- Call `index_status`. If it returns `complete`, stop polling and report success.
+- If it returns `error`, stop polling and surface the error to the user.
+- If it returns any other status (e.g., `indexing`, `pending`), wait a short interval (a few seconds) and retry.
+- Stop after up to 20 retries (a few seconds apart). If still not complete, surface: "Codebase graph reindex did not complete within the polling window — check `index_status` manually."
+
+**Report:** Update the "Codebase graph" line in the Step 7 summary to: `reindex triggered and complete` (or `reindex triggered — polling timed out` if the bounded retry count was reached).
 
 ---
 
