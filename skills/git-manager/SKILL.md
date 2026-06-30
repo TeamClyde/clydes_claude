@@ -174,6 +174,20 @@ Empty output → no binding → **no warning anywhere.** This is the soft-warn c
 2. Pull strategy: no PR open → `--rebase`; PR open → `--merge`
 3. On conflicts: list files, stop, do not auto-resolve
 4. `git log --oneline main..HEAD` — flag WIP/TODO/FIXME/debug commits
+4b. **PR-size soft-warn:** resolve the base from `project.json` `git.main-branch` (default `main` if the key is absent or `project.json` does not exist — do NOT hardcode `origin/main`). Call this value `<base>`. Run:
+
+   ```bash
+   git diff --stat origin/<base>...HEAD
+   ```
+
+   The `--stat` line-count is a **heuristic proxy** for the rule's "logical change" metric (see `rules/delivery-cadence.md`). It is an advisory signal, NOT a raw-LOC gate or a hard count — comment padding, whitespace, and generated code can inflate the number without increasing review burden. Use it to flag, not to refuse.
+
+   Read the ceiling from `project.json` `git.pr-sizing.ceiling-loc` (default `400` if absent). If the stat shows more than `<ceiling>` lines changed OR more than 50 files changed, surface a non-blocking advisory (never refuse or abort the push):
+
+   - **`posture: ongoing`** (or absent config): "Advisory: this branch diff is large (`<lines>` lines, `<files>` files — `--stat` is a heuristic proxy, not a raw-LOC gate). Consider splitting if review burden is high. See `rules/delivery-cadence.md`."
+   - **`posture: new`**: "Note: this branch diff exceeds the sizing ceiling (`<lines>` lines, `<files>` files — `--stat` is a heuristic proxy, not a raw-LOC gate). Review `rules/delivery-cadence.md` slicing patterns before opening the PR."
+   - Absent `git.pr-sizing` entirely → treat as `ongoing` and use the default ceiling.
+
 5. `git push origin <branch>`
 6. Report commit range pushed
 
@@ -294,6 +308,20 @@ This workflow is **host-blind**: it never branches on a host name. PR creation i
    - **On a concrete `merge_method` that matches `<merge-strategy>`** — silent, proceed.
 
    **git-manager requests the strategy and flags divergence; it does NOT enforce.** The host enforces the actual merge via branch-protection rules or repository merge settings. This check is advisory — it never blocks the PR.
+
+5d. **PR-size soft-warn:** reuse the already-resolved `<dst>` from step 4b (no re-read of `project.json`). Run:
+
+   ```bash
+   git diff --stat origin/<dst>...HEAD
+   ```
+
+   The `--stat` line-count is a **heuristic proxy** for the rule's "logical change" metric (see `rules/delivery-cadence.md`). It is an advisory signal, NOT a raw-LOC gate or a hard count — comment padding, whitespace, and generated code can inflate the number without increasing review burden. Use it to flag, not to refuse.
+
+   Read the ceiling from `project.json` `git.pr-sizing.ceiling-loc` (default `400` if absent). If the stat shows more than `<ceiling>` lines changed OR more than 50 files changed, surface a non-blocking advisory (never refuse or abort PR creation):
+
+   - **`posture: ongoing`** (or absent config): "Advisory: this branch diff is large (`<lines>` lines, `<files>` files — `--stat` is a heuristic proxy, not a raw-LOC gate). Consider splitting if review burden is high. See `rules/delivery-cadence.md`."
+   - **`posture: new`**: "Note: this branch diff exceeds the sizing ceiling (`<lines>` lines, `<files>` files — `--stat` is a heuristic proxy, not a raw-LOC gate). Review `rules/delivery-cadence.md` slicing patterns before opening the PR."
+   - Absent `git.pr-sizing` entirely → treat as `ongoing` and use the default ceiling.
 
 6. **`create_pr(title, body, src_branch, dst_branch)`:** open the PR through the detected adapter, where `dst_branch` is the resolved `<dst>` from step 4b — not separately derived. Pass the rendered title (`type: subject [PROJ-N]`) and body (from the template below, or the `pr-body` override). The adapter parses its host's output and returns a normalized **PR URL**; the `manual` adapter returns the sentinel `manual submission required`. The per-adapter `create_pr` blocks in `references/host-adapters.md` own all host-specific transport — `gh pr create` for GitHub, `glab mr create` for GitLab, the self-contained `git credential fill` + `curl` REST script for Bitbucket (which retrieves the credential non-interactively, builds the auth header in a variable, and unsets all secrets), and the rendered title/body for `manual`. Do not inline any of that here. All Bitbucket secret-handling guarantees live in that block.
 7. Report the PR URL returned by `create_pr` on success (or "manual submission required" with the rendered title/body for the `manual` path).
@@ -585,7 +613,7 @@ Stop immediately and surface to the user:
 
 | Condition | Warning |
 |-----------|---------|
-| Staged diff exceeds 50 files | Surface count before committing |
+| Branch diff (`git diff --stat origin/<base/dst>...HEAD`) exceeds `git.pr-sizing.ceiling-loc` lines (default 400) OR exceeds 50 files — evaluated in `publish` (step 4b) and `finish` (step 5d) | Non-blocking advisory; `--stat` is a heuristic proxy for logical change per `rules/delivery-cadence.md`, not a raw-LOC gate. Message tone scales with posture: `ongoing` → advisory note; `new` → clearer nudge. Never refuses or aborts. |
 | WIP/TODO/FIXME/debug in staged content | Flag specific lines |
 | Branch open >5 days without PR | Note it |
 | Branch >10 commits behind `main` | Recommend `sync` |
