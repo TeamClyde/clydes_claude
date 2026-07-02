@@ -173,7 +173,7 @@ The caller retains full context across the skill call. The skill does not produc
 2. Claude Code spawns a fresh subagent process with `~/.claude/agents/architect.md` as its system prompt.
 3. The subagent receives only: its system prompt, and the structured prompt from the caller. It has no access to main conversation history, no ambient rules, no tool calls from the caller's session.
 4. The `architect` agent reads the plan doc cold. If it needs to verify a cross-reference, it dispatches `researcher` as a nested agent call with a specific question.
-5. The architect returns a structured verdict (`BLOCKING` / `MINOR` / `LOOKS GOOD` / `VERDICT: APPROVED or NEEDS REVISION`).
+5. The architect classifies findings by severity (`error` / `warning` / `note`, plus Strengths worth preserving) and returns a `VERDICT: APPROVED or NEEDS REVISION` (NEEDS REVISION iff ≥1 `error`).
 6. The main context receives the result and decides what to do: revise the plan, surface blockers to the user, or proceed to `test-strategy`.
 
 The agent's isolation is what makes the review meaningful. The architect cannot be influenced by the reasoning that produced the plan.
@@ -254,7 +254,7 @@ Re-running the skill reads `progress.json` and resumes from the first incomplete
 
 - **Per-skill verify is superseded.** Prior to Wave 5 of the Orchestration & Regulation Campaign, each fan-out consumer (architect panel, `adherence-audit`, `requesting-code-review`, SDD, `librarian`, `orchestration-audit`) maintained its own ad-hoc verify step, most of which were dedup/rank-only rather than adversarial. These are replaced by the shared tiered-adversarial verify protocol (`skills/dispatching-parallel-agents/references/verify-protocol.md`). Do not introduce new per-skill verify logic; route through the shared protocol instead.
 
-- **Agent iteration limit.** The `architect` agent supports a maximum of 3 review rounds. If BLOCKING issues remain after the third pass, the main context surfaces them to the user — a fourth round is not attempted. This prevents infinite review loops but means some blocking issues require human resolution.
+- **Agent iteration model.** The `architect` agent loops until blockers clear; after 3 rounds with `error`-severity findings remaining, it pauses and surfaces them to the user as a checkpoint (continue / intervene / accept) rather than silently stopping or attempting a fourth round unbidden. This prevents infinite review loops while keeping the user in control of the stopping decision.
 
 - **Windows path portability in agent spawns.** Agents that receive file paths (e.g. `infra-init-graph-builder` receiving `.claude-init/progress.json`) must receive OS-native paths (`C:/Users/...`) not MSYS Unix paths (`/c/Users/...`). The `infra-init` skill derives `REPO_PATH` with `git rev-parse --show-toplevel` for this reason. Any new skill that spawns agents and passes paths must follow the same pattern.
 
