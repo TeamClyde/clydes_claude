@@ -67,6 +67,7 @@ digraph process {
     "Read plan, extract all tasks with full text, note context, create TodoWrite" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Dispatch final code reviewer subagent for entire implementation" [shape=box];
+    "Invoke handoff (execution-complete gate)" [shape=box style=filled fillcolor=lightyellow];
     "Use finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
     "Read plan, extract all tasks with full text, note context, create TodoWrite" -> "Assert entry gate (E1-E5)";
@@ -91,9 +92,14 @@ digraph process {
     "Mark task complete in TodoWrite" -> "More tasks remain?";
     "More tasks remain?" -> "Assert entry gate (E1-E5)" [label="yes"];
     "More tasks remain?" -> "Dispatch final code reviewer subagent for entire implementation" [label="no"];
-    "Dispatch final code reviewer subagent for entire implementation" -> "Use finishing-a-development-branch";
+    "Dispatch final code reviewer subagent for entire implementation" -> "Invoke handoff (execution-complete gate)";
+    "Invoke handoff (execution-complete gate)" -> "Use finishing-a-development-branch";
 }
 ```
+
+## Completion
+
+After the final code-reviewer subagent returns clean for the entire implementation, invoke the `handoff` skill before moving on to `finishing-a-development-branch` — the execution-complete gate. This refreshes the active plan's live `<slug>-handoff.md` in place and emits a copy-pasteable bootstrap prompt, so a walk-away or overnight resume is cheap. This composes with any existing post-completion graph-refresh step — handoff runs alongside it, not instead of it. Trigger-on-gate (final review clean), same constraint as `executing-plans` Step 3: no token-threshold signal exists to condition on.
 
 ## Model Selection
 
@@ -301,6 +307,7 @@ X1 (Task Reference ✅) and X3 (handoff refresh) are still mandatory even for tr
 After the exit gate passes:
 
 1. **If Jira enabled:** transition the task's Jira ticket to **Done** (or **Testing** if AWS verification required) via `jira-workflow-manager`. **If Jira disabled:** skip.
+1a. **Verification-pause handoff (conditional):** If this task is code-complete but requires user verification/sign-off before being marked Done — the semantic condition above ("Testing if AWS verification required"), independent of whether Jira is enabled — invoke the `handoff` skill before pausing for that sign-off, so a fresh session can resume the wait cheaply. If no per-task verification pause applies (task went straight to Done), this step does not fire — the Completion-section execution-complete handoff already covers session end.
 2. **Invoke `plan-management:completed`:** with the plan-doc path, status `completed`, and a 1–2 sentence summary. **If Jira enabled:** include `jira-key`. **If Jira disabled:** omit `jira-key` entirely. This promotes the TODO.md entry from In Progress to History.
 3. Mark the task complete in TodoWrite.
 
