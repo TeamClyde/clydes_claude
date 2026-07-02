@@ -85,6 +85,28 @@ Parent: docs/explanation/features/doc-tools.md
 
 Multi-parent ADRs (cross-cutting decisions) list one `Parent:` line per parent. The parent document's `## Decisions` section must contain a reciprocal backlink in the form `[ADR-NNNN](../adr/NNNN-<slug>.md) — <title> (Accepted)`. `docs-status` enforces both directions of this relationship via its three cross-link integrity sweeps. `doc-author`'s Step 1 backlink pass inserts the parent-side backlink automatically when `accepted-adrs` are passed; the ADR's own `## Related` section is written at ADR creation time and is immutable thereafter (except for the narrow link-hygiene repair case where an ADR was written before its canonical parent doc existed).
 
+### Diagrams by Default
+
+Documentation should include Mermaid diagrams wherever they clarify structure, flow, or relationships better than prose alone. The single source of truth for this convention is `rules/doc-tools.md` § "Diagrams by Default." Five doc-producing skills honor this convention and carry a one-line reference to the rule anchor:
+
+- `brainstorming` — includes diagrams in design docs where they illuminate the proposed solution structure
+- `writing-plans` — includes diagrams in architecture sections where they show file/module boundaries and call flow
+- `doc-author` — includes diagrams in explanation docs where they clarify component interactions or data flow
+- `architecture-decision-records` — includes diagrams in ADRs where they illustrate the problem space or decision trade-offs
+- `plan-management` — includes diagrams in feature docs synthesized at sub-plan close where they map feature structure
+
+```mermaid
+flowchart TD
+    Rule["rules/doc-tools.md<br/>§ Diagrams by Default<br/>(single source of truth)"]
+    Rule --> BS["brainstorming"]
+    Rule --> WP["writing-plans"]
+    Rule --> DA["doc-author"]
+    Rule --> ADR["architecture-decision-records"]
+    Rule --> PM["plan-management<br/>close-subplan"]
+```
+
+The convention is not "always include a diagram" but rather "include a diagram when it is the clearest way to communicate." Visual communication has a high signal-to-noise ratio when used judiciously; overuse dilutes its value. The rule anchor and all referencing skills carry guidance on when to reach for a diagram.
+
 ### When to Write an ADR
 
 | Write ADR | Skip ADR |
