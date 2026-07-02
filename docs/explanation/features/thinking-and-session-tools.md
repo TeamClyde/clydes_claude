@@ -87,6 +87,8 @@ User: /different-viewpoints-lite <problem> [hypothesis: <theory>]
 
 ### Session handoff
 
+#### User-initiated handoff (manual)
+
 ```
 User: /handoff
   → read .claude/active-plan
@@ -94,6 +96,27 @@ User: /handoff
     │                         refresh handoff doc in place; emit prompt pointing at handoff + plan
     └── no active plan → emit prompt with inline context only (no file writes)
 ```
+
+#### Auto-handoff at human gates (automatic)
+
+The `handoff` skill is also auto-triggered at three semantic gates when a plan is active. This is **not a hook** — the trigger is folded into skill steps because each gate represents a semantic decision point that only the skill knows has been reached (a tool-event hook cannot know when "the gate is complete"). Additionally, there is no tokens-remaining-in-session signal available to a skill, so the handoff fires on reaching the gate itself, never on a token threshold.
+
+```mermaid
+flowchart LR
+    PG["Planning pause<br/>(plan-gate Step 7)"] --> H["handoff<br/>(refresh handoff doc<br/>+ emit bootstrap prompt)"]
+    EC["Execution complete<br/>(executing-plans Step 3 /<br/>SDD Completion)"] --> H
+    VP["Verification-pause<br/>(conditional)"] --> H
+```
+
+The three auto-fire gates:
+
+1. **Planning pause** — `plan-gate` Step 7, after the gate completes (after architect + test-strategy and the `ExitPlanMode` decision). Non-blocking. The handoff refreshes the plan's handoff doc and emits a bootstrap prompt (via `handoff` skill output) for the next session to pick up and resume execution.
+
+2. **Execution complete** — `executing-plans` Step 3 ("Complete Development") after all code and tests are committed, and `subagent-driven-development` `## Completion` step after the final code reviewer returns clean, both before `finishing-a-development-branch`. The handoff occurs in the executing agent's context (not the main context) and refreshes the handoff doc + emits a prompt.
+
+3. **Verification-pause** — `executing-plans` Step 7a and `subagent-driven-development` Post-Exit-Gate Step 1a. This gate is **conditional** — it fires only when a task actually pauses for user verification/sign-off (e.g. before submitting a PR, before running a live deployment). On fully-automated runs with no verification gate, this trigger does not fire.
+
+Each auto-handoff follow the same refresh logic: if an active plan exists, the skill overwrites `plans/<slug>/<slug>-handoff.md` in place, updating the status table, active task, last-updated date, and open gotchas. No journal append occurs (handoff is not a divergence event).
 
 ### Feedback capture
 
