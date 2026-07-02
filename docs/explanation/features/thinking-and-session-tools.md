@@ -112,11 +112,11 @@ The three auto-fire gates:
 
 1. **Planning pause** — `plan-gate` Step 7, after the gate completes (after architect + test-strategy and the `ExitPlanMode` decision). Non-blocking. The handoff refreshes the plan's handoff doc and emits a bootstrap prompt (via `handoff` skill output) for the next session to pick up and resume execution.
 
-2. **Execution complete** — `executing-plans` Step 3 ("Complete Development") after all code and tests are committed, and `subagent-driven-development` `## Completion` step after the final code reviewer returns clean, both before `finishing-a-development-branch`. The handoff occurs in the executing agent's context (not the main context) and refreshes the handoff doc + emits a prompt.
+2. **Execution complete** — `executing-plans` Step 3 ("Complete Development") after all code and tests are committed, and `subagent-driven-development` `## Completion` step after the final code reviewer returns clean, both before `finishing-a-development-branch`. The handoff is invoked by the orchestrating context — the session running `executing-plans`, or the `subagent-driven-development` orchestrator after the final review — not by a per-task implementer subagent (which lacks `Skill`-tool access). It refreshes the handoff doc and emits a bootstrap prompt.
 
 3. **Verification-pause** — `executing-plans` Step 7a and `subagent-driven-development` Post-Exit-Gate Step 1a. This gate is **conditional** — it fires only when a task actually pauses for user verification/sign-off (e.g. before submitting a PR, before running a live deployment). On fully-automated runs with no verification gate, this trigger does not fire.
 
-Each auto-handoff follow the same refresh logic: if an active plan exists, the skill overwrites `plans/<slug>/<slug>-handoff.md` in place, updating the status table, active task, last-updated date, and open gotchas. No journal append occurs (handoff is not a divergence event).
+Each auto-handoff follows the same refresh logic: if an active plan exists, the skill overwrites `plans/<slug>/<slug>-handoff.md` in place, updating the status table, active task, last-updated date, and open gotchas. No journal append occurs (handoff is not a divergence event).
 
 ### Feedback capture
 
