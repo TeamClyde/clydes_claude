@@ -291,6 +291,7 @@ The design doc (`plans/<slug>/<slug>-design.md`) is written at Step 12, after bo
   - Slug is a kebab-case short description of the work (e.g. `auth-refactor`, `mobile-onboarding`)
   - Dates live inside the doc, not in the filename
   - (User preferences for spec location override this default)
+  - Per `rules/doc-tools.md` § "Diagrams by Default", include a Mermaid diagram where it clarifies structure or flow.
 - Use elements-of-style:writing-clearly-and-concisely skill if available
 - (`plans/` is gitignored — the design doc is a session working artifact, not committed to git)
 

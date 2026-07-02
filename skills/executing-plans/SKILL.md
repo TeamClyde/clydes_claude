@@ -93,11 +93,13 @@ X1 (Task Reference ✅) and X3 (handoff refresh) are still mandatory even for tr
 
 6. Mark task as completed
 7. If Jira enabled: Transition Jira ticket to Done (or Testing if human verification required) via jira-workflow-manager. If Jira disabled: skip.
+7a. **Verification-pause handoff (conditional):** If this task is code-complete but requires user verification/sign-off before being marked Done — the semantic condition above ("Testing if human verification required"), independent of whether Jira is enabled — invoke the `handoff` skill before pausing for that sign-off, so a fresh session can resume the wait cheaply. If no per-task verification pause applies (task went straight to Done), this step does not fire — the Step 3 execution-complete handoff already covers session end.
 8. If Jira enabled: Invoke plan-management skill: path, jira-key, status: completed, 1-2 sentence summary. If Jira disabled: invoke plan-management skill with status: completed and summary only (omit jira-key).
 
 ### Step 3: Complete Development
 
 After all tasks complete and verified:
+- **Execution-complete handoff (auto):** Invoke the `handoff` skill before announcing completion. This is the execution-complete human pause — the work is done and control is about to pass to branch-finishing, so a fresh session should be able to resume cheaply without rehydrating the full execution context. `handoff` refreshes the active plan's live `<slug>-handoff.md` in place and emits a copy-pasteable bootstrap prompt. Trigger-on-gate, not conditional on any token signal — there is no "tokens remaining in session" signal available to a skill, so this fires on reaching the gate itself, never on a token threshold.
 - Announce: "I'm using the finishing-a-development-branch skill to complete this work."
 - **REQUIRED SUB-SKILL:** Use finishing-a-development-branch
 - Follow that skill to verify tests, present options, execute choice

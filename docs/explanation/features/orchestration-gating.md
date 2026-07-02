@@ -118,9 +118,11 @@ flowchart TB
 
 `architect`'s `LOOKS GOOD` was never a severity — it labels findings worth *preserving*, which carry no problem-severity. It collapses into a **Strengths** section and the `GREEN` verdict, not into a tier. The action-bearing verdict *words* `APPROVED` / `NEEDS REVISION` are retained (callers key on them) and live on the verdict axis, mapping to `GREEN` / `RED`.
 
+**Note:** the `architect` rows above document the historical reconciliation — where the old surface labels came from. The `architect` agent now emits `error` / `warning` / `note` **natively** (per its 4-lens finding-space model — see the Runtime View "Architect review" step below); it no longer produces `BLOCKING` / `MINOR` labels for a renaming step to reconcile.
+
 **Why the rename is safe (and why it waited until now):** renaming an externally-consumed severity enum is the GCC-14 `-Werror` / Clippy breakage class — but that hazard only bites when *downstream parsers are external*. Here every consumer is **in-repo markdown read by an LLM** (`plan-gate`, `rules/planning.md`), not an external parser, so all producers and consumers are renamed **atomically in one wave**. Doing it earlier would have broken a consumer in isolation; doing it together does not.
 
-**[Wave 5] One shared verify protocol.** The review and enforcement gates (architect panel, `adherence-audit`, `requesting-code-review`, SDD, `librarian`, `orchestration-audit`) previously each rolled their own finding-verification pass — mostly dedup/rank-only, non-adversarial. [ADR-0006](../adr/0006-tiered-adversarial-verify-standard.md) establishes a single canonical verify protocol shared by all six consumers: `skills/dispatching-parallel-agents/references/verify-protocol.md` is the doc, `scripts/lib/verify.mjs` is the dependency-free engine, and `verify:check` (wired into `npm test`) enforces that the implementation's machine-readable param block byte-matches the doc so the two cannot drift. The protocol is three tiers — batched triage, clustered adversarial re-check, minority-veto 3-voter consensus on the contested tail — with per-consumer profiles carrying asymmetric cost models. Reviewers no longer roll their own verify; every fan-out routes through this one primitive.
+**[Wave 5] One shared verify protocol.** The review and enforcement gates (architect panel, `adherence-audit`, `requesting-code-review`, SDD, `librarian`, `orchestration-audit`) previously each rolled their own finding-verification pass — mostly dedup/rank-only, non-adversarial. [ADR-0006](../adr/0006-tiered-adversarial-verify-standard.md) establishes a single canonical verify protocol shared by all six consumers: `skills/dispatching-parallel-agents/references/verify-protocol.md` is the doc, `scripts/lib/verify.mjs` is the dependency-free engine, and `verify:check` (wired into `npm test`) enforces that the implementation's machine-readable param block byte-matches the doc so the two cannot drift. The protocol is three tiers — batched triage, clustered adversarial re-check, minority-veto 3-voter consensus on the contested tail — with per-consumer profiles carrying asymmetric cost models. Reviewers no longer roll their own verify; every fan-out routes through this one primitive. The architect panel's consumption of this protocol has one added wrinkle: it first partitions its review into the **4 finding-space lenses** (L1–L4) and runs **one challenge/dedup convergence pass** over the collected lens findings — that convergence pass *ends in*, and does not replace, the shared tiered/minority-veto verify described above.
 
 ### The explicit-invocation-vs-prose axis is separate and orthogonal
 
@@ -197,13 +199,32 @@ The gate-map (`docs/reference/gate-map.md`) is the authoritative record of inter
 
 `plan-gate` is the canonical soft-gate example. It is invoked by the `writing-plans` skill immediately after a plan doc is drafted, before `executing-plans` begins. The LLM reads the `plan-gate` skill file and follows its sequence as interpreted prose instructions:
 
-1. **Architect review** — the `architect` agent receives the plan doc, reviews for design soundness and self-containment, and returns APPROVED or a list of BLOCKING items.
+1. **Architect review** — the `architect` agent is dispatched as a **4-lens finding-space panel**: L1 correctness & coherence, L2 grounding & self-containment (owns the Symbol-Verification and Framework & External-Behavior sweeps), L3 systemic & standards, L4 simplicity / over-engineering. Severity is **blockers-only `error`** — nits and improvements are `warning`/`note` and never gate. After the four lenses report, a **challenge + dedup convergence pass** collapses overlapping findings, applies one shared severity bar, and filters disclosed-and-accepted risks, then runs the surviving `error` tail through the shared tiered/minority-veto verify protocol. The panel **loops until zero blockers remain**, with a **3-round checkpoint pause** (surfaced to the user — continue / intervene / accept) if blockers persist past round 3. Returns **APPROVED** or **NEEDS REVISION**. See the taxonomy section above and `agents/architect.md` / `skills/plan-gate/references/architect-panel.md` for the canonical model.
 2. **Test-strategy** — after APPROVED, the `test-strategy` agent appends a Testing section to the plan doc.
 3. **Test-builder** — produces failing tests aligned with the plan's acceptance criteria (skipped for `test-suite-addition` plans).
 4. **Jira ticket creation** — `jira-workflow-manager` agent creates Epic and Task tickets (skipped when `jira.enabled: false` in `project.json`).
 5. **TODO registration** — `plan-management` skill updates `TODO.md` with the new plan's tasks.
 
 Only after all steps pass does `executing-plans` begin. This entire sequence is **soft**: the LLM interprets each step and may, in principle, skip or abbreviate it. The `rules/` layer (particularly `rules/workflow-phases.md` and the CLAUDE.md delegation table) reinforces the sequence as a behavioral constraint, but does not make it technically impossible to bypass.
+
+The diagram below shows the 4-lens panel's flow from dispatch to verdict:
+
+```mermaid
+flowchart TB
+    PLAN["Plan doc"] --> L1["L1 — correctness & coherence"]
+    PLAN --> L2["L2 — grounding & self-containment (owns both sweeps)"]
+    PLAN --> L3["L3 — systemic & standards"]
+    PLAN --> L4["L4 — simplicity / over-engineering (warning-default)"]
+    L1 --> CONVERGE["Challenge + dedup convergence pass (dedup -> shared severity bar -> disclosed-risk filter)"]
+    L2 --> CONVERGE
+    L3 --> CONVERGE
+    L4 --> CONVERGE
+    CONVERGE --> VERIFY["Tiered / minority-veto verify (surviving error tail only)"]
+    VERIFY --> VERDICT{"Zero blockers?"}
+    VERDICT -->|"yes"| APPROVED["APPROVED"]
+    VERDICT -->|"no"| REVISION["NEEDS REVISION"]
+    REVISION -.->|"loop until clear; pause at round 3"| L1
+```
 
 **Sub-plan mode:** When `plan-gate` runs for a Form-A sub-plan, it invokes architect and adherence-audit but skips test-strategy, test-builder, Jira ticket creation, and TODO registration. The parent plan owns those. A `mode: minimal` invocation runs architect only.
 
@@ -339,6 +360,8 @@ The following edges meet the criterion but are deferred:
 | Candidate | Mechanism | Deferral reason |
 |---|---|---|
 | `mcp-governance` — no direct Jira MCP / no direct git-MCP calls | `PreToolUse` hook on `mcp__*` tools | Jira is disabled in this repo (`project.json` `jira.enabled: false`), so present enforcement value is low. Revisit when Jira is re-enabled. |
+
+**Deferred (non-hook) future work:** a deterministic completeness-lint / symbol pre-pass for the architect panel — checking that every plan-referenced symbol resolves before the LLM-judgment lenses run — is deferred future work, not yet built.
 
 ### Explicitly NOT hardenable — not tool-observable
 

@@ -8,10 +8,10 @@ Key terms used across the Claude workflow system. Listed alphabetically.
 A specialized subagent dispatched via `Agent { subagent_type: "<name>", prompt: "..." }`. Agents run in isolated context windows — they have no access to the conversation that spawned them. Used for tasks that benefit from isolation (plan review, test execution, Jira operations). See `docs/agent-architecture.md`.
 
 **architect**
-The plan-review agent. Reads a plan doc cold — with no access to the conversation that produced it — and returns BLOCKING / MINOR / LOOKS GOOD findings and a VERDICT of APPROVED or NEEDS REVISION. Invoked automatically by `plan-gate` and manually before `ExitPlanMode` for ad-hoc work.
+The plan-review agent. Reads a plan doc cold — with no access to the conversation that produced it — across 4 finding-space lenses (L1–L4), and returns `error` / `warning` / `note` findings (plus Strengths worth preserving) and a VERDICT of APPROVED or NEEDS REVISION. Invoked automatically by `plan-gate` and manually before `ExitPlanMode` for ad-hoc work.
 
 **architect gate**
-The mandatory review step before any plan proceeds to execution. Runs in `plan-gate`. Up to 3 revision cycles; if BLOCKING issues remain after 3 passes, surface to user.
+The mandatory review step before any plan proceeds to execution. Runs in `plan-gate`. Loops until blockers clear; after 3 rounds with `error`-severity findings remaining, pauses and surfaces to the user (continue / intervene / accept).
 
 **brainstorming**
 The design-first skill for M/L work. Asks clarifying questions, proposes 2–3 approaches with trade-offs, documents the chosen approach, and hands off to `writing-plans`. Output: `plans/<slug>/<slug>-design.md`.

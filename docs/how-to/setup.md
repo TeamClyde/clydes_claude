@@ -88,7 +88,7 @@ Component classes and their install targets:
 | `git-manager` skill | `/git-manager commit files:[README.md] type:chore description:"test"` on a scratch repo — should stage + commit |
 | `/infra-init` skill | run on this repo — should produce `.claude-init/CODEBASE.md` + `enrichments.json` |
 | `/e2e-init` skill | run on a sample repo — should produce `.claude/testing-plan.md` |
-| `architect` agent | invoke with any `plans/**/*-plan.md` path — should return BLOCKING / MINOR / APPROVED |
+| `architect` agent | invoke with any `plans/**/*-plan.md` path — should return `error` / `warning` findings and an APPROVED / NEEDS REVISION verdict |
 | MCP servers | `claude mcp list` — all three appear |
 
 Once verified, start any session with `/using-superpowers` to initialize the orientation protocol.

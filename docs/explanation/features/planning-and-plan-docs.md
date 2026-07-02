@@ -82,7 +82,7 @@ graph TD
 | `brainstorming` | skill | Design-exploration phase; produces `<slug>-design.md`; surfaces ADR candidates |
 | `writing-plans` | skill | Drafts the four-file plan tree from research output; self-containment threshold check |
 | `plan-gate` | skill | Sequences the gates (architect → test-strategy → test-builder → Jira → TODO); triggered on `writing-plans` completion |
-| `architect` | agent | Independent plan reviewer; returns BLOCKING / MINOR / LOOKS GOOD / VERDICT; max 3 rounds |
+| `architect` | agent | Independent plan reviewer across 4 finding-space lenses (L1–L4); blockers-only `error` severity; returns APPROVED / NEEDS REVISION with `error` / `warning` / Strengths findings; loops until clear with a 3-round pause |
 | `test-strategy` | agent | Post-architect validation; appends `## Testing` section to the plan doc |
 | `test-builder` | agent | Pre-execution test-code writer; commits failing tests before implementation begins |
 | `jira-workflow-manager` | agent | Creates Epic + Task tickets from the plan; fills Task Reference Jira Key column |
@@ -122,13 +122,14 @@ The entry point is the `brainstorming` skill. Before drafting a single line, the
 architect → test-strategy → test-builder → jira-workflow-manager → plan-management
 ```
 
-**Architect gate** — The `architect` agent receives the plan doc path and reviews for design soundness and self-containment. It returns a structured verdict:
+**Architect gate** — The `architect` agent receives the plan doc path and reviews the plan across 4 finding-space lenses (L1 correctness & coherence, L2 grounding & self-containment, L3 systemic & standards, L4 simplicity / over-engineering). It classifies findings by severity and returns a verdict:
 
-- `BLOCKING` — issues that must be resolved before proceeding.
-- `MINOR` / `LOOKS GOOD` — the gate passes; minor items are advisory.
-- `APPROVED` — explicit approval; proceed to test-strategy.
+- `error` — a blocker or major finding (would fail the plan or produce an incorrect/irreversible outcome); forces `NEEDS REVISION` until resolved.
+- `warning` / `note` — informational; the gate passes on these alone (they never gate the verdict).
+- Strengths — positive findings worth preserving.
+- Verdict: `APPROVED` (no surviving `error` findings) → proceed to test-strategy; `NEEDS REVISION` (≥1 surviving `error`).
 
-Iteration rules: if architect surfaces a user-judgment question (not resolvable from available context), surface it to the user verbatim — do not resolve with assumptions. If the issue is a design flaw resolvable from context, resolve it, update the plan, and re-invoke. Maximum three rounds. If BLOCKING items remain after the third pass, surface to the user; do not attempt a fourth round.
+Iteration rules: if architect surfaces a user-judgment question (not resolvable from available context), surface it to the user verbatim — do not resolve with assumptions. If the issue is a design flaw resolvable from context, resolve it, update the plan, and re-invoke. Loop until blockers clear; after 3 rounds with `error`-severity findings remaining, pause and surface to the user as a checkpoint (continue / intervene / accept) — do not silently stop or attempt a fourth round unbidden.
 
 **Test-strategy gate** — After APPROVED, the `test-strategy` agent appends a `## Testing` section to the plan doc. This section becomes the source the `jira-workflow-manager` copies into ticket descriptions. The section name must be exactly `## Testing`. Implementation must not begin without this section.
 
@@ -211,7 +212,7 @@ _(No accepted ADRs yet.)_
 
 - **Form-A sub-plans have no journal or handoff.** This is intentional and correct. `doc-author` and other tools that walk the plan tree for a journal file will get a not-found response; they proceed on design + plan only. Do not interpret a missing journal as a defect.
 
-- **Architect review maximum is three rounds.** If BLOCKING issues remain after three passes, the correct action is to surface them to the user, not to attempt a fourth round. Repeated re-invocation without user input degrades plan quality by accumulating unresolved assumptions.
+- **Architect review loops until blockers clear, pausing at 3 rounds.** If `error`-severity findings remain after 3 rounds, pause and surface them to the user as a checkpoint (continue / intervene / accept) — not a silent stop or an unbidden fourth round. Repeated re-invocation without user input degrades plan quality by accumulating unresolved assumptions.
 
 - **`## Decisions` is set at close, not at authoring time.** During plan execution, ADR candidates are marked with `[adr-candidate]` journal tags. The ADR Promotion Scan at `close-subplan` decides which become actual ADRs. Do not hand-add ADR backlinks to a feature-doc's `## Decisions` section during execution — the `doc-author` `backlink-only` pass at close is the only correct mechanism. Hand-editing risks a format mismatch that `docs-status` will flag as an ERROR.
 

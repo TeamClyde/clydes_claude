@@ -104,7 +104,7 @@ The primary path from idea to committed code (detail in [planning-and-plan-docs]
 
 ## Troubleshooting
 
-**Architect returned NEEDS REVISION:** address BLOCKING findings and re-invoke `plan-gate`. Maximum 3 iterations; surface persistent blockers to the user — do not attempt a fourth round.
+**Architect returned NEEDS REVISION:** address the `error`-severity findings and re-invoke `plan-gate`. The gate loops until blockers clear; after 3 rounds it pauses and surfaces persistent blockers to the user (continue / intervene / accept) rather than attempting a fourth round unbidden.
 
 **test-runner returned SETUP REQUIRED:** run `/e2e-init` in the repo to generate `.claude/testing-plan.md`.
 
