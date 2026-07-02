@@ -40,7 +40,7 @@ Apply these overrides:
 
 ## Gate Chain — Watchdog Wrapper
 
-The gate chain (Steps 1 → 1a → 2 → Checkpoint → 3 → 4 → 5 → 6) runs as a **Shape C — Sequential chain** (per `dispatching-parallel-agents` §"Dispatching in prose" Shape C — Sequential chain). The chain halts on the first ABANDONED step.
+The gate chain (Steps 1 → 1a → 2 → Checkpoint → 3 → 4 → 5 → 6 → 7) runs as a **Shape C — Sequential chain** (per `dispatching-parallel-agents` §"Dispatching in prose" Shape C — Sequential chain). The chain halts on the first ABANDONED step. Step 7 is the non-blocking planning-pause handoff: the "halts on first ABANDONED" behavior still applies to Steps 1–6, but a Step 7 ABANDONED is non-blocking — the gate is already complete by that point.
 
 **Per-step watchdog rule:** Every Agent/Skill dispatch in the gate chain carries a bounded per-step expectation. If a step does not complete within that bound it is declared **ABANDONED**: halt the chain immediately and surface the partial gate state to the user (which steps completed, which step timed out). Do not skip ahead. Do not silently drop the hang.
 
@@ -200,6 +200,14 @@ Fill in the actual round number from Step 1. If architect review was skipped (`w
 
 ---
 
+### Step 7 — Planning-pause handoff (auto)
+
+The gate is complete and the plan is now waiting on the user's ExitPlanMode / execution decision — a human pause. Invoke the `handoff` skill so a fresh session can resume cheaply without rehydrating the full planning context. `handoff` refreshes the active plan's live `<slug>-handoff.md` in place and emits a copy-pasteable bootstrap prompt. This is trigger-on-gate, not conditional on any token signal.
+
+**Watchdog:** if `handoff` does not complete within the stated bound, declare it ABANDONED — surface to the user that the gate completed (Step 6 recorded the outcome) but the planning-pause handoff was not refreshed. This is non-blocking: it is NOT a gate failure. Reuse the same per-step bound the other gate steps use — do not introduce a new numeric value.
+
+---
+
 ## Sub-Plan Mode
 
 When plan-gate is invoked on a **Form-A sub-plan**, a reduced gate runs: the parent plan already owns ticketing, registration, and the Testing Plan, so the sub-plan gate exists only to keep the sub-plan's design sound and drift-free.
@@ -259,6 +267,7 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 - `jira-workflow-manager` agent (subagent_type: jira-workflow-manager) — Step 4 (skipped if jira.enabled: false)
 - `plan-management` skill — Step 5 (TODO.md registration)
 - `plan-management:divergence` skill — Step 6 (gate-complete record; fires once at end of successful path)
+- `handoff` skill — Step 7 (planning-pause handoff; non-blocking)
 
 **Followed by:**
 - `executing-plans` skill
