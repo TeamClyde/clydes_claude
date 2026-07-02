@@ -62,17 +62,17 @@ The gate chain (Steps 1 → 1a → 2 → Checkpoint → 3 → 4 → 5 → 6 → 
 
 **If `workflow.architect-review: false`:** skip this step and proceed directly to Step 2.
 
-**Watchdog:** if the architect panel (or its tiered-verify call) does not complete within the stated bound, declare it ABANDONED — halt the chain and surface partial gate state to the user. Do not silently retry or skip to Step 2.
+**Watchdog:** if the architect panel (or its convergence pass) does not complete within the stated bound, declare it ABANDONED — halt the chain and surface partial gate state to the user. Do not silently retry or skip to Step 2.
 
-Step 1 dispatches a **7-criterion architect panel** (Shape A — Dimensional-review panel, per `dispatching-parallel-agents` §"Dispatching in prose") — one `subagent_type: architect` agent per criterion, all in parallel (each passed the plan doc path, a single-criterion `instructions` field, and the `executor_profile`). See `references/architect-panel.md` for the full dispatch detail: example Agent block, per-criterion enumeration, the 5 dispatch rules, and the tiered-verify step.
+Step 1 dispatches a **4-lens architect panel** (Shape A — Dimensional-review panel, per `dispatching-parallel-agents` §"Dispatching in prose") — one `subagent_type: architect` agent per lens, all in parallel (each passed the plan doc path, a single-LENS `instructions` field, and the `executor_profile`; each lens reads the WHOLE plan). See `references/architect-panel.md` for the full dispatch detail: the 4-lens table (L1 correctness & coherence; L2 grounding & self-containment; L3 systemic & standards; L4 simplicity / over-engineering), example Agent block, the 5 dispatch rules, and the challenge/dedup convergence pass.
 
-**Tiered verify — required hard gate:** after collecting all panel findings, run ONE tiered adversarial verify (`skills/dispatching-parallel-agents/references/verify-protocol.md`, `plan-review` profile) over the collected `error` findings before producing the round verdict. This step is **not optional** — a round verdict produced without running the tiered verify is **invalid** and must not be used to advance the gate. If the tiered-verify call is skipped or fails, declare this step ABANDONED and surface to the user; do not proceed to Step 2.
+**Challenge + Dedup Convergence Pass — required hard gate:** after collecting all four lenses' findings, run ONE convergence pass (per `references/architect-panel.md` § Post-Collection) before producing the round verdict: dedup overlapping findings across lenses → apply one shared severity bar (re-classify each `error` against the strict blocker definition; demote non-blockers to `warning`) → apply the disclosed-risk rule (a risk the plan itself discloses and accepts is NOT re-raised as `error`), then run the tiered/minority-veto adversarial verify (`skills/dispatching-parallel-agents/references/verify-protocol.md`, `plan-review` profile) over the surviving `error` tail. This step is **not optional** — a round verdict produced without running the convergence pass is **invalid** and must not be used to advance the gate. If the convergence pass is skipped or fails, declare this step ABANDONED and surface to the user; do not proceed to Step 2.
 
-**Synthesis:** after the tiered verify completes, produce the SINGLE `APPROVED` / `NEEDS REVISION` verdict for this round.
+**Synthesis:** after the convergence pass completes, produce the SINGLE `APPROVED` / `NEEDS REVISION` verdict for this round (NEEDS REVISION iff ≥1 surviving `error`).
 
-**Hard-gate:** on `error` findings, fix or surface, then re-dispatch the full panel. Two stop conditions (whichever comes first):
-- **3-round cap** — after round 3 with `error` findings remaining, surface to user and stop.
-- **Value exhaustion** — if a completed round yields no new **genuine blocker** (i.e., every `error` in that round is either a duplicate of a prior-round finding or was already addressed in the plan update), stop iterating even if fewer than 3 rounds have run. Document this as "value-exhausted after round N" in the gate record. Do not run another round purely to produce a finding-free sweep.
+**Loop until clear:** on surviving blockers, fix or surface, then re-dispatch the 4-lens panel. The loop continues until a round yields ZERO surviving blockers.
+- **APPROVED** — a round yields zero surviving blockers.
+- **3-round PAUSE** — if blockers remain after round 3, surface to the user as a checkpoint and pause: report the remaining blockers and offer **continue** (run another round) / **intervene** (user resolves a blocker directly) / **accept** (proceed despite remaining findings). The user decides — the loop pauses rather than terminating on its own.
 
 `warning` / `Strengths` findings are informational only; plan-gate proceeds.
 
@@ -86,7 +86,7 @@ Step 1 dispatches a **7-criterion architect panel** (Shape A — Dimensional-rev
 
 After the architect panel produces its APPROVED verdict, collect any tasks flagged with a slicing concern. Two sources produce these flags:
 
-1. **Architect slicing lens** — Criterion 7 of the architect panel flags oversized tasks as `warning`-severity and proposes vertical-slice decompositions. If any `warning` findings reference task size or slicing, they are already in the architect's output.
+1. **Architect slicing lens** — **Lens L3** (systemic & standards) of the architect panel flags oversized tasks as `warning`-severity and proposes vertical-slice decompositions. If any `warning` findings reference task size or slicing, they are already in the architect's output.
 2. **Plan-author flag** — the plan doc's per-task sections may contain an `> **Expected PR size:** Projected over the ceiling` note (written at authoring time per `skills/writing-plans/SKILL.md` § Expected PR Size).
 
 **Posture-aware behavior:** read `project.json` `git.pr-sizing.posture`:
@@ -110,7 +110,7 @@ After the APPROVED verdict and before moving to Step 2, output a short, non-bloc
 
 **When nothing is flagged:** skip this step entirely — do not output a notice.
 
-This step is the surface point; it is not detection. Detection belongs to the architect slicing lens (during review) and the plan author (at authoring time). plan-gate does not re-analyze task scope here.
+This step is the surface point; it is not detection. Detection belongs to the architect slicing lens (lens L3, during review) and the plan author (at authoring time). plan-gate does not re-analyze task scope here.
 
 See also: `rules/delivery-cadence.md` § Cross-References for the full consumer list.
 
@@ -218,7 +218,7 @@ When plan-gate is invoked on a **Form-A sub-plan**, a reduced gate runs: the par
 
 | Step | Standard mode | Sub-plan mode |
 |------|---------------|---------------|
-| 1 — Architect | run | **run** — hard-gate on `error` findings, 3-round cap (identical to standard) |
+| 1 — Architect | run | **run** — 4-lens panel, blockers-only, loop-until-clear, 3-round pause (identical to standard) |
 | 1a — PR-size surface | run (non-blocking) | **run** — advisory only regardless of posture; sub-plans are part of a larger flow, so posture is always treated as `ongoing` |
 | Adherence soft-gate | — | **run** — after architect APPROVED, dispatch `Skill { skill: "adherence-audit", args: "plan-doc: plans/<parent>/<child>/<child>-plan.md" }`. Its Phase 9 surfaces drift the sub-plan would introduce. `[Plan-Introduced]` `error` findings are surfaced and resolved before execution; `warning`/`note` are informational. **Soft-gate — never deadlocks the gate.** |
 | 2 — Test strategy | run | **skip** — the parent plan owns the `## Testing Plan` |
@@ -245,8 +245,8 @@ After all steps complete successfully:
 
 | Condition | Action |
 |---|---|
-| Architect returns NEEDS REVISION (rounds 1–2) | Fix/surface issues, re-invoke architect |
-| Architect returns NEEDS REVISION after round 3 | Surface to user, stop |
+| Architect returns NEEDS REVISION (rounds 1–2) | Fix/surface issues, re-invoke the 4-lens panel |
+| Architect returns NEEDS REVISION after round 3 | PAUSE — surface remaining blockers to user as a checkpoint (continue / intervene / accept); the loop pauses rather than stopping on its own |
 | Architect fails / unavailable | Surface the failure, stop — do not skip a gate step |
 | Plan doc missing required sections | Surface what is missing, stop |
 
@@ -260,7 +260,7 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 - `writing-plans` — automatically at end of skill
 
 **Calls:**
-- `architect` agent (subagent_type: architect) — Step 1: 7-criterion parallel dimension panel + 1 tiered verify (skipped if architect-review: false)
+- `architect` agent (subagent_type: architect) — Step 1: 4-lens finding-space panel + 1 convergence pass (skipped if architect-review: false)
 - `adherence-audit` skill — Sub-Plan Mode soft-gate, sub-plan invocations only (see § Sub-Plan Mode); not in the standard top-level sequence
 - `test-strategy` agent (subagent_type: test-strategy) — Step 2
 - `test-builder` agent (subagent_type: test-builder) — Step 3 (skipped if tdd: false)
@@ -276,7 +276,7 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 
 1. This skill fires automatically after `writing-plans` — do not invoke it manually in Case A.
 2. If architect returns NEEDS REVISION, update the plan doc and re-invoke architect — do not proceed to test-strategy until APPROVED.
-3. Maximum 3 architect iterations — surface remaining `error`-severity issues to the user after the third pass.
+3. The architect loop runs until a round yields zero surviving blockers — it does not stop on its own after a fixed count. After round 3 with blockers remaining, PAUSE and surface them to the user as a checkpoint (continue / intervene / accept); do not silently terminate.
 4. `jira.enabled: false` and `workflow.tdd: false` are silent skips — no user-facing warning or confirmation prompt.
 5. On the Jira-disabled path, omit `jira-key` from the `plan-management:created` call entirely — do not pass an empty string.
 6. Step 6 (`:divergence` call) fires exactly once at the end of the successful path — never per-stage. Mid-gate failures leave the plan doc in its pre-gate state; re-running plan-gate is idempotent.
