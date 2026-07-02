@@ -3,7 +3,7 @@
 Canonical reference for how skills, agents, rules, hooks, and plugins connect in the
 Claude workflow. Update this file whenever a component is added, removed, or rewired.
 
-Last updated: 2026-06-29
+Last updated: 2026-07-02
 
 ---
 
@@ -75,7 +75,7 @@ All agents invoked via: `Agent { subagent_type: "<name>", prompt: "..." }`
 
 | Agent | Called by | Purpose |
 |-------|-----------|---------|
-| `architect` | `plan-gate` (auto — Case A), CLAUDE.md (manual — Case B) | Plan review: design soundness, self-containment, logic completeness. Returns APPROVED or NEEDS REVISION with BLOCKING / MINOR findings. |
+| `architect` | `plan-gate` (auto — Case A), CLAUDE.md (manual — Case B) | Plan review across 4 finding-space lenses (L1 correctness & coherence, L2 grounding & self-containment [owns both sweeps], L3 systemic & standards, L4 simplicity / over-engineering); blockers-only `error` severity; loop-until-clear with a 3-round pause. Returns APPROVED or NEEDS REVISION (`error` / `warning` / Strengths findings). |
 | `jira-workflow-manager` | CLAUDE.md, `git-manager`, `executing-plans` | All Jira operations: ticket creation, status transitions, comments. Never call Atlassian MCP directly. |
 | `researcher` | Planning phase (parallel dispatch OK) | Single MCP lookup — ARN, SSM parameter, DynamoDB table name, env var location. One question per instance. |
 | `integration-engineer` | Planning phase | Cross-repo contract analysis — maps endpoints, finds callers in other repos. Read-only. |
@@ -96,7 +96,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 |-------|--------------|--------------|
 | `brainstorming` | M/L work, design-first path | `writing-plans`. Also establishes a provisional `wip/*` branch and sets `claude.expectedBranch` binding (macro entry gate) before any research begins. |
 | `writing-plans` | After brainstorming, or directly for S/M | `plan-gate` (auto) |
-| `plan-gate` | Auto after `writing-plans` | `architect`, `test-strategy`, `test-builder` agents. Surfaces oversized tasks to the architect via the PR-sizing slicing lens (`project.json git.pr-sizing`). |
+| `plan-gate` | Auto after `writing-plans` | `architect` (dispatched as a 4-lens finding-space panel + one challenge/dedup convergence pass), `test-strategy`, `test-builder` agents. Surfaces oversized tasks via the PR-sizing slicing lens (lens L3; `project.json git.pr-sizing`). |
 | `executing-plans` | When plan is approved and work begins | `git-manager`, `jira-workflow-manager`, `plan-management` per task |
 | `subagent-driven-development` | Alternative to `executing-plans` for parallelizable tasks | Same as executing-plans. Adds micro entry gate (captures `BASELINE` SHA + in-scope file list before each implementer dispatch) and micro exit gate (observed-state checks X5–X8: verify commits landed, in-scope files clean, branch unchanged — checking observed git state rather than implementer self-report). |
 | `finishing-a-development-branch` | After all tasks complete | Presents merge/PR/keep/discard options |
