@@ -278,7 +278,7 @@ See `close-subplan.md` for the full step sequence including ADR Promotion Scan (
 3. Parent task row ✅ in top-level plan
 4. Handoff refresh; revert active-plan marker (sub-plan close) or delete it (terminal)
 5. **ADR Promotion Scan** — orphan hard-block (4-option prompt) gates promotion on a confirmed parent doc path from `Docs Affected`
-6. **Feature-Doc Synthesis Pass** — serial loop over `Docs Affected`; `doc-author` drafts each; user accept/edit/decline; accepted drafts committed via `git-manager`
+6. **Feature-Doc Synthesis Pass** — serial loop over `Docs Affected`; `doc-author` drafts each; user accept/edit/decline; accepted drafts committed via `git-manager`. Per `rules/doc-tools.md` § "Diagrams by Default", synthesized docs include Mermaid diagrams where they clarify structure or flow.
 7. Report to caller
 
 **Top-Level vs. Sub-Plan Detection:** uses the walk-up algorithm defined in the Active-Plan Marker section above. If walk-up finds a parent `*-plan.md`, run the Sub-Plan Close Path; otherwise run the Terminal-State Path. Full details in `close-subplan.md`.

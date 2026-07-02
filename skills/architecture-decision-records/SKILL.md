@@ -44,6 +44,8 @@ Proposed → Accepted → Deprecated → Superseded
            Rejected
 ```
 
+Per `rules/doc-tools.md` § "Diagrams by Default", ADRs may include Mermaid diagrams (flowcharts, architecture diagrams, decision trees) where they clarify trade-offs or consequences better than prose.
+
 ## Templates
 
 ### Template 1: Standard ADR (MADR Format)

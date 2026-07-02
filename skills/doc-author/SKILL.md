@@ -70,6 +70,7 @@ Every Step-2 dispatch MUST include these five constraints in the prompt. They ar
 > 3b. (`mode=create`) Template placeholder lines (the example/scaffold prose under each heading) are scaffolding, not authoritative content. Replace them with real content. Do not append to them.
 > 4. Front-matter is authoritative. Update only `**Last updated:**` and append-only fields (Related plans, Related ADRs, Key files). Never rewrite or reorder front-matter fields.
 > 5. Use the front-matter pattern `**Field:** value` exactly as the template does — do NOT switch to YAML frontmatter (no `---` block, no `key: value` lines).
+> 6. Per `rules/doc-tools.md` § "Diagrams by Default", include Mermaid diagrams where they clarify structure or flow (not for trivial content).
 
 The full existing content of the target file (or scaffolded template if creating) must be embedded in the prompt under a `## Existing content` block so docs-architect sees the authoritative starting state.
 

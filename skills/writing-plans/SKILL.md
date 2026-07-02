@@ -226,6 +226,8 @@ Set `plan-type: test-suite-addition` when the plan creates or expands a test sui
 
 **Every plan MUST start with this header (including the constitutional gate preamble):**
 
+Per `rules/doc-tools.md` § "Diagrams by Default", the **Architecture** section may include a Mermaid diagram where it clarifies the approach better than prose alone.
+
 ```markdown
 ---
 plan-type: standard
