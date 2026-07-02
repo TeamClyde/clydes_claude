@@ -234,6 +234,7 @@
     "urls",
     "unstage",
     "unstaged",
+    "reflog",
     "implementer",
     "implementer→orchestrator",
     "branch→plan",
