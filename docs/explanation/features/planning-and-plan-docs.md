@@ -122,11 +122,12 @@ The entry point is the `brainstorming` skill. Before drafting a single line, the
 architect → test-strategy → test-builder → jira-workflow-manager → plan-management
 ```
 
-**Architect gate** — The `architect` agent receives the plan doc path and reviews for design soundness and self-containment. It returns a structured verdict:
+**Architect gate** — The `architect` agent receives the plan doc path and reviews the plan across 4 finding-space lenses (L1 correctness & coherence, L2 grounding & self-containment, L3 systemic & standards, L4 simplicity / over-engineering). It classifies findings by severity and returns a verdict:
 
-- `BLOCKING` — issues that must be resolved before proceeding.
-- `MINOR` / `LOOKS GOOD` — the gate passes; minor items are advisory.
-- `APPROVED` — explicit approval; proceed to test-strategy.
+- `error` — a blocker or major finding (would fail the plan or produce an incorrect/irreversible outcome); forces `NEEDS REVISION` until resolved.
+- `warning` / `note` — informational; the gate passes on these alone (they never gate the verdict).
+- Strengths — positive findings worth preserving.
+- Verdict: `APPROVED` (no surviving `error` findings) → proceed to test-strategy; `NEEDS REVISION` (≥1 surviving `error`).
 
 Iteration rules: if architect surfaces a user-judgment question (not resolvable from available context), surface it to the user verbatim — do not resolve with assumptions. If the issue is a design flaw resolvable from context, resolve it, update the plan, and re-invoke. Loop until blockers clear; after 3 rounds with `error`-severity findings remaining, pause and surface to the user as a checkpoint (continue / intervene / accept) — do not silently stop or attempt a fourth round unbidden.
 
