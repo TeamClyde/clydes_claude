@@ -11,6 +11,14 @@
 
 ADRs live under `docs/explanation/adr/`, not flat `docs/adr/`.
 
+## Diagrams by Default
+
+> When authoring or updating any doc — design docs, plan docs, feature docs, ADRs, closeout docs — include a Mermaid diagram wherever it clarifies structure, flow, or relationships better than prose. Prefer Mermaid `flowchart`, `sequenceDiagram`, and `erDiagram` over ASCII art or prose-only descriptions of multi-step or multi-component relationships.
+>
+> **Guardrail:** "where it clarifies," not "always." A one-line ADR, a trivial single-step change, or a doc with no structural/flow content does not need a diagram. Do not add a diagram to satisfy a checkbox — add it when a reader would understand the content faster by seeing it.
+>
+> This is the single source of truth for the diagrams-by-default convention. The doc-producing skills (`brainstorming`, `writing-plans`, `doc-author`, `architecture-decision-records`, `plan-management` close-subplan) reference this section rather than restating it.
+
 ## Explanation Quadrant Layout
 
 Three artifact classes under `docs/explanation/`:
