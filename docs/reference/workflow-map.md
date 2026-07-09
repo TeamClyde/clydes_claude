@@ -3,7 +3,7 @@
 Canonical reference for how skills, agents, rules, hooks, and plugins connect in the
 Claude workflow. Update this file whenever a component is added, removed, or rewired.
 
-Last updated: 2026-07-02
+Last updated: 2026-07-08
 
 ---
 
@@ -138,6 +138,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | `plan-gate` | Auto after `writing-plans` | Adherence audit runs in parallel with architect review (Task 12). Jira ticket creation and test-builder steps are skipped when `jira.enabled=false` or `tdd=false` in `project.json`. **Sub-plan mode:** detected by plan-doc path shape (3+ segments under `plans/` → Form A sub-plan); architect + adherence-audit run, but test-strategy, test-builder, Jira creation, and TODO.md registration skip. Optional `mode: minimal` argument runs architect only. **Plan-type frontmatter:** if `plan-type: test-suite-addition` in plan's frontmatter, Step 3 (test-builder) skips because the deliverable IS the test suite. |
 | `using-git-worktrees` | Feature work needing isolation | Creates worktrees; pairs with `finishing-a-development-branch`. Captures the base branch at invocation (`git symbolic-ref --short HEAD`, or SHA with `sha:` prefix on detached HEAD) and persists per-worktree to `.claude/worktrees/<wt-name>/base-branch` so cleanup restores the original context. Accepts optional `BASE` parameter override. Pattern mirrors git's own per-worktree metadata in `.git/worktrees/<name>/`. |
 | `dispatching-parallel-agents` | 2+ independent tasks | Coordinates parallel agent dispatch |
+| `librarian` | User wants deep, multi-source **web** research with citations | Regulated read-only web-research fan-out built on `dispatching-parallel-agents` — the engine's executable exemplar. Runs `librarian.workflow.mjs` (engine bundle inlined) via the Workflow tool (user opt-in). Runtime script is co-located in the skill dir as a symlink to the source in `scripts/`; invoke by the **absolute** skill-base-dir path so it works from any repo. One Sonnet-pinned agent per sub-question → one batched adversarial verify → cited report. |
 | `verification-before-completion` | Before claiming work is done | Verifies tests pass, no regressions |
 | `systematic-debugging` | Bug, test failure, unexpected behavior | Structured diagnosis before fixing |
 | `test-driven-development` | Feature or bugfix implementation | TDD cycle for code changes |

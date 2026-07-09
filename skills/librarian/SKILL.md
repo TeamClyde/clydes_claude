@@ -10,7 +10,7 @@ allowed-tools: Read, Bash, Workflow
 
 ## Overview
 
-**REQUIRED BACKGROUND:** Use `dispatching-parallel-agents` before proceeding. The librarian is the engine's executable exemplar — a regulated, read-only **web-research** fan-out applying all five front-door rules. The engine lives in `scripts/lib/dispatch.mjs` (`parallelFanout`, `dimensionalReview`) and is inlined into `scripts/librarian.workflow.mjs` via the engine bundle (`scripts/build-engine-bundle.mjs`).
+**REQUIRED BACKGROUND:** Use `dispatching-parallel-agents` before proceeding. The librarian is the engine's executable exemplar — a regulated, read-only **web-research** fan-out applying all five front-door rules. The engine lives in `scripts/lib/dispatch.mjs` (`parallelFanout`, `dimensionalReview`) and is inlined into the built bundle `scripts/librarian.workflow.mjs` via `scripts/build-engine-bundle.mjs`. That bundle is the **source** (in the workflow repo); the **runtime** copy the skill invokes is co-located in this skill directory as `librarian.workflow.mjs` (a symlink to the source bundle), so the skill runs from any repo.
 
 It fans out **one web-research agent per sub-question** (each searches the web and cites its sources), runs **one adversarial verify** over all collected findings, and synthesizes a **cited report**. It brings in *external* information — it does not merely re-analyze the seed.
 
@@ -47,7 +47,7 @@ Use when the user asks for:
 1. **Seed** — user supplies a brief or points to a local file.
 2. **Extract (if `.docx`)** — main-context runs the Python snippet above via Bash and captures the plain text.
 3. **Derive sub-questions** — main-context turns the brief/seed into 4–~12 *independent* research sub-questions and agrees the list with the user. Default 4–6; cap at 20.
-4. **Workflow tool** — invoke `scripts/librarian.workflow.mjs` via the Workflow tool (requires user opt-in), passing `{ brief, subQuestions, seedText? }` as `args`. One Sonnet-pinned agent per sub-question fans out via `parallelFanout` (`maxInFlight: 6`); each runs WebSearch/WebFetch and returns cited findings.
+4. **Workflow tool** — invoke the workflow script via the Workflow tool (requires user opt-in), passing `{ brief, subQuestions, seedText? }` as `args`. Set `scriptPath` to an **absolute** path: take the *Base directory for this skill* injected at skill start and join `librarian.workflow.mjs` (i.e. `<skill-base-dir>/librarian.workflow.mjs`). The script is co-located in the skill directory (a symlink that resolves to the built bundle in the workflow repo), so the absolute path works **regardless of your current working directory**. Do NOT pass a cwd-relative path like `scripts/librarian.workflow.mjs` — that resolves only when your cwd is the workflow repo, and is the cause of the "scripts don't exist" failure. One Sonnet-pinned agent per sub-question fans out via `parallelFanout` (`maxInFlight: 6`); each runs WebSearch/WebFetch and returns cited findings.
 5. **Adversarial verify** — the workflow runs ONE `dimensionalReview` verify pass that re-checks each claim against its cited source and labels support (`supported` / `uncertain` / `unsupported`). Never per-finding voting.
 6. **Synthesize** — a Sonnet agent produces the final cited report grouped by sub-question, with confidence, contradictions surfaced, and a "what this means for the build" section.
 7. **Return** — `{ report, sources, subQuestionCount, findingCount, degraded, verifyDegraded }`. If `degraded: true` (fewer sub-questions than quorum succeeded) or `verifyDegraded: true` (the verify step was abandoned → findings are UNVERIFIED), surface it before presenting.
@@ -82,10 +82,12 @@ Each research unit has a 240 s watchdog. A timed-out unit is abandoned (non-pree
 
 6. **Running without the user's Workflow-tool opt-in.** The run requires the user to explicitly opt into the Workflow tool — surface and confirm before invoking it.
 
+7. **"The scripts don't exist."** The `.mjs` files are NOT copied into the installed skill directory — the source bundle lives in the workflow repo's `scripts/`, and the skill directory carries a co-located symlink `librarian.workflow.mjs` pointing at it. Invoke it by the **absolute** skill-base-dir path (see How It Runs step 4), never a cwd-relative `scripts/...` path. A cwd-relative path resolves only when your cwd is the workflow repo — from any other repo it fails and looks like a missing script.
+
 ## Related
 
 - `dispatching-parallel-agents` — the regulated fan-out front-door (canonical reference)
 - `scripts/lib/dispatch.mjs` — `parallelFanout`, `dimensionalReview`
-- `scripts/librarian.workflow.mjs` — the Workflow-tool script (engine bundle inlined)
-- `scripts/build-engine-bundle.mjs` — regenerates the inlined bundle
+- `scripts/librarian.workflow.mjs` — the source Workflow-tool bundle (engine inlined); the skill invokes it through the co-located symlink `skills/librarian/librarian.workflow.mjs`
+- `scripts/build-engine-bundle.mjs` — regenerates the inlined bundle (writes to the source in `scripts/`; the co-located symlink tracks it automatically)
 - `docs/explanation/orchestration-regulation-layer.md` §7 (the deep-research worked example this rebuilds) / §9 (build spec)

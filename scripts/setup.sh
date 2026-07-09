@@ -268,6 +268,16 @@ for skill_dir in "$REPO_ROOT/skills"/*/; do
   install_symlink "$target" "$HOME/.claude/skills/$name" "skills/$name"
 done
 
+# Co-locate the librarian Workflow-tool bundle inside its skill dir so the skill
+# is invokable by its absolute skill-base-dir path from any repo (not just this
+# one). The runtime bundle lives in scripts/; this links it into the skill dir.
+# gitignored (not committed) — created per-machine here so it survives fresh
+# Windows clones where core.symlinks=false would otherwise materialize a
+# committed symlink as a plain text file. See skills/librarian/SKILL.md.
+install_symlink "$REPO_ROOT/scripts/librarian.workflow.mjs" \
+  "$REPO_ROOT/skills/librarian/librarian.workflow.mjs" \
+  "skills/librarian/librarian.workflow.mjs"
+
 # ---------------------------------------------------------------------------
 # Step 5 — Symlink rules + CLAUDE.md
 # ---------------------------------------------------------------------------
