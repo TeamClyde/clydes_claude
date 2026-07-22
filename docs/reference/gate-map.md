@@ -27,8 +27,12 @@ flowchart LR
   doc_backfill --> architecture_decision_records
   doc_backfill --> doc_author
   doc_backfill --> git_manager
+  doc_tools --> architecture_decision_records
+  doc_tools --> brainstorming
   doc_tools --> doc_author
+  doc_tools --> plan_management
   doc_tools --> project_setup
+  doc_tools --> writing_plans
   docs_refresh --> architecture_decision_records
   docs_refresh --> changelog_automation
   docs_refresh --> doc_author
@@ -41,6 +45,7 @@ flowchart LR
   docs_status --> project_setup
   executing_plans --> e2e_init
   executing_plans --> git_manager
+  executing_plans --> handoff
   executing_plans --> systematic_debugging
   executing_plans --> test_runner
   finishing_a_development_branch --> git_manager
@@ -84,6 +89,7 @@ flowchart LR
   plan_gate --> architect
   plan_gate --> dispatching_parallel_agents
   plan_gate --> executing_plans
+  plan_gate --> handoff
   plan_gate --> jira_workflow_manager
   plan_gate --> plan_management
   plan_gate --> test_builder
@@ -124,6 +130,8 @@ flowchart LR
   stack_hats --> subagent_driven_development
   subagent_driven_development --> dispatching_parallel_agents
   subagent_driven_development --> executing_plans
+  subagent_driven_development --> finishing_a_development_branch
+  subagent_driven_development --> handoff
   subagent_driven_development --> jira_workflow_manager
   subagent_driven_development --> plan_management
   subagent_driven_development --> researcher
@@ -199,8 +207,12 @@ flowchart LR
 | doc-backfill | architecture-decision-records |
 | doc-backfill | doc-author |
 | doc-backfill | git-manager |
+| doc-tools | architecture-decision-records |
+| doc-tools | brainstorming |
 | doc-tools | doc-author |
+| doc-tools | plan-management |
 | doc-tools | project-setup |
+| doc-tools | writing-plans |
 | docs-refresh | architecture-decision-records |
 | docs-refresh | changelog-automation |
 | docs-refresh | doc-author |
@@ -213,6 +225,7 @@ flowchart LR
 | docs-status | project-setup |
 | executing-plans | e2e-init |
 | executing-plans | git-manager |
+| executing-plans | handoff |
 | executing-plans | systematic-debugging |
 | executing-plans | test-runner |
 | finishing-a-development-branch | git-manager |
@@ -256,6 +269,7 @@ flowchart LR
 | plan-gate | architect |
 | plan-gate | dispatching-parallel-agents |
 | plan-gate | executing-plans |
+| plan-gate | handoff |
 | plan-gate | jira-workflow-manager |
 | plan-gate | plan-management |
 | plan-gate | test-builder |
@@ -296,6 +310,8 @@ flowchart LR
 | stack-hats | subagent-driven-development |
 | subagent-driven-development | dispatching-parallel-agents |
 | subagent-driven-development | executing-plans |
+| subagent-driven-development | finishing-a-development-branch |
+| subagent-driven-development | handoff |
 | subagent-driven-development | jira-workflow-manager |
 | subagent-driven-development | plan-management |
 | subagent-driven-development | researcher |

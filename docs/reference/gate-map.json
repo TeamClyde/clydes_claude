@@ -17,7 +17,7 @@
     {
       "type": "agent",
       "name": "architect",
-      "description": "Independent plan reviewer invoked at the end of planning, before ExitPlanMode or before a task transitions from In Progress to Testing/Done. Reads the plan doc cold — with no access to the conversation that produced it — and evaluates design soundness, logic completeness, internal consistency, cross-plan accuracy, and self-containment. Returns structured findings at severity `error` / `warning` / Strengths and a VERDICT of APPROVED or NEEDS REVISION. Invoke with a plan_doc_path and an optional instructions field to narrow the review focus.",
+      "description": "Independent plan reviewer invoked at the end of planning, before ExitPlanMode or before a task transitions from In Progress to Testing/Done. Reads the plan doc cold — with no access to the conversation that produced it — and evaluates it against four finding-space lenses: correctness & coherence, grounding & self-containment, systemic & standards, and simplicity / over-engineering. Severity is blockers-only: `error` = a blocker or major issue that would fail the plan or produce an incorrect/irreversible outcome; everything else is informational `warning` / `note`. Returns structured findings and a VERDICT of APPROVED or NEEDS REVISION, looping until blockers clear with a 3-round checkpoint pause. Invoke with a plan_doc_path and an optional instructions field to narrow the review to a single lens.",
       "model": "claude-sonnet-4-6",
       "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\agents\\architect.md"
     },
@@ -397,7 +397,7 @@
     {
       "type": "skill",
       "name": "plan-management",
-      "description": "Use when Jira tickets are created or change status (in_progress, done), when adding items to the backlog, when reconciling TODO.md against current ticket state, or when a plan deviation is discovered, a sub-plan is spawned, or a sub-plan is ready to close. Invoke after every ticket creation or status transition to keep TODO.md current; invoke for plan-doc state changes (divergence, spawn-subplan, close-subplan) independently of Jira.",
+      "description": "Use when Jira tickets are created or change status (in_progress, done), when adding items to the backlog, when reconciling TODO.md against current ticket state, or when a plan deviation is discovered, a sub-plan is spawned, or a sub-plan is ready to close. Invoke after every ticket creation or status transition to keep TODO.md current; invoke for plan-doc state changes (divergence, spawn-subplan, close-subplan, repoint) independently of Jira.",
       "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\plan-management\\SKILL.md"
     },
     {
@@ -604,11 +604,27 @@
     },
     {
       "from": "doc-tools",
+      "to": "architecture-decision-records"
+    },
+    {
+      "from": "doc-tools",
+      "to": "brainstorming"
+    },
+    {
+      "from": "doc-tools",
       "to": "doc-author"
     },
     {
       "from": "doc-tools",
+      "to": "plan-management"
+    },
+    {
+      "from": "doc-tools",
       "to": "project-setup"
+    },
+    {
+      "from": "doc-tools",
+      "to": "writing-plans"
     },
     {
       "from": "docs-refresh",
@@ -657,6 +673,10 @@
     {
       "from": "executing-plans",
       "to": "git-manager"
+    },
+    {
+      "from": "executing-plans",
+      "to": "handoff"
     },
     {
       "from": "executing-plans",
@@ -832,6 +852,10 @@
     },
     {
       "from": "plan-gate",
+      "to": "handoff"
+    },
+    {
+      "from": "plan-gate",
       "to": "jira-workflow-manager"
     },
     {
@@ -989,6 +1013,14 @@
     {
       "from": "subagent-driven-development",
       "to": "executing-plans"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "finishing-a-development-branch"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "handoff"
     },
     {
       "from": "subagent-driven-development",
