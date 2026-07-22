@@ -18,6 +18,11 @@ research/
 # Test harness for setup script
 scripts/setup-test.sh
 
+# Per-machine symlink created by setup.sh (co-locates the librarian runtime
+# bundle into its skill dir). Not committed — a committed symlink materializes
+# as a plain text file on fresh Windows clones (core.symlinks=false).
+skills/librarian/librarian.workflow.mjs
+
 # Standard ignores
 node_modules/
 .DS_Store
