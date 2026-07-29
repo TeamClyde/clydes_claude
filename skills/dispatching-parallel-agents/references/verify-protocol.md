@@ -15,11 +15,13 @@ Three tiers run in sequence: triage (cheap, batched), clustered re-check (task-a
 
 ---
 
-## Tier 1 — Batched Triage
+## Tier 1 — Chunked Batched Triage
 
 **Portable. Identical across all consumers.**
 
-ONE batched call receives the full findings list and assigns each finding a label:
+Triage is batched, and **chunked** at a bounded number of findings per call (engine default: 40). Chunks are dispatched concurrently and their verdicts merged into one map keyed by the finding's global index. Chunking exists because a single call handed a large findings list will silently judge only a prefix of it and return — the batch must be small enough that the judge reliably covers all of it.
+
+Each call assigns every finding it receives a label:
 
 | Label | Meaning |
 |---|---|
@@ -35,9 +37,11 @@ The triage call also flags two additional conditions per finding (non-exclusive 
 | `thin-source` | The finding rests on a single source, or the cited source is shallow/low-authority. |
 
 **Drop rule (default):** `unsupported` findings are dropped immediately — no re-check, no vote — *unless* the active consumer profile's `escalateOn` set lists `unsupported`. Only `web-research` does (`guard-unsupported`): for that profile, `unsupported` findings escalate to Tier 2 instead of being dropped. The drop rule is profile-overridable; it is not a global pre-filter that runs before profile escalation.
+**Unjudged is not refuted (PINNED):** a finding that comes back with **no verdict** — because a chunk truncated its output or the chunk call failed — **escalates to Tier 2**. It is never dropped. An unjudged finding carries no evidence against it, so dropping it silently discards collected work while reporting success. Track the judged fraction as `triageCoverage` and surface it to the caller; `< 1` means the adversarial tiers, not triage, are what carried those findings.
+
 **No new lookups:** Triage does not fetch URLs, read additional files, or extend the evidence set. It evaluates only the evidence the fan-out agents already cited.
 
-Output set after Tier 1 (profile-aware): `supported` findings pass through directly; any finding whose label or flag is in the active profile's `escalateOn` set escalates to Tier 2 (e.g. `uncertain` + `disagree` for most profiles; additionally `unsupported` + `thin-source` for `web-research`); all remaining `unsupported` findings are dropped.
+Output set after Tier 1 (profile-aware): `supported` findings pass through directly; any finding whose label or flag is in the active profile's `escalateOn` set escalates to Tier 2 (e.g. `uncertain` + `disagree` for most profiles; additionally `unsupported` + `thin-source` for `web-research`), as does any unjudged finding; all remaining `unsupported` findings are dropped.
 
 ---
 
@@ -69,9 +73,17 @@ Output set after Tier 2: `drop` decisions are removed; `keep` decisions form the
 
 The **contested tail** = findings that escalated at Tier 1 (their label or flag matched the active profile's `escalateOn` — e.g. `uncertain`, `disagree`, `thin-source`) **and** were kept by the Tier-2 re-check. Clean Tier-1 `supported` findings never reach this tier.
 
+### Dispatch Shape (PINNED)
+
+**One agent call per voter frame per chunk — NEVER one call per finding.** Each of the three voters receives a whole chunk of contested findings (same bound as Tier 1) and returns one refute/keep vote per finding index. Cost is `3 × chunks`, independent of how many findings each chunk holds. Per-finding voting is `O(3N)` and has already cost this repo a session limit at scale; it is prohibited, not merely discouraged.
+
+The three frames for a chunk run concurrently; chunks run in sequence, so at most `voters` agents are in flight at this tier.
+
+**A voter that omits a finding's index has NOT refuted it** — silence counts as a keeper, mirroring Tier 2's absent-entry `keep` rule. Without this, a voter whose output truncates would silently refute its own tail. If *every* voter frame fails while findings are waiting on them, Tier 3 never ran: degrade rather than pass the contested set through labelled as verified.
+
 ### The Rule (PINNED)
 
-**Three structurally-diverse voters each independently attempt to REFUTE the finding.** A finding survives if and only if ≥ 2 of 3 voters *fail* to refute it.
+**Three structurally-diverse voters each independently attempt to REFUTE the finding.** A finding survives if and only if ≥ 2 of 3 voters *fail* to refute it. Batching changes only the dispatch shape — the per-finding aggregation is unchanged.
 
 | Outcome | Refutations | Disposition |
 |---|---|---|
@@ -126,7 +138,7 @@ In all degradation cases: the returned findings include a `degraded: true` field
 
 ```json
 {
-  "protocolVersion": "1.0",
+  "protocolVersion": "1.1",
   "tiers": ["triage", "clusteredRecheck", "consensus"],
   "consensus": { "voters": 3, "surviveAtLeast": 2, "rule": "minority-veto", "diversity": ["role", "ordering", "modelFamily"] },
   "labels": ["supported", "uncertain", "unsupported"],

@@ -255,7 +255,8 @@ async function dimensionalReview(dimensions, policy = {}) {
 // Named exports only — never export default (engine bundle strip regex).
 
 const VERIFY_PROTOCOL = {
-  protocolVersion: '1.0',
+  protocolVersion: '1.1', // 1.1: Tier-1 and Tier-3 dispatch batched/chunked; decision rules unchanged
+
   tiers: ['triage', 'clusteredRecheck', 'consensus'],
   consensus: { voters: 3, surviveAtLeast: 2, rule: 'minority-veto', diversity: ['role', 'ordering', 'modelFamily'] },
   labels: ['supported', 'uncertain', 'unsupported'],
@@ -301,13 +302,34 @@ const RECHECK_SCHEMA = {
   },
 };
 
-const VOTE_SCHEMA = {
-  type: 'object', required: ['refuted'],
+// Tier 3 is dispatched as ONE call per voter frame over a whole chunk — never one call per finding.
+// Per-finding voting is O(3N) agents and has already cost this repo a session limit at scale.
+const BATCH_VOTE_SCHEMA = {
+  type: 'object', required: ['votes'],
   properties: {
-    refuted: { type: 'boolean' },
-    reason:  { type: 'string' },
+    votes: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['index', 'refuted'],
+        properties: {
+          index:   { type: 'integer' },
+          refuted: { type: 'boolean' },
+          reason:  { type: 'string' },
+        },
+      },
+    },
   },
 };
+
+// Max findings presented to any single tier agent. A live run handed one triage agent 254 rows and got
+// verdicts for 23 of them back; chunking keeps each call inside a size the model reliably covers.
+const TRIAGE_CHUNK = 40;
+
+function chunkArr(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
 
 // Cluster key: subQuestion for web-research; file portion of where for others.
 const defaultClusterKey = (f) => f.subQuestion ?? (f.where ? String(f.where).split(':')[0] : 'default');
@@ -366,15 +388,20 @@ function recheckPrompt(members) {
   );
 }
 
-function refutePrompt(finding, voter) {
+// Batched sibling of the old per-finding refutePrompt: same three adversarial frames, many findings
+// per call. One agent per frame judges the whole chunk by index.
+function batchRefutePrompt(findings, voter) {
   const frames = [
     'You are a literalist. Does the cited source/file LITERALLY state this? `refuted:true` if the premise is not directly supported.',
     'You are a context-skeptic. Could this be true in general but WRONG here? Check the specific context.',
     'You are an alternative-reader. Is there a benign/correct reading under which the finding is a false positive?',
   ];
+  const list = findings.map((f) => `[${f._idx}] ${renderFinding(f)}`).join('\n');
   return (
-    `${frames[voter]} Return \`refuted:true\` ONLY if you can show it is wrong; default \`refuted:false\` when uncertain.\n\n` +
-    `finding: ${renderFinding(finding)}`
+    `${frames[voter]}\n` +
+    'Judge EVERY finding below independently, by its index. Return one entry per index. ' +
+    'Set `refuted:true` ONLY if you can show it is wrong; default `refuted:false` when uncertain. Terse.\n\n' +
+    list
   );
 }
 
@@ -397,17 +424,31 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
     // Stamp global index; all tier logic uses `work`, NOT the caller's `findings`.
     const work = findings.map((f, i) => ({ ...f, _idx: i }));
 
-    // ── Tier 1: Batched Triage ───────────────────────────────────────────────
-    const t1 = await withDeadline(
-      agent(triagePrompt(work), { label: 'verify:triage', schema: TRIAGE_SCHEMA, model: 'claude-sonnet-4-6' }),
-      perTierTimeoutMs,
+    // ── Tier 1: Chunked Triage ───────────────────────────────────────────────
+    // One agent per chunk, in parallel. allSettled (not all): chunking multiplies the failure surface,
+    // and a failed chunk is survivable — its findings simply arrive unjudged, which now escalates
+    // rather than drops (see the escalation loop below).
+    const t1results = await Promise.allSettled(
+      chunkArr(work, TRIAGE_CHUNK).map((c) =>
+        withDeadline(
+          agent(triagePrompt(c), { label: 'verify:triage', schema: TRIAGE_SCHEMA, model: 'claude-sonnet-4-6' }),
+          perTierTimeoutMs,
+        ),
+      ),
     );
 
-    // Build verdict map keyed by _idx.
+    // Build verdict map keyed by _idx, merged across every chunk.
     const verdictMap = new Map();
-    for (const v of t1.verdicts) {
-      verdictMap.set(v.index, v); // v.index is the global _idx echoed by agent
+    for (const r of t1results) {
+      if (r.status !== 'fulfilled') continue;
+      for (const v of r.value?.verdicts ?? []) {
+        verdictMap.set(v.index, v); // v.index is the global _idx echoed by agent
+      }
     }
+
+    // What fraction of the input triage actually judged. < 1 means some findings passed through
+    // unjudged (a truncating or failed chunk) — the caller must be able to see that.
+    const triageCoverage = work.length ? work.filter((f) => verdictMap.has(f._idx)).length / work.length : 1;
 
     // Fail loud, never silent. If triage judged NONE of a non-empty input (no verdicts, or verdicts
     // whose indices match no finding), the verify never actually ran — a broken contract (e.g.
@@ -422,7 +463,7 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
       return {
         findings:      findings,
         contested:     [],
-        counts:        { supported: 0, dropped: work.length, contested: 0 },
+        counts:        { supported: 0, dropped: work.length, contested: 0, triageCoverage: 0 },
         degraded:      true,
         verifyEmptied: true,
       };
@@ -430,11 +471,14 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
 
     const supported   = [];  // Pass-through without re-check
     const escalation  = [];  // Routed to Tier 2
-    // Anything else (unsupported, no verdict) is silently dropped.
+    // `unsupported` (when the profile does not escalate it) is the only silent drop.
 
     for (const f of work) {
       const v = verdictMap.get(f._idx);
-      if (!v) continue; // No verdict → drop
+      // No verdict → ESCALATE, never drop. An unjudged finding carries no evidence against it;
+      // dropping it is the partial-coverage form of the bug the anyJudged guard above catches
+      // wholesale. Route it down the same path as `uncertain` and let Tiers 2/3 decide.
+      if (!v) { escalation.push(f); continue; }
 
       const label   = v.support;       // 'supported' | 'uncertain' | 'unsupported'
       const disagree = v.disagree === true;
@@ -465,15 +509,22 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
 
     const contestedTail = []; // Survivors from Tier 2 → routed to Tier 3
 
-    for (const [key, members] of clusters) {
-      const r = await withDeadline(
-        agent(recheckPrompt(members), { label: `verify:recheck:${key}`, schema: RECHECK_SCHEMA, model: 'claude-sonnet-4-6' }),
-        perTierTimeoutMs,
-      );
+    // Clusters run concurrently — they are independent, and one agent call per cluster is already
+    // well inside the runtime concurrency ceiling. (Was a sequential await per cluster: pure wall-clock loss.)
+    const clusterResults = await Promise.all(
+      [...clusters].map(async ([key, members]) => {
+        const r = await withDeadline(
+          agent(recheckPrompt(members), { label: `verify:recheck:${key}`, schema: RECHECK_SCHEMA, model: 'claude-sonnet-4-6' }),
+          perTierTimeoutMs,
+        );
+        return [members, r];
+      }),
+    );
 
+    for (const [members, r] of clusterResults) {
       // Build keep-set keyed by GLOBAL _idx (not cluster position).
       const keepSet = new Map();
-      for (const entry of r.keep) {
+      for (const entry of r?.keep ?? []) {
         keepSet.set(entry.index, entry.keep); // entry.index is the global _idx
       }
 
@@ -487,40 +538,63 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
       }
     }
 
-    // ── Tier 3: Minority-Veto 3-Voter Consensus ──────────────────────────────
+    // ── Tier 3: Minority-Veto 3-Voter Consensus (BATCHED) ────────────────────
+    // One agent per voter frame per chunk — NOT one agent per finding. Frames run concurrently within
+    // a chunk, chunks run in sequence, so at most `voters` (3) agents are in flight here. Cost is
+    // O(3 × chunks) instead of O(3 × findings). The decision rule below is unchanged.
     const finalSurvivors = [];
     const contested      = [];
+    const contestedChunks = chunkArr(contestedTail, TRIAGE_CHUNK);
+    let framesSucceeded = 0;
 
-    for (const f of contestedTail) {
-      const votes = await withDeadline(
-        Promise.all(
-          [0, 1, 2].map((v) =>
-            agent(refutePrompt(f, v), {
-              label: `verify:consensus:${v}`,
-              findingId: f.id,
-              schema: VOTE_SCHEMA,
+    for (const [chunkIdx, members] of contestedChunks.entries()) {
+      const frames = await Promise.allSettled(
+        [0, 1, 2].map((v) =>
+          withDeadline(
+            agent(batchRefutePrompt(members, v), {
+              label: `verify:consensus:${v}:${chunkIdx}`,
+              schema: BATCH_VOTE_SCHEMA,
               model: 'claude-sonnet-4-6',
             }),
+            perTierTimeoutMs,
           ),
         ),
-        perTierTimeoutMs,
       );
 
-      const keepers = votes.filter((x) => !x.refuted).length;
-      const anyRefuted = votes.some((x) => x.refuted);
+      // Count refutations per GLOBAL _idx. A frame that omits an index has NOT refuted it — silence
+      // defaults to keeper, mirroring Tier 2's absent-entry rule. Without this a truncating frame
+      // would silently refute its own tail.
+      const refutedBy = new Map();
+      for (const fr of frames) {
+        if (fr.status !== 'fulfilled') continue;
+        framesSucceeded++;
+        for (const v of fr.value?.votes ?? []) {
+          if (v.refuted === true) refutedBy.set(v.index, (refutedBy.get(v.index) ?? 0) + 1);
+        }
+      }
 
-      if (keepers >= VERIFY_PROTOCOL.consensus.surviveAtLeast) {
-        // Survives
-        finalSurvivors.push(f);
-        if (anyRefuted) {
-          // At least one refutation — log contested (visibility, not drop)
+      for (const f of members) {
+        const refutals = refutedBy.get(f._idx) ?? 0;
+        const keepers  = VERIFY_PROTOCOL.consensus.voters - refutals;
+
+        if (keepers >= VERIFY_PROTOCOL.consensus.surviveAtLeast) {
+          // Survives
+          finalSurvivors.push(f);
+          if (refutals > 0) {
+            // At least one refutation — log contested (visibility, not drop)
+            contested.push(f);
+          }
+        } else {
+          // < surviveAtLeast keepers → dropped AND logged contested
           contested.push(f);
         }
-      } else {
-        // < surviveAtLeast keepers → dropped AND logged contested
-        contested.push(f);
       }
     }
+
+    // Every voter frame failing while findings were waiting on them means Tier 3 never ran. Silence
+    // defaults to keeper, so continuing would pass the whole contested set through labelled as
+    // verified. Degrade instead.
+    if (contestedChunks.length > 0 && framesSucceeded === 0) throw new Error('tier3-no-frames');
 
     // Combine: Tier-1 supported + Tier-3 survivors
     const survivors = [...supported, ...finalSurvivors];
@@ -532,6 +606,7 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
         supported:  survivors.length,
         dropped:    work.length - survivors.length,
         contested:  contested.length,
+        triageCoverage,
       },
       degraded: false,
     };
