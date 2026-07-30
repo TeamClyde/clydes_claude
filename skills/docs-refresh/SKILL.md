@@ -1,7 +1,7 @@
 ---
 name: docs-refresh
 description: Use when generating or refreshing doc content for a specific Diátaxis quadrant or artifact type — routes to the right bundled doc specialist agent or skill (tutorial-engineer / docs-architect / reference-builder / architecture-decision-records / changelog-automation / openapi-spec-generation / mermaid-expert). Multi-domain aware. Does not commit (user reviews specialist output). Triggers on "docs refresh", "generate tutorial", "draft ADR", "refresh changelog", "/docs-refresh".
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Task
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent
 ---
 
 # /docs-refresh — Doc Generation Slash Command
