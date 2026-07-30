@@ -212,6 +212,42 @@ mkdir -p "$HOME/.claude/hooks"
 success "~/.claude/ directories ready"
 
 # ---------------------------------------------------------------------------
+# Step 2.1 — Materialize committed .claude/ symlinks on Windows
+# ---------------------------------------------------------------------------
+# .claude/skills and .claude/agents are committed as mode-120000 symlinks so
+# they exist at clone time (required for project-level skill/agent discovery in
+# a fresh sandbox session). Git for Windows defaults core.symlinks=false, which
+# checks them out as plain text files containing the link target. Repair that.
+
+echo ""
+echo "Step 2.1 — Checking committed .claude/ symlinks"
+
+for _pair in "skills:../skills" "agents:../agents"; do
+  _name="${_pair%%:*}"
+  _target="${_pair##*:}"
+  _link="$REPO_ROOT/.claude/$_name"
+  if [[ -L "$_link" ]]; then
+    skip "already a symlink: .claude/$_name"
+  elif [[ -f "$_link" ]] && [[ "$(cat "$_link")" == "$_target" ]]; then
+    # Checked out as a plain file by core.symlinks=false — replace it.
+    rm -f "$_link"
+    if make_symlink "$_target" "$_link"; then
+      success "materialized: .claude/$_name -> $_target"
+    else
+      warn "could not materialize .claude/$_name — run: git config core.symlinks true && git checkout -- .claude/$_name"
+    fi
+  elif [[ ! -e "$_link" ]]; then
+    warn "missing: .claude/$_name — expected a committed symlink"
+  else
+    # Exists but is neither a symlink, nor a plain file holding exactly the
+    # link target, nor absent — e.g. a real directory from an older layout, or
+    # a file mangled by CRLF translation. Never silently repair this: removing
+    # a real directory here could destroy work.
+    warn "unexpected state at .claude/$_name — not a symlink and not a link-target file; inspect manually"
+  fi
+done
+
+# ---------------------------------------------------------------------------
 # Step 2.5 — Remove orphaned symlinks
 # ---------------------------------------------------------------------------
 # When a component is deleted from the repo (e.g. a retired agent), its
