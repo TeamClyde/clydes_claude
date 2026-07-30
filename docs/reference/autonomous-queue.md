@@ -37,7 +37,7 @@ file is both the work list and the resume mechanism.
 
 | id | issues | weight | base | status | attempts | deferrals | files | done-when | decide |
 |----|--------|--------|------|--------|----------|-----------|-------|-----------|--------|
-| q001 | 116 | 1 | main | pending | 0 | 0 | `skills/docs-refresh/SKILL.md` | `grep -q '^allowed-tools:.*Agent' skills/docs-refresh/SKILL.md` → 0 **and** `grep -q '^allowed-tools:.*Task' skills/docs-refresh/SKILL.md` → 1 | yes |
+| q001 | 116 | 1 | main | in-progress | 0 | 0 | `skills/docs-refresh/SKILL.md` | `grep -q '^allowed-tools:.*Agent' skills/docs-refresh/SKILL.md` → 0 **and** `grep -q '^allowed-tools:.*Task' skills/docs-refresh/SKILL.md` → 1 | yes |
 | q002 | 113, 151 | 3 | `fix/verify-chunking` | pending | 0 | 0 | `scripts/lib/verify.mjs`, `scripts/lib/verify.test.mjs` | `npm test` → 0 | yes |
 | q003 | 144 | 2 | `chore/refresh-reference-artifacts` | pending | 0 | 0 | `README.md` | `npm run harvest:check` → 0 | yes |
 
@@ -48,6 +48,8 @@ file is both the work list and the resume mechanism.
   body says at `:58`, and as all 43 other skills use. Two-sided assertion: `Agent`
   present **and** `Task` absent. The second `grep` is expected to exit **1** —
   that non-zero exit is the pass condition.
+  Claimed `in-progress` by run `run-20260730T053122Z` (2026-07-30T05:31:22Z),
+  working on branch `fix/docs-refresh-agent-tool-116`.
 - **q002** — #113 and #151 are defects *in* `fix/verify-chunking` (pushed, green at
   `a388254`, unmerged). Base must be that branch; on `main` the code does not exist.
   Five issues touch `verify.mjs`, so these are serialized as one solo row.
