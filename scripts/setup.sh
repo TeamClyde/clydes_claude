@@ -144,6 +144,7 @@ echo "Step 1 — Checking prerequisites"
 
 PREREQS_OK=true
 
+# Hard prerequisites — without these the symlinking core (Steps 2-6) cannot run.
 check_prereq() {
   local cmd="$1"
   local message="$2"
@@ -153,9 +154,59 @@ check_prereq() {
   fi
 }
 
-check_prereq "node"       "Install Node.js from https://nodejs.org"
-check_prereq "npm"        "Install Node.js from https://nodejs.org (includes npm)"
-check_prereq "pre-commit" "Install with: pip install pre-commit"
+# Soft prerequisites — a missing one skips only its own dependent step.
+# EVERY flag must be initialised here: setup.sh runs under `set -euo pipefail`,
+# so a consumer testing an unset flag would abort the script with an unbound
+# variable error — reintroducing exactly the hard-fail this task removes.
+# Exactly six flags for six guard sites (2b-2g). Do not add a flag without a
+# consumer, and do not delete a check without confirming it has none: an unread
+# flag is dead weight, but a deleted check with live consumers is worse.
+HAVE_NODE=true
+HAVE_NPM=true
+HAVE_UV=true
+HAVE_CLAUDE=true
+HAVE_PYTHON=true
+HAVE_INFRA_INIT_PY=true
+
+# Returns 1 when the tool is missing, so a caller CAN branch on it. Nothing
+# currently does — the flag is the real output — so every call site below must
+# append `|| true`. Without it `set -e` aborts on the first missing optional
+# tool, which is the exact hard-fail #161 is about, just with a new cause.
+# `check_prereq` above needs no such guard: it always returns 0 and signals
+# through PREREQS_OK.
+check_optional() {
+  local cmd="$1"
+  local flag="$2"
+  local consequence="$3"
+  local message="$4"
+  if ! command -v "$cmd" > /dev/null 2>&1; then
+    warn "optional: $cmd not found — $consequence ($message)"
+    eval "$flag=false"
+    return 1
+  fi
+  return 0
+}
+
+check_prereq "git" "Install Git from https://git-scm.com"
+
+# `pre-commit` is deliberately NOT checked at all — not even as optional.
+# The command is never invoked anywhere in this script; Step 6 only symlinks the
+# repo's own hooks/pre-commit FILE, which succeeds whether or not the pip-installed
+# pre-commit framework exists. Per #115 that hook is not wired into any repo
+# anyway (core.hooksPath is unset). A check with no consumer is what caused #161.
+#
+check_optional "node" HAVE_NODE \
+  "Step 10 will skip the skill-usage hook and the weekly report schedule" \
+  "Install Node.js from https://nodejs.org" || true
+check_optional "npm" HAVE_NPM \
+  "Step 8 npm installs and Step 10 nodemailer will be skipped" \
+  "Install Node.js from https://nodejs.org (includes npm)" || true
+check_optional "uv" HAVE_UV \
+  "Step 9 git MCP registration will be skipped" \
+  "Install uv from https://docs.astral.sh/uv/getting-started/installation/" || true
+check_optional "claude" HAVE_CLAUDE \
+  "Steps 7 and 9 (plugins, MCP registration) will be skipped" \
+  "Install with: npm install -g @anthropic-ai/claude-code" || true
 
 # Python 3: try python3 first (macOS/Linux), fall back to python (Windows)
 PYTHON_CMD=""
@@ -166,13 +217,12 @@ for _py in python3 python; do
   fi
 done
 if [[ -z "$PYTHON_CMD" ]]; then
-  fail "missing: python3 — Install Python 3.9+ from https://python.org"
-  PREREQS_OK=false
+  warn "optional: python3 not found — Step 10 settings.json merge will be skipped (Install Python 3.9+ from https://python.org)"
+  HAVE_PYTHON=false
 fi
 
-# /infra-init specifically requires python3.11 or python3.14 — resolve separately
-# from the generic PYTHON_CMD above (which covers the MCP settings merge and can
-# use any Python 3).
+# /infra-init specifically requires python3.11 or python3.14 — resolved
+# separately from PYTHON_CMD above, which covers the settings merge.
 INFRA_INIT_PY=""
 for _py in python3.11 python3.14; do
   if command -v "$_py" > /dev/null 2>&1; then
@@ -181,21 +231,17 @@ for _py in python3.11 python3.14; do
   fi
 done
 if [[ -z "$INFRA_INIT_PY" ]]; then
-  fail "missing: python3.11 or python3.14 — required by /infra-init. Install one of them and re-run setup.sh."
-  PREREQS_OK=false
+  warn "optional: python3.11/python3.14 not found — Step 8 /infra-init dependencies will be skipped"
+  HAVE_INFRA_INIT_PY=false
 fi
-
-check_prereq "uv"     "Install uv from https://docs.astral.sh/uv/getting-started/installation/ (required for git MCP server)"
-check_prereq "claude" "Install Claude Code CLI with: npm install -g @anthropic-ai/claude-code"
-check_prereq "git"    "Install Git from https://git-scm.com"
 
 if ! $PREREQS_OK; then
   echo ""
-  echo "  One or more prerequisites are missing. Install them and re-run setup.sh."
+  echo "  A required prerequisite is missing. Install it and re-run setup.sh."
   exit 1
 fi
 
-success "All prerequisites found"
+success "Required prerequisites found (git); optional gaps warned above and skipped individually"
 
 # ---------------------------------------------------------------------------
 # Step 2 — Create ~/.claude/ directory structure
@@ -386,6 +432,7 @@ PLUGINS=(
 # They are marked Removed in plugins/registry.md and the enforcement pass below
 # uninstalls them; they no longer belong in the install list.
 
+if $HAVE_CLAUDE; then
 # Snapshot installed plugins once so each iteration can check without a subprocess
 PLUGIN_LIST_OUTPUT=""
 PLUGIN_LIST_OUTPUT=$(claude plugin list 2>/dev/null) || true
@@ -465,6 +512,9 @@ if [[ -f "$REPO_ROOT/plugins/registry.md" ]]; then
     fi
   done < "$REPO_ROOT/plugins/registry.md"
 fi
+else
+  skip "claude CLI not installed — skipping plugin install and registry enforcement"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 8 — Install MCP packages
@@ -483,7 +533,11 @@ install_npm_pkg() {
   fi
 }
 
-install_npm_pkg "@aashari/mcp-server-atlassian-bitbucket"
+if $HAVE_NPM; then
+  install_npm_pkg "@aashari/mcp-server-atlassian-bitbucket"
+else
+  skip "npm not installed — skipping MCP npm packages"
+fi
 # git MCP server uses uvx (mcp-server-git) — no pre-install needed; uvx downloads on first use
 
 # codebase-memory-mcp — single static binary, installed to ~/.local/bin
@@ -502,6 +556,7 @@ fi
 # /infra-init Python dependencies — tree-sitter parsers (env var scanner).
 # Install unpinned. pip show guard avoids re-resolving on every setup.sh run.
 echo ""
+if $HAVE_INFRA_INIT_PY; then
 info "Installing /infra-init Python dependencies using $INFRA_INIT_PY"
 for pkg in tree-sitter-python tree-sitter-typescript pyyaml jsonschema; do
   if "$INFRA_INIT_PY" -m pip show "$pkg" > /dev/null 2>&1; then
@@ -515,6 +570,9 @@ for pkg in tree-sitter-python tree-sitter-typescript pyyaml jsonschema; do
     fi
   fi
 done
+else
+  skip "python3.11/python3.14 not found — skipping /infra-init dependencies"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 9 — Register MCP servers via claude mcp add
@@ -546,14 +604,22 @@ register_mcp_stdio() {
   fi
 }
 
-# git — local repo history/blame/diff (uvx downloads on first use)
-register_mcp_stdio "git" uvx -- mcp-server-git --repository .
+if $HAVE_CLAUDE; then
+  # git — local repo history/blame/diff (uvx downloads on first use)
+  if $HAVE_UV; then
+    register_mcp_stdio "git" uvx -- mcp-server-git --repository .
+  else
+    skip "uv not installed — skipping git MCP registration"
+  fi
 
-# codebase-memory-mcp — symbol graph for /infra-init
-if [[ -x "$CBM_BIN" ]]; then
-  register_mcp_stdio "codebase-memory-mcp" "$CBM_BIN"
+  # codebase-memory-mcp — symbol graph for /infra-init
+  if [[ -x "$CBM_BIN" ]]; then
+    register_mcp_stdio "codebase-memory-mcp" "$CBM_BIN"
+  else
+    warn "skipping codebase-memory-mcp registration — binary not found at $CBM_BIN"
+  fi
 else
-  warn "skipping codebase-memory-mcp registration — binary not found at $CBM_BIN"
+  skip "claude CLI not installed — skipping all MCP registration"
 fi
 
 echo ""
@@ -580,11 +646,15 @@ install_symlink "$REPO_ROOT/scripts/skill-log.js"   "$HOME/.claude/scripts/skill
 install_symlink "$REPO_ROOT/scripts/skill-audit.js" "$HOME/.claude/scripts/skill-audit.js" "scripts/skill-audit.js"
 
 # Install nodemailer (used by skill-audit.js --send)
-info "Installing nodemailer ..."
-if (cd "$REPO_ROOT/scripts" && npm install --silent 2>/dev/null); then
-  success "nodemailer installed"
+if $HAVE_NPM; then
+  info "Installing nodemailer ..."
+  if (cd "$REPO_ROOT/scripts" && npm install --silent 2>/dev/null); then
+    success "nodemailer installed"
+  else
+    warn "npm install failed in scripts/ — run manually: cd $REPO_ROOT/scripts && npm install"
+  fi
 else
-  warn "npm install failed in scripts/ — run manually: cd $REPO_ROOT/scripts && npm install"
+  skip "npm not installed — skipping nodemailer"
 fi
 
 # Warn if email config is missing (credentials are machine-specific, not in the repo)
@@ -595,6 +665,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   echo "     Generate an app password at: https://myaccount.google.com/apppasswords"
 fi
 
+if $HAVE_NODE; then
 # Build the hook command using a Windows-native path so cmd.exe can resolve it.
 if command -v cygpath > /dev/null 2>&1; then
   _SKILL_LOG_WIN=$(cygpath -w "$HOME/.claude/scripts/skill-log.js")
@@ -605,6 +676,7 @@ fi
 
 # Merge the PostToolUse hook into ~/.claude/settings.json.
 # Skips if a Skill matcher is already present (respects --force to replace).
+if $HAVE_PYTHON; then
 PYTHONUTF8=1 \
   _SETTINGS_FILE="$(command -v cygpath > /dev/null 2>&1 && cygpath -m "$SETTINGS_FILE" || echo "$SETTINGS_FILE")" \
   _HOOK_CMD="$_HOOK_CMD" \
@@ -642,6 +714,12 @@ else:
         f.write("\n")
     print(f"  ✓ PostToolUse Skill hook added to settings.json")
 PYEOF
+else
+  skip "python3 not found — skipping settings.json hook merge"
+fi
+else
+  skip "node not found — skipping skill-usage hook registration"
+fi
 
 # ---------------------------------------------------------------------------
 # Weekly email report — Windows Task Scheduler (MSYS/MinGW) or crontab (Unix)
@@ -692,11 +770,15 @@ SHEOF
   fi
 }
 
-uname_out=$(uname -s 2>/dev/null || echo "unknown")
-if echo "$uname_out" | grep -qi "mingw\|cygwin\|msys"; then
-  _setup_windows_schedule
+if $HAVE_NODE; then
+  uname_out=$(uname -s 2>/dev/null || echo "unknown")
+  if echo "$uname_out" | grep -qi "mingw\|cygwin\|msys"; then
+    _setup_windows_schedule
+  else
+    _setup_unix_schedule
+  fi
 else
-  _setup_unix_schedule
+  skip "node not found — skipping weekly report schedule"
 fi
 
 echo ""
