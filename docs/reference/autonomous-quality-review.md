@@ -28,6 +28,7 @@ assertion** — that gap between the two ledgers is the point of keeping them ap
 | 2026-07-30 | [#163](https://github.com/TeamClyde/clydes_claude/pull/163) | 160, 161 | Yes, both, as stated. | `IMPROVEMENT` | Test discovery is *narrower* than what it replaced; `setup.sh` has no automated test. | Three unrelated changes plus the queue scaffolds in one PR. |
 | 2026-07-30 | [#164](https://github.com/TeamClyde/clydes_claude/pull/164) | 116 | Yes, exactly and only — one frontmatter token, nothing else in the file. | `IMPROVEMENT` (narrow) | **The `done-when` asserts the file's own text, not the behaviour the issue is about.** Separately, the queue lock never reached `main`. | First autonomous unit. Architect gate skipped on weight-1. |
 | 2026-07-31 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **No worker fire observed in 24h.** Nothing to review. See detail. |
+| 2026-08-01 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Second consecutive day with no worker fire.** PR #164 now unmerged 56h. See detail. |
 
 **Verdict values:** `IMPROVEMENT` · `NEUTRAL CHURN` · `REGRESSION`
 
@@ -193,3 +194,74 @@ an unmerged real run **and** a stall, and only reading open PRs separates them.
   (`plans/autonomous-backlog-scheduling/autonomous-backlog-scheduling-design.md`)
   does not exist on `main`, so the queue's stated rationale cannot be checked
   against its source.
+
+---
+
+## 2026-08-01 — detail
+
+**No pull request was opened in the review window** (2026-07-31T14:10Z →
+2026-08-01T14:10Z). Part 1 again has no diff to judge. This is the **second
+consecutive empty day**, which changes what the absence means: one quiet day is
+noise, two is a pattern.
+
+Confirmed rather than assumed:
+
+- `search_pull_requests … repo:TeamClyde/clydes_claude is:pr created:>=2026-07-30`
+  returns exactly three PRs — #162, #163, #164 — all opened 2026-07-30, all
+  already reviewed in the 2026-07-30 entry. Nothing newer exists.
+- Every branch tip on `origin` was inspected individually. The newest commit on
+  *any* branch in the window is `9a67f71` on `main` at 2026-07-31T14:14Z — this
+  review job's own commit from yesterday. No worker commit exists anywhere.
+- The branch list is byte-identical to yesterday's: the same six heads at the
+  same six SHAs. No fire created a branch, and none pushed to an existing one.
+
+### The blocker has not moved in two days
+
+PR #164 — still the only output the autonomous worker has ever produced — has
+now been **open and unmerged for ~56 hours**, last updated 2026-07-30T05:34Z.
+Every consequence recorded yesterday holds unchanged, so they are not restated
+at length; what matters is that a full day passed with no movement:
+
+1. `main` still shows `q001` as `pending` and the run ledger still reads
+   `_(no entries yet)_`. The lock, the `done` transition and the ledger row all
+   remain on `fix/docs-refresh-agent-tool-116`.
+2. A fire reading `main` today would still re-claim finished work. This was
+   predicted on 2026-07-30 and is now 48 hours old.
+3. The queue is still three seed rows, because expansion is gated on the proof
+   unit producing a PR that `main` can see.
+
+### The done-when evidence is sound — and still not on `main`
+
+Re-verified directly against the branch rather than taken from yesterday's
+entry. `run-20260730T053122Z` records `grep … Agent` → **0**, `grep … Task` →
+**1**, `npm test` → **0**, verbatim commands with real exit codes, exactly as
+the ledger's own rule demands. The `grep`→1 is the intended pass condition, not
+a failure. **This is not a condition-D finding**: the evidence is genuine and
+complete. Its only defect is location. That distinction matters — a missing-
+evidence finding and an unmerged-evidence finding call for opposite responses.
+
+The `done-when` remains the wrong assertion for the reason given in the
+2026-07-30 entry (both greps interrogate the text the edit itself changes). That
+is a standing gap, not a new one.
+
+### What is *not* wrong
+
+No row is `blocked`. No row is stuck `in-progress` on `main`. No `attempts` or
+`deferrals` counter has moved off zero on any row, and the ledger records no
+`released` outcome. There is no starvation and no gate failure. The queue is not
+absorbing repeated failures — **it is not being run at all**. Reporting these as
+"clean" would be misleading: they are zero because nothing executed, not because
+something executed successfully.
+
+### Could not assess
+
+- **Whether a fire was attempted and aborted, or was never scheduled.** Still
+  indistinguishable from the repository, for the same structural reason as
+  yesterday: there is no `.github/workflows/`, the worker is an external
+  scheduled task, and a resource-driven `released` row is by design written to a
+  feature branch that would never appear. An aborted fire and an absent fire
+  produce byte-identical state. Two days of this makes the observability gap the
+  more urgent design defect — the daily review cannot tell Jason *why* the
+  pipeline is quiet, only that it is.
+- The cited design doc is still absent from `main`.
+- The `decide` column is still undefined in the queue's own Rules section.
