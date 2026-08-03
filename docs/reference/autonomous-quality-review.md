@@ -30,6 +30,7 @@ assertion** — that gap between the two ledgers is the point of keeping them ap
 | 2026-07-31 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **No worker fire observed in 24h.** Nothing to review. See detail. |
 | 2026-08-01 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Second consecutive day with no worker fire.** PR #164 now unmerged 56h. See detail. |
 | 2026-08-02 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Third consecutive day with no worker fire.** PR #164 now unmerged ~80h. Pipeline is deadlocked, not slow. See detail. |
+| 2026-08-03 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Fourth consecutive day with no worker fire.** PR #164 now unmerged ~105h. The only commits on `main` in four days are this review job's own. See detail. |
 
 **Verdict values:** `IMPROVEMENT` · `NEUTRAL CHURN` · `REGRESSION`
 
@@ -361,3 +362,99 @@ behaves differently — is unchanged and still unaddressed.
   is still absent from `main`, so the queue's rationale still cannot be checked
   against its source.
 - The `decide` column is still undefined in the queue's own Rules section.
+
+---
+
+## 2026-08-03 — detail
+
+**No pull request was opened in the review window** (2026-08-02T14:11Z →
+2026-08-03T14:14Z). Part 1 has no diff to judge for the **fourth consecutive
+day**. Part 2 completed in full.
+
+Confirmed rather than assumed (nothing below is carried over from prior
+entries):
+
+- `list_pull_requests … state:all sort:created desc` returns #164 as the newest
+  PR in the repository, created 2026-07-30T05:33:35Z. Nothing newer exists.
+  Draft PRs are included in that listing, so a draft is not hiding the work.
+- `git fetch --prune --all` then `git log --all --oneline --since='24 hours ago'`
+  returns **zero commits across all refs** — not even this review job's own,
+  since yesterday's landed at 14:11Z and the window opens at 14:14Z.
+- All six `origin` heads are at the SHAs the prior three entries record. The
+  newest non-`main` head is `b75131e` on `fix/docs-refresh-agent-tool-116` at
+  2026-07-30T05:34Z. No fire created a branch and none pushed to an existing one.
+- PR #164 read directly: `state: open`, `merged: false`, `updated_at`
+  2026-07-30T05:34:09Z — unchanged since the minute it was opened, now
+  **~104.7 hours** (4.4 days). No review, no comment, no push.
+
+### The only thing moving in this repository is the observer
+
+PR #164's recorded base is `0e91384`. `main` is now three commits past it —
+`ee91420`, `9a67f71`, `2d48fdf`, `9d0373d` — and **every one of those is this
+review job's own daily commit**. Four days of repository history contain no
+production work of any kind: only the log of a reviewer reporting that there is
+nothing to review.
+
+That reframes the severity. The prior entries described a pipeline waiting on a
+merge. What the fourth day shows is a system in which the *monitoring* half runs
+flawlessly on schedule and the *working* half has never run twice. A monitor
+that reliably reports its own liveness while the thing it monitors is dead is
+the failure mode most likely to be mistaken for health — and the `[STALLED]`
+subject line is the only thing preventing that mistake here.
+
+None of the three commits conflicts with #164 (they touch
+`autonomous-quality-review.md`; #164 touches `SKILL.md`, `autonomous-queue.md`
+and `autonomous-run-ledger.md`). The PR should still merge cleanly — its
+staleness is not yet a mechanical obstacle. GitHub reports `mergeable_state:
+unknown`, which is an uncomputed cache, not a conflict.
+
+### One hypothesis tested and *not* settled
+
+Yesterday's entry narrowed the cause toward "the worker is not scheduled, or
+aborts before it can write anything," and noted the question could not be
+settled from the repository. This review attempted to settle it directly by
+enumerating the account's scheduled jobs rather than inferring from repository
+state.
+
+**The attempt failed for a structural reason worth recording.** The available
+cron-listing tool is scoped to jobs created *within the calling session*; it
+returns "No scheduled jobs" here, and it does not even list *this* review job,
+which is demonstrably scheduled and demonstrably firing. A negative result from
+that tool is therefore evidence of nothing at all, and must not be read as
+"the worker is not scheduled." The observability gap stands, and it is now
+confirmed to be unreachable from inside a run — not merely unreached. Settling
+it requires Jason inspecting the scheduler configuration directly.
+
+### What is *not* wrong — and why that is not reassurance
+
+No row is `blocked`. No row is stuck `in-progress`. `attempts` and `deferrals`
+are `0` on all three rows, and the ledger still reads `_(no entries yet)_` with
+no `released` outcome recorded. There is **no starvation, no gate failure and no
+resource-driven release** — the two categories the daily brief keeps apart are
+both empty, and they are empty because nothing executed. Grading this as a clean
+day would invert its meaning; it is the emptiest day of the four.
+
+No condition-D finding. The `done-when` evidence for `run-20260730T053122Z` was
+verified against the branch on 2026-08-01 and is genuine and complete; its
+defect is location, not integrity. The standing criticism of that `done-when` —
+that both `grep`s interrogate the very text the edit changed, so they assert the
+diff applied rather than that anything behaves differently — is unchanged and
+still unaddressed.
+
+### Could not assess
+
+- **Whether a fire was attempted and aborted, or was never scheduled.** See the
+  narrowing above: now actively probed and still structurally invisible. No
+  `.github/workflows/` exists, the worker is an external scheduled task, and a
+  resource-driven `released` row is by design written to a feature branch that
+  would never appear on `main`.
+- The cited design doc
+  (`plans/autonomous-backlog-scheduling/autonomous-backlog-scheduling-design.md`)
+  is still absent from `main` — the branch carrying it,
+  `feature/autonomous-backlog-scheduling`, is unmerged — so the queue's
+  rationale still cannot be checked against its source.
+- The `decide` column is still undefined in the queue's own Rules section.
+- The queue file's closing note still asserts "No fire will pick them up,
+  because the worker routine does not exist yet." A fire ran on 07-30 and
+  shipped `q001`, so that sentence has been false for four days. Flagged on
+  07-30; still uncorrected, because the correction is on the unmerged branch.
