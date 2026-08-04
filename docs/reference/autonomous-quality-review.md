@@ -31,6 +31,7 @@ assertion** — that gap between the two ledgers is the point of keeping them ap
 | 2026-08-01 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Second consecutive day with no worker fire.** PR #164 now unmerged 56h. See detail. |
 | 2026-08-02 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Third consecutive day with no worker fire.** PR #164 now unmerged ~80h. Pipeline is deadlocked, not slow. See detail. |
 | 2026-08-03 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Fourth consecutive day with no worker fire.** PR #164 now unmerged ~105h. The only commits on `main` in four days are this review job's own. See detail. |
+| 2026-08-04 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Fifth consecutive day with no worker fire.** PR #164 now unmerged ~129h. No branch in the repository has moved in 129h except `main`, and only by this job. See detail. |
 
 **Verdict values:** `IMPROVEMENT` · `NEUTRAL CHURN` · `REGRESSION`
 
@@ -458,3 +459,109 @@ still unaddressed.
   because the worker routine does not exist yet." A fire ran on 07-30 and
   shipped `q001`, so that sentence has been false for four days. Flagged on
   07-30; still uncorrected, because the correction is on the unmerged branch.
+
+---
+
+## 2026-08-04 — detail
+
+**PRs opened in the 24h window: none.** The newest pull request in the
+repository is still #164, created `2026-07-30T05:33:35Z` — **129 hours** ago.
+There is nothing to review for a fifth consecutive day, so no verdict is
+recorded. The rubric was not applied to anything; that is the finding.
+
+### The measurement that matters this time
+
+Previous entries established the stall from `main`'s commit log. That leaves one
+loophole: a fire could be working on a feature branch and simply not have opened
+a PR yet, which would look identical from `main`. This review closed that
+loophole by enumerating every remote ref's tip commit date rather than reading
+`main` alone.
+
+| Remote branch | Tip committed | Age |
+|---|---|---|
+| `origin/main` | 2026-08-03 14:17 | this review job's own commit |
+| `origin/fix/docs-refresh-agent-tool-116` | 2026-07-30 05:34 | 129h |
+| `origin/feature/autonomous-backlog-wave-minus-1` | 2026-07-29 20:29 | ~137h |
+| `origin/feature/autonomous-backlog-scheduling` | 2026-07-29 19:53 | ~138h |
+| `origin/fix/verify-chunking` | 2026-07-29 10:23 | ~148h |
+| `origin/chore/refresh-reference-artifacts` | 2026-07-22 12:57 | ~314h |
+
+**No ref in the repository has advanced in 129 hours except `main`, and every
+`main` commit in that span is this review job writing about the absence of
+work.** The stall is now established positively, not merely inferred from a
+missing PR. The worker is not working quietly on a branch; it is not running.
+
+### Categorisation — and why every problem bucket is empty
+
+Against the queue on `main`: `q001`, `q002`, `q003` are all `pending`, all with
+`attempts = 0` and `deferrals = 0`. The ledger on `main` still reads
+`_(no entries yet)_`.
+
+- **No row is `blocked`** — nothing was tried and rejected by a gate.
+- **No row is stuck `in-progress`** — nothing claimed a lock and died.
+- **No `deferrals >= 3`** — no starvation; no constrained fire skipped a heavy
+  row for a cheap one.
+- **No `released` outcome anywhere in the ledger** — no fire ran out of budget
+  mid-flight.
+
+This is the distinction the daily brief is required to keep apart, and it is
+decisive here. `blocked` means *could not be done*; `released`/`deferred` means
+*could not be afforded*. **Both categories are empty.** A cadence-too-dense or
+token-budget explanation would have to leave fingerprints in the second
+category, and there are none — not one deferral, not one release, in five days.
+Whatever is wrong is upstream of the queue: the worker is not reaching the point
+where it could record either kind of failure. Tuning the schedule density or the
+token budget would therefore be treating the wrong thing.
+
+### PR #164 — unchanged, and now the load-bearing symptom
+
+`updated_at` is still `2026-07-30T05:34:09Z`. In 129 hours the PR has received no
+review, no comment, and no push. Its base sha (`0e913849`) now trails `main`
+(`f8f1d33`) by five review commits. `mergeable_state` is still `unknown` — an
+uncomputed cache, not a conflict; the three intervening commits touch only
+`autonomous-quality-review.md`, which #164 does not modify.
+
+This matters beyond the one PR. #164 carries `q001`'s `done` transition **and**
+the sole run-ledger entry. While it sits unmerged, `main` cannot show that any
+autonomous work has ever succeeded, and a fresh fire reading the queue from
+`main` would still see `q001` as `pending` and could redo it. The PR's own
+author flagged this in its "Notes for the reviewer" — that an unattended run has
+no sanctioned route to write the lock to a protected branch. **That unanswered
+design question and this five-day stall are plausibly the same problem**, though
+this review cannot demonstrate the causal link from inside the repository.
+
+### Condition D — not triggered, with the standing caveat restated
+
+No unit is marked `shipped` on `main` at all, so there is no unevidenced claim to
+find. The `run-20260730T053122Z` evidence was verified genuine on 2026-08-01 and
+is unchanged; its defect remains *location* (branch, not `main`), not integrity.
+The standing criticism of that `done-when` also stands: both `grep`s interrogate
+the very text the edit changed, so they assert the diff applied rather than that
+any behaviour differs. Five days on, nothing has revisited it.
+
+### Could not assess
+
+- **Whether the worker is scheduled at all, or is being rejected at start.**
+  Unchanged and still structurally unreachable. The 2026-08-03 entry probed this
+  directly and established that the cron-listing tool is scoped to the calling
+  session — it does not list even *this* job, which is demonstrably firing. A
+  negative result from it is evidence of nothing. Settling this requires Jason
+  inspecting the scheduler configuration outside a run.
+- **Why nobody has merged #164.** Whether it is awaiting human review by design
+  or has been forgotten is not visible from the repository.
+- The design doc `plans/autonomous-backlog-scheduling/autonomous-backlog-scheduling-design.md`
+  is still absent from `main` (its branch is unmerged), so the queue's rationale
+  still cannot be checked against its source.
+- The `decide` column is still undefined in the queue's own Rules section.
+- The queue's closing note still asserts "No fire will pick them up, because the
+  worker routine does not exist yet." A fire ran on 07-30 and shipped `q001`, so
+  that sentence has been false for five days; the correction sits on the
+  unmerged branch. Flagged 07-30, 07-31, 08-01, 08-02, 08-03 — and again here.
+
+### Assessment
+
+A reviewer with nothing to review five days running is not a healthy pipeline
+being reported on accurately; it is a dead pipeline with a live monitor attached.
+The one thing this job must not do is let a steady cadence of tidy daily entries
+read as steady work. The `[STALLED]` subject line is the only part of this
+system still doing what it was built to do.
