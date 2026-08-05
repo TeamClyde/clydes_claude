@@ -15,11 +15,13 @@ Three tiers run in sequence: triage (cheap, batched), clustered re-check (task-a
 
 ---
 
-## Tier 1 — Batched Triage
+## Tier 1 — Chunked Batched Triage
 
 **Portable. Identical across all consumers.**
 
-ONE batched call receives the full findings list and assigns each finding a label:
+Triage is batched, and **chunked** at a bounded number of findings per call (engine default: 40). Chunks are dispatched concurrently and their verdicts merged into one map keyed by the finding's global index. Chunking exists because a single call handed a large findings list will silently judge only a prefix of it and return — the batch must be small enough that the judge reliably covers all of it.
+
+Each call assigns every finding it receives a label:
 
 | Label | Meaning |
 |---|---|
@@ -35,9 +37,11 @@ The triage call also flags two additional conditions per finding (non-exclusive 
 | `thin-source` | The finding rests on a single source, or the cited source is shallow/low-authority. |
 
 **Drop rule (default):** `unsupported` findings are dropped immediately — no re-check, no vote — *unless* the active consumer profile's `escalateOn` set lists `unsupported`. Only `web-research` does (`guard-unsupported`): for that profile, `unsupported` findings escalate to Tier 2 instead of being dropped. The drop rule is profile-overridable; it is not a global pre-filter that runs before profile escalation.
+**Unjudged is not refuted (PINNED):** a finding that comes back with **no verdict** — because a chunk truncated its output or the chunk call failed — **escalates to Tier 2**. It is never dropped. An unjudged finding carries no evidence against it, so dropping it silently discards collected work while reporting success. Track the judged fraction as `triageCoverage` and surface it to the caller; `< 1` means the adversarial tiers, not triage, are what carried those findings.
+
 **No new lookups:** Triage does not fetch URLs, read additional files, or extend the evidence set. It evaluates only the evidence the fan-out agents already cited.
 
-Output set after Tier 1 (profile-aware): `supported` findings pass through directly; any finding whose label or flag is in the active profile's `escalateOn` set escalates to Tier 2 (e.g. `uncertain` + `disagree` for most profiles; additionally `unsupported` + `thin-source` for `web-research`); all remaining `unsupported` findings are dropped.
+Output set after Tier 1 (profile-aware): `supported` findings pass through directly; any finding whose label or flag is in the active profile's `escalateOn` set escalates to Tier 2 (e.g. `uncertain` + `disagree` for most profiles; additionally `unsupported` + `thin-source` for `web-research`), as does any unjudged finding; all remaining `unsupported` findings are dropped.
 
 ---
 
@@ -59,6 +63,8 @@ For **each cluster**, dispatch ONE re-check agent that:
 
 **Cost bound:** N findings → approximately (distinct cluster keys) re-check calls, not N calls. This bounds re-check cost to the number of distinct files/sub-questions touched, regardless of how many findings each contains.
 
+**Cluster failure is contained (PINNED):** clusters are independent, so a cluster whose re-check times out or errors falls back to **its own input set** — all of its members are kept and escalate to Tier 3 — while every other cluster's decisions stand. A failed cluster must never degrade the whole verify: measured re-check durations span a wide range, so one slow cluster is the expected case, and collapsing the run on it discards completed Tier-1 work and skips Tier 3 entirely. Report the fraction of clusters that returned as `recheckCoverage`.
+
 Output set after Tier 2: `drop` decisions are removed; `keep` decisions form the **contested tail** that escalates to Tier 3 consensus. The re-check returns a binary `keep`/`drop` per member — there is no separate "ambiguous" outcome.
 
 ---
@@ -69,9 +75,24 @@ Output set after Tier 2: `drop` decisions are removed; `keep` decisions form the
 
 The **contested tail** = findings that escalated at Tier 1 (their label or flag matched the active profile's `escalateOn` — e.g. `uncertain`, `disagree`, `thin-source`) **and** were kept by the Tier-2 re-check. Clean Tier-1 `supported` findings never reach this tier.
 
+### Dispatch Shape (PINNED)
+
+**One agent call per voter frame per chunk — NEVER one call per finding.** Each of the three voters receives a whole chunk of contested findings (same bound as Tier 1) and returns one refute/keep vote per finding index. Cost is `3 × chunks`, independent of how many findings each chunk holds. Per-finding voting is `O(3N)` and has already cost this repo a session limit at scale; it is prohibited, not merely discouraged.
+
+The three frames for a chunk run concurrently; chunks run in sequence, so at most `voters` agents are in flight at this tier.
+
+**A voter that omits a finding's index has NOT refuted it** — silence counts as a keeper, mirroring Tier 2's absent-entry `keep` rule. Without this, a voter whose output truncates would silently refute its own tail. If *every* voter frame fails while findings are waiting on them, Tier 3 never ran: degrade rather than pass the contested set through labelled as verified.
+
+**A voter frame that never RAN is not a voter that stayed silent (PINNED).** Frames dispatch concurrently and independently, so a rejected or timed-out frame is simply absent from the results. It must be excluded from the denominator, never counted as a keeper. Two distinct rules follow, and both are per-CHUNK — a healthy chunk never vouches for a sibling chunk that lost its frames:
+
+- **Quorum floor.** Apply the survival rule only when at least `surviveAtLeast` frames returned for that chunk. Below the floor there is no consensus to compute — "≥ 2 of 3 failed to refute" is unanswerable when fewer than 2 voted. Keep the chunk's members (a frame that never ran is not evidence against a finding) but log **every one** as `contested`, so a chunk that was never actually judged cannot read as a clean unanimous keep.
+- **Live denominator.** Above the floor, measure keepers as `(frames that returned) − refutations`, never against the fixed voter count. Counting absent frames as silent keepers lets a real refutation be outvoted by voters that never ran — the verify becomes least adversarial exactly when it is least healthy.
+
+Report the fraction of frames that returned as `consensusCoverage`.
+
 ### The Rule (PINNED)
 
-**Three structurally-diverse voters each independently attempt to REFUTE the finding.** A finding survives if and only if ≥ 2 of 3 voters *fail* to refute it.
+**Three structurally-diverse voters each independently attempt to REFUTE the finding.** A finding survives if and only if ≥ 2 of the voters that *returned* fail to refute it, and at least `surviveAtLeast` voters returned. Batching changes only the dispatch shape — the per-finding aggregation is unchanged.
 
 | Outcome | Refutations | Disposition |
 |---|---|---|
@@ -120,13 +141,24 @@ In all degradation cases: the returned findings include a `degraded: true` field
 
 **Fallback rule:** On tier failure, always fall back to **that tier's input set** — never to an empty set. Dropping everything on timeout is worse than returning unverified findings with a clear `degraded` flag.
 
+**Scope the fallback to the unit that failed.** Tiers 2 and 3 dispatch many independent agents (one per cluster, three per chunk). When one of them is lost, the fallback applies to *that cluster* or *that chunk* — not to the whole run. A whole-tier collapse is reserved for a whole-tier failure.
+
+### `degraded` vs `partial` — distinct signals
+
+| Field | Meaning | Correct caller response |
+|---|---|---|
+| `degraded: true` | The verify did not run. No usable judgement was produced. | Discard the verify output; treat findings as unverified. |
+| `partial: true` | The verify ran and its output is usable, but some tier agents were lost, so it was **less adversarial than this protocol promises**. | Use the output; surface the reduced assurance. Read `recheckCoverage` / `consensusCoverage` for the extent. |
+
+**Do not conflate them.** Callers commonly implement `degraded` as "throw the verify away and pass the raw findings through". Raising `degraded` for a single lost voter frame would therefore discard an entire otherwise-good verify pass — a worse outcome than the fail-open it was meant to fix. Partial loss gets its own flag precisely so the healthy majority of the work survives.
+
 ---
 
 ## Machine-readable param block
 
 ```json
 {
-  "protocolVersion": "1.0",
+  "protocolVersion": "1.2",
   "tiers": ["triage", "clusteredRecheck", "consensus"],
   "consensus": { "voters": 3, "surviveAtLeast": 2, "rule": "minority-veto", "diversity": ["role", "ordering", "modelFamily"] },
   "labels": ["supported", "uncertain", "unsupported"],

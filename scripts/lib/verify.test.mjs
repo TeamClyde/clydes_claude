@@ -8,17 +8,26 @@ const F = [
   { id: 'c', where: 'y.mjs:3', summary: 'borderline', _seed: 'uncertain' },
 ];
 
-// Generic stub: triage echoes _seed; Tier-2 recheck keeps all; consensus voters keep unless summary has 'kill'.
+// Generic stub: triage echoes _seed; Tier-2 recheck keeps all; consensus voters keep unless refute() says so.
+// Tier 3 is BATCHED — one call per voter frame returns a vote per index (label: verify:consensus:<voter>:<chunk>).
+// `_idx` equals fixture position, so positional `i` is the index the engine will look up.
 function mkAgent({ recheckDrops = [], refute = () => false } = {}) {
   return async (prompt, opts) => {
     if (opts.label === 'verify:triage') return { verdicts: F.map((f, i) => ({ index: i, support: f._seed })) };
     if (opts.label?.startsWith('verify:recheck')) return { keep: F.map((_, i) => ({ index: i, keep: !recheckDrops.includes(i) })) };
     if (opts.label?.startsWith('verify:consensus')) {
       const voter = Number(opts.label.split(':')[2]);
-      return { refuted: refute(opts.findingId, voter) };
+      return { votes: F.map((f, i) => ({ index: i, refuted: refute(f.id, voter) })) };
     }
   };
 }
+
+// Build N uniform findings that all cluster together (same `where` file) for volume tests.
+const manyFindings = (n) =>
+  Array.from({ length: n }, (_, i) => ({ id: `f${i}`, where: `x.mjs:${i}`, summary: `claim ${i}` }));
+
+// Indices the engine rendered into a tier prompt (renderFinding emits `[idx] where — summary`).
+const promptIndices = (prompt) => [...prompt.matchAll(/^\[(\d+)\]/gm)].map((m) => Number(m[1]));
 
 test('protocol object matches the pinned shape', () => {
   assert.equal(VERIFY_PROTOCOL.consensus.voters, 3);
@@ -49,7 +58,7 @@ test('Tier 2 keys on GLOBAL _idx, not cluster position', async () => {
   const agent = async (prompt, opts) => {
     if (opts.label === 'verify:triage') return { verdicts: G.map((f, i) => ({ index: i, support: f._seed })) };
     if (opts.label?.startsWith('verify:recheck')) return { keep: [{ index: 0, keep: true }, { index: 2, keep: false }] };
-    if (opts.label?.startsWith('verify:consensus')) return { refuted: false };
+    if (opts.label?.startsWith('verify:consensus')) return { votes: G.map((_, i) => ({ index: i, refuted: false })) };
   };
   const out = await tieredVerify(G, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
   const ids = out.findings.map((f) => f.id);
@@ -87,7 +96,7 @@ test('web-research profile: unsupported finding escalates to Tier 2 (not dropped
   const agent = async (prompt, opts) => {
     if (opts.label === 'verify:triage') return { verdicts: [{ index: 0, support: 'unsupported' }] };
     if (opts.label?.startsWith('verify:recheck')) return { keep: [{ index: 0, keep: true }] };
-    if (opts.label?.startsWith('verify:consensus')) return { refuted: false };
+    if (opts.label?.startsWith('verify:consensus')) return { votes: [{ index: 0, refuted: false }] };
   };
   const out = await tieredVerify(W, { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
   assert.ok(out.findings.map((f) => f.id).includes('u'),
@@ -103,7 +112,7 @@ test('tolerant rendering: a finding lacking where/summary triages on its own fie
   const agent = async (prompt, opts) => {
     if (opts.label === 'verify:triage') { triageSeen = prompt; return { verdicts: [{ index: 0, support: 'supported' }] }; }
     if (opts.label?.startsWith('verify:recheck')) return { keep: [{ index: 0, keep: true }] };
-    if (opts.label?.startsWith('verify:consensus')) return { refuted: false };
+    if (opts.label?.startsWith('verify:consensus')) return { votes: [{ index: 0, refuted: false }] };
   };
   const out = await tieredVerify(WR, { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
   assert.ok(!triageSeen.includes('undefined'), 'must not render "undefined" into the triage prompt');
@@ -133,10 +142,230 @@ test('fail loud: triage judging nothing on a non-empty input degrades (verifyEmp
 test('all-unsupported with verdicts present is a clean empty result, not verifyEmptied', async () => {
   const agent = async (prompt, opts) => {
     if (opts.label === 'verify:triage') return { verdicts: F.map((_, i) => ({ index: i, support: 'unsupported' })) };
-    return { keep: [], refuted: false };
+    return { keep: [], votes: [] };
   };
   const out = await tieredVerify(F, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
   assert.equal(out.degraded, false, 'triage judged every finding → not a failure');
   assert.ok(!out.verifyEmptied, 'must not flag verifyEmptied when findings were genuinely judged');
   assert.equal(out.findings.length, 0, 'all-unsupported → correct empty result');
+});
+
+// ── Regression: PARTIAL triage coverage ────────────────────────────────────────
+// A live run handed one triage agent 254 findings; it returned verdicts for indices 0-22 and the
+// engine silently dropped the other 231 (`if (!v) continue`). The anyJudged guard only catches the
+// all-or-nothing case, so partial truncation passed as success. An unjudged finding carries no
+// evidence against it — it must escalate, never drop.
+test('partial triage coverage: unjudged findings escalate instead of being dropped', async () => {
+  const N = 100;
+  const many = manyFindings(N);
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') {
+      // Simulate a truncating triage agent: judge only global indices <= 22, whatever chunk they land in.
+      return { verdicts: promptIndices(prompt).filter((i) => i <= 22).map((i) => ({ index: i, support: 'supported' })) };
+    }
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [] };    // absent → keep
+    if (opts.label?.startsWith('verify:consensus')) return { votes: [] }; // absent → keeper
+  };
+  const out = await tieredVerify(many, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.findings.length, N, 'no finding may be dropped merely for lacking a verdict');
+  assert.equal(out.counts.triageCoverage, 23 / N, 'coverage shortfall is reported, not hidden');
+});
+
+test('triage is chunked so every finding is actually presented for judgement', async () => {
+  const N = 100;
+  const many = manyFindings(N);
+  const seen = new Set();
+  let triageCalls = 0;
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') {
+      triageCalls++;
+      const idxs = promptIndices(prompt);
+      for (const i of idxs) seen.add(i);
+      return { verdicts: idxs.map((i) => ({ index: i, support: 'supported' })) };
+    }
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [] };
+    if (opts.label?.startsWith('verify:consensus')) return { votes: [] };
+  };
+  const out = await tieredVerify(many, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.ok(triageCalls > 1, 'a 100-finding input must be split across more than one triage call');
+  assert.equal(seen.size, N, 'every index 0..N-1 is presented to some triage chunk');
+  assert.equal(out.counts.triageCoverage, 1);
+});
+
+// ── Regression: Tier-3 cost bound ──────────────────────────────────────────────
+// Tier 3 used to run 3 voter agents PER FINDING in a sequential loop. Once the upstream watchdog and
+// triage-coverage bugs were fixed, ~250 findings would reach it — ~500 sequential agents, reproducing
+// a prior incident that burned a session limit. Dispatch is now batched: 3 frames per chunk.
+test('Tier 3 dispatch is batched — agent count scales with chunks, not with findings', async () => {
+  const N = 60;
+  const many = manyFindings(N);
+  let consensusCalls = 0;
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') {
+      return { verdicts: promptIndices(prompt).map((i) => ({ index: i, support: 'uncertain' })) };
+    }
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [] };
+    if (opts.label?.startsWith('verify:consensus')) { consensusCalls++; return { votes: [] }; }
+  };
+  const out = await tieredVerify(many, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.findings.length, N, 'all 60 escalate and survive');
+  assert.ok(consensusCalls <= 3 * Math.ceil(N / 40), `batched Tier 3 must not exceed 3 per chunk (got ${consensusCalls})`);
+  assert.ok(consensusCalls < N, `must not be per-finding voting (got ${consensusCalls} for ${N} findings)`);
+});
+
+test('minority-veto survives the batch dispatch shape', async () => {
+  const M = [
+    { id: 'm1', where: 'x.mjs:1', summary: 'refuted by two frames' },
+    { id: 'm2', where: 'x.mjs:2', summary: 'refuted by one frame' },
+  ];
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: M.map((_, i) => ({ index: i, support: 'uncertain' })) };
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [] };
+    if (opts.label?.startsWith('verify:consensus')) {
+      const voter = Number(opts.label.split(':')[2]);
+      return { votes: [
+        { index: 0, refuted: voter < 2 },   // m1: 2 of 3 refute → 1 keeper → drop
+        { index: 1, refuted: voter === 0 }, // m2: 1 of 3 refutes → 2 keepers → survive
+      ] };
+    }
+  };
+  const out = await tieredVerify(M, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  const ids = out.findings.map((f) => f.id);
+  assert.ok(!ids.includes('m1'), 'm1 drops on minority-veto (1 keeper < surviveAtLeast 2)');
+  assert.ok(ids.includes('m2'), 'm2 survives (2 keepers)');
+  assert.deepEqual(out.contested.map((f) => f.id).sort(), ['m1', 'm2'], 'both logged contested');
+});
+
+// A voter frame that omits an index has NOT refuted it — same rule as Tier 2's absent-entry keep.
+// Without this, a frame that truncates silently refutes its tail: the Tier-1 bug, one tier down.
+test('a consensus frame omitting an index counts as a keeper, not a refutation', async () => {
+  const S = [{ id: 's1', where: 'x.mjs:1', summary: 'judged by two of three frames' }];
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: [{ index: 0, support: 'uncertain' }] };
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [] };
+    if (opts.label?.startsWith('verify:consensus')) {
+      const voter = Number(opts.label.split(':')[2]);
+      return { votes: voter === 0 ? [] : [{ index: 0, refuted: false }] }; // frame 0 stays silent
+    }
+  };
+  const out = await tieredVerify(S, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.ok(out.findings.map((f) => f.id).includes('s1'), 'survives');
+  assert.ok(!out.contested.map((f) => f.id).includes('s1'),
+    'silence is not a refutation — must not be logged contested');
+});
+
+test('triageCoverage is 1 when every finding is judged', async () => {
+  const out = await tieredVerify(F, { profile: 'audit', agent: mkAgent(), perTierTimeoutMs: 1000 });
+  assert.equal(out.counts.triageCoverage, 1);
+});
+
+// ── Regression: Tier-3 fail-open on lost voter frames ──────────────────────────
+// `keepers` was computed against the hardcoded `consensus.voters` (3) rather than the number of
+// frames that actually returned. Frames dispatch with allSettled, so a rejected frame was skipped
+// and never subtracted from the denominator: 2 of 3 frames timing out scored 3-0 and the finding
+// passed as a CLEAN unanimous consensus — no contested entry, nothing degraded. The verify became
+// least adversarial exactly when it was least healthy, and said nothing.
+
+// One escalated finding, all frames of a chunk configured by `frameFails` to reject.
+const oneUncertain = [{ id: 'x1', where: 'x.mjs:1', summary: 'needs consensus' }];
+
+// Agent whose consensus frames can be made to reject per (voter, chunk).
+function consensusAgent({ findings, frameRejects = () => false, refute = () => false }) {
+  return async (prompt, opts) => {
+    if (opts.label === 'verify:triage') {
+      return { verdicts: findings.map((_, i) => ({ index: i, support: 'uncertain' })) };
+    }
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [] };   // absent → keep
+    if (opts.label?.startsWith('verify:consensus')) {
+      const [, , voter, chunk] = opts.label.split(':').map((s, i) => (i >= 2 ? Number(s) : s));
+      if (frameRejects(voter, chunk)) throw new Error('frame down');
+      return { votes: findings.map((_, i) => ({ index: i, refuted: refute(i, voter) })) };
+    }
+  };
+}
+
+test('Tier 3: a chunk below voter quorum is kept but marked contested, never a clean consensus', async () => {
+  // 2 of 3 frames die; the survivor does not refute. Old behaviour: keepers = 3 - 0 = 3 → clean keep.
+  const out = await tieredVerify(oneUncertain, {
+    profile: 'audit',
+    agent: consensusAgent({ findings: oneUncertain, frameRejects: (v) => v < 2 }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.ok(out.findings.map((f) => f.id).includes('x1'), 'silence is not evidence — the finding is kept');
+  assert.ok(out.contested.map((f) => f.id).includes('x1'),
+    'but a chunk that never reached quorum must NOT read as a clean unanimous consensus');
+  assert.equal(out.partial, true, 'lost frames are surfaced to the caller');
+  assert.equal(out.counts.consensusCoverage, 1 / 3);
+  assert.equal(out.degraded, false, 'partial frame loss is not a whole-verify degrade');
+});
+
+test('Tier 3: the keeper denominator counts frames that returned, not the hardcoded voter count', async () => {
+  // 1 frame dies; of the 2 that return, 1 refutes. Correct: keepers = 2 - 1 = 1 < surviveAtLeast → drop.
+  // Old behaviour: keepers = 3 - 1 = 2 → survives as if two voters had cleared it.
+  const out = await tieredVerify(oneUncertain, {
+    profile: 'audit',
+    agent: consensusAgent({
+      findings: oneUncertain,
+      frameRejects: (v) => v === 0,
+      refute: (_i, voter) => voter === 1,
+    }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.ok(!out.findings.map((f) => f.id).includes('x1'),
+    'a refutation from half the surviving frames must not be outvoted by frames that never ran');
+  assert.ok(out.contested.map((f) => f.id).includes('x1'));
+});
+
+test('Tier 3: frame loss in one chunk does not silently vouch for that chunk', async () => {
+  // 60 findings → chunks of 40 and 20. Every frame of chunk 1 dies; chunk 0 is healthy.
+  // Old behaviour: `framesSucceeded` was a GLOBAL counter, so chunk 0's successes kept the
+  // total-wipeout guard quiet and chunk 1's 20 findings passed as clean 3-0 consensus.
+  const many = manyFindings(60);
+  const out = await tieredVerify(many, {
+    profile: 'audit',
+    agent: consensusAgent({ findings: many, frameRejects: (_v, chunk) => chunk === 1 }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.equal(out.findings.length, 60, 'nothing is dropped for a failure that is not evidence');
+  assert.deepEqual(
+    out.contested.map((f) => f.id).sort(),
+    many.slice(40).map((f) => f.id).sort(),
+    'exactly the un-voted chunk is flagged — containment, not blanket suspicion',
+  );
+  assert.equal(out.partial, true);
+  assert.equal(out.counts.consensusCoverage, 3 / 6, 'one of two chunks lost all three frames');
+});
+
+// ── Regression: Tier-2 Promise.all made one slow cluster fatal ─────────────────
+// Clusters ran under Promise.all, so a single cluster's rejection propagated to the outer catch and
+// degraded the ENTIRE verify — completed Tier-1 work discarded, Tier 3 never run, every finding
+// returned UNVERIFIED. The protocol's own fallback rule is per-tier-input, not global.
+
+test('Tier 2: one failing cluster is contained — the rest of the verify still runs', async () => {
+  const C = [
+    { id: 'c1', where: 'a.mjs:1', summary: 'in the failing cluster' },
+    { id: 'c2', where: 'b.mjs:1', summary: 'kept by its cluster' },
+    { id: 'c3', where: 'b.mjs:2', summary: 'dropped by its cluster' },
+  ];
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: C.map((_, i) => ({ index: i, support: 'uncertain' })) };
+    if (opts.label === 'verify:recheck:a.mjs') throw new Error('cluster down');
+    if (opts.label === 'verify:recheck:b.mjs') return { keep: [{ index: 1, keep: true }, { index: 2, keep: false }] };
+    if (opts.label?.startsWith('verify:consensus')) return { votes: [] }; // absent → keeper
+  };
+  const out = await tieredVerify(C, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.degraded, false, 'a single failed cluster must not degrade the whole verify');
+  const ids = out.findings.map((f) => f.id);
+  assert.ok(ids.includes('c1'), "the failed cluster falls back to ITS OWN input (keep-all), not to nothing");
+  assert.ok(ids.includes('c2'), 'the healthy cluster still keeps what it kept');
+  assert.ok(!ids.includes('c3'), 'the healthy cluster still drops what it dropped');
+  assert.equal(out.partial, true, 'the lost cluster is surfaced, not swallowed');
+  assert.equal(out.counts.recheckCoverage, 1 / 2);
+});
+
+test('a fully healthy verify reports full coverage and is not partial', async () => {
+  const out = await tieredVerify(F, { profile: 'audit', agent: mkAgent(), perTierTimeoutMs: 1000 });
+  assert.equal(out.partial, false);
+  assert.equal(out.counts.recheckCoverage, 1);
+  assert.equal(out.counts.consensusCoverage, 1);
 });
