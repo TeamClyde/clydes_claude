@@ -79,34 +79,48 @@ export function deriveEvidenceState({ findings, rawFindings, verifyDegraded, cov
 
 // ── URL membership (section validation layer 1) ─────────────────────────────
 // `)` is allowed IN the match because it is legitimate URL path content
-// (…/wiki/Bird_(disambiguation)), then unbalanced trailing `)` are trimmed because a `)` is far
-// more often the closer of a wrapping `(` or a markdown `[t](…)` link than part of the path.
+// (…/wiki/Bird_(disambiguation)), then trailing noise is trimmed off separately below.
 // Excluding `)` from the class outright — the obvious move — silently truncates the parenthetical
 // case, and because unknownUrls compares against the finding's exact source, a correctly cited
 // URL then reads as smuggled.
 const PROSE_URL_RE = /https?:\/\/[^\s<>"'`\]]+/gi;
 
-// Sentence-final punctuation is not part of a URL. Without this, "see https://x/y." never matches
-// the finding's own `https://x/y` and every section would fail validation on its last sentence.
-const stripTrailingPunct = (u) => u.replace(/[.,;:!?]+$/, '');
+// Trailing noise on a URL in prose nests in both directions — "(see https://x/y.)" buries the
+// unbalanced `)` under a period, while "(see https://x/y)," buries it under a comma — so a fixed
+// strip-punct-then-strip-paren order fixes one shape and breaks the other. Hence: loop until the
+// end index stops moving.
+//
+// Parens are counted ONCE up front and `closes` is decremented as closers are consumed, rather
+// than rescanning the string per iteration. The rescanning version is O(n^2) and measurably hangs
+// on a long run of `)` — and this input is agent-generated prose, so a degenerate repeated-character
+// run is a real possibility rather than a theoretical one.
+const TRAILING_PUNCT = '.,;:!?';
 
-// Trims trailing `)` one at a time only while they are unbalanced (more closers than openers seen
-// so far), so `(https://x/y)` → `https://x/y` (the wrapper is unbalanced) but
-// `.../wiki/Bird_(disambiguation)` is left intact (the pair is balanced). Must run AFTER
-// stripTrailingPunct: a trailing `,`/`.` (e.g. "(https://x/y),") sits outside the paren and would
-// otherwise mask the unbalanced `)` underneath it from this check.
-const trimUnbalancedParens = (u) => {
-  let out = u;
-  while (out.endsWith(')') && (out.match(/\(/g) ?? []).length < (out.match(/\)/g) ?? []).length) {
-    out = out.slice(0, -1);
+const trimTrailingNoise = (u) => {
+  let opens = 0;
+  let closes = 0;
+  for (let i = 0; i < u.length; i++) {
+    if (u[i] === '(') opens++;
+    else if (u[i] === ')') closes++;
   }
-  return out;
+  let end = u.length;
+  for (;;) {
+    const before = end;
+    while (end > 0 && TRAILING_PUNCT.includes(u[end - 1])) end--;
+    // Only an UNBALANCED closer is trimmed, so `.../wiki/Bird_(disambiguation)` keeps its pair
+    // while a wrapping `(...)` or a markdown `[t](...)` closer is removed.
+    if (end > 0 && u[end - 1] === ')' && closes > opens) {
+      end--;
+      closes--;
+    }
+    if (end === before) return u.slice(0, end);
+  }
 };
 
 /** @param {string} markdown @returns {string[]} deduped URLs appearing in the prose */
 export function urlsInProse(markdown) {
   const hits = String(markdown ?? '').match(PROSE_URL_RE) ?? [];
-  return [...new Set(hits.map((u) => trimUnbalancedParens(stripTrailingPunct(u))))];
+  return [...new Set(hits.map(trimTrailingNoise))];
 }
 
 /**
@@ -131,7 +145,7 @@ export function urlsInProse(markdown) {
 export function unknownUrls(markdown, findings) {
   const known = new Set(
     (findings ?? [])
-      .map((f) => (typeof f?.source === 'string' ? stripTrailingPunct(f.source.trim()) : ''))
+      .map((f) => (typeof f?.source === 'string' ? trimTrailingNoise(f.source.trim()) : ''))
       .filter(Boolean),
   );
   return urlsInProse(markdown).filter((u) => !known.has(u));

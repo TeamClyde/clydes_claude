@@ -177,3 +177,30 @@ test('assessCoverage tolerates duplicate subQuestion values; hasAnySource reject
     'prose containing a URL is not itself a citation',
   );
 });
+
+test('urlsInProse: strips a sentence period nested INSIDE a wrapping paren (regression guard)', () => {
+  const md = '(for more, see https://x.example/y.) Next sentence.';
+  assert.deepEqual(urlsInProse(md), ['https://x.example/y']);
+});
+
+test('urlsInProse: strips a comma nested INSIDE a wrapping paren (regression guard)', () => {
+  const md = '(see https://x.example/y,) and more';
+  assert.deepEqual(urlsInProse(md), ['https://x.example/y']);
+});
+
+test('unknownUrls: [] for the ".)" shape when the URL IS in the findings (regression guard)', () => {
+  const findings = [{ source: 'https://x.example/y' }];
+  assert.deepEqual(unknownUrls('(for more, see https://x.example/y.) Next sentence.', findings), []);
+});
+
+// Time bound guards ALGORITHMIC COMPLEXITY, not raw speed: linear extraction over 50,000 trailing
+// closers is ~1ms, so a 2000ms budget has a huge margin and will not flake on a slow machine. The
+// quadratic implementation this replaces would take well over a minute on this input.
+test('urlsInProse: stays linear on a degenerate run of trailing closers', () => {
+  const md = `see https://x.example/y${')'.repeat(50_000)}`;
+  const start = Date.now();
+  const result = urlsInProse(md);
+  const elapsed = Date.now() - start;
+  assert.deepEqual(result, ['https://x.example/y']);
+  assert.ok(elapsed < 2000, `expected under 2000ms, took ${elapsed}ms`);
+});
