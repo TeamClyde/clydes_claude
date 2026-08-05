@@ -63,6 +63,8 @@ For **each cluster**, dispatch ONE re-check agent that:
 
 **Cost bound:** N findings → approximately (distinct cluster keys) re-check calls, not N calls. This bounds re-check cost to the number of distinct files/sub-questions touched, regardless of how many findings each contains.
 
+**Cluster failure is contained (PINNED):** clusters are independent, so a cluster whose re-check times out or errors falls back to **its own input set** — all of its members are kept and escalate to Tier 3 — while every other cluster's decisions stand. A failed cluster must never degrade the whole verify: measured re-check durations span a wide range, so one slow cluster is the expected case, and collapsing the run on it discards completed Tier-1 work and skips Tier 3 entirely. Report the fraction of clusters that returned as `recheckCoverage`.
+
 Output set after Tier 2: `drop` decisions are removed; `keep` decisions form the **contested tail** that escalates to Tier 3 consensus. The re-check returns a binary `keep`/`drop` per member — there is no separate "ambiguous" outcome.
 
 ---
@@ -81,9 +83,16 @@ The three frames for a chunk run concurrently; chunks run in sequence, so at mos
 
 **A voter that omits a finding's index has NOT refuted it** — silence counts as a keeper, mirroring Tier 2's absent-entry `keep` rule. Without this, a voter whose output truncates would silently refute its own tail. If *every* voter frame fails while findings are waiting on them, Tier 3 never ran: degrade rather than pass the contested set through labelled as verified.
 
+**A voter frame that never RAN is not a voter that stayed silent (PINNED).** Frames dispatch concurrently and independently, so a rejected or timed-out frame is simply absent from the results. It must be excluded from the denominator, never counted as a keeper. Two distinct rules follow, and both are per-CHUNK — a healthy chunk never vouches for a sibling chunk that lost its frames:
+
+- **Quorum floor.** Apply the survival rule only when at least `surviveAtLeast` frames returned for that chunk. Below the floor there is no consensus to compute — "≥ 2 of 3 failed to refute" is unanswerable when fewer than 2 voted. Keep the chunk's members (a frame that never ran is not evidence against a finding) but log **every one** as `contested`, so a chunk that was never actually judged cannot read as a clean unanimous keep.
+- **Live denominator.** Above the floor, measure keepers as `(frames that returned) − refutations`, never against the fixed voter count. Counting absent frames as silent keepers lets a real refutation be outvoted by voters that never ran — the verify becomes least adversarial exactly when it is least healthy.
+
+Report the fraction of frames that returned as `consensusCoverage`.
+
 ### The Rule (PINNED)
 
-**Three structurally-diverse voters each independently attempt to REFUTE the finding.** A finding survives if and only if ≥ 2 of 3 voters *fail* to refute it. Batching changes only the dispatch shape — the per-finding aggregation is unchanged.
+**Three structurally-diverse voters each independently attempt to REFUTE the finding.** A finding survives if and only if ≥ 2 of the voters that *returned* fail to refute it, and at least `surviveAtLeast` voters returned. Batching changes only the dispatch shape — the per-finding aggregation is unchanged.
 
 | Outcome | Refutations | Disposition |
 |---|---|---|
@@ -132,13 +141,24 @@ In all degradation cases: the returned findings include a `degraded: true` field
 
 **Fallback rule:** On tier failure, always fall back to **that tier's input set** — never to an empty set. Dropping everything on timeout is worse than returning unverified findings with a clear `degraded` flag.
 
+**Scope the fallback to the unit that failed.** Tiers 2 and 3 dispatch many independent agents (one per cluster, three per chunk). When one of them is lost, the fallback applies to *that cluster* or *that chunk* — not to the whole run. A whole-tier collapse is reserved for a whole-tier failure.
+
+### `degraded` vs `partial` — distinct signals
+
+| Field | Meaning | Correct caller response |
+|---|---|---|
+| `degraded: true` | The verify did not run. No usable judgement was produced. | Discard the verify output; treat findings as unverified. |
+| `partial: true` | The verify ran and its output is usable, but some tier agents were lost, so it was **less adversarial than this protocol promises**. | Use the output; surface the reduced assurance. Read `recheckCoverage` / `consensusCoverage` for the extent. |
+
+**Do not conflate them.** Callers commonly implement `degraded` as "throw the verify away and pass the raw findings through". Raising `degraded` for a single lost voter frame would therefore discard an entire otherwise-good verify pass — a worse outcome than the fail-open it was meant to fix. Partial loss gets its own flag precisely so the healthy majority of the work survives.
+
 ---
 
 ## Machine-readable param block
 
 ```json
 {
-  "protocolVersion": "1.1",
+  "protocolVersion": "1.2",
   "tiers": ["triage", "clusteredRecheck", "consensus"],
   "consensus": { "voters": 3, "surviveAtLeast": 2, "rule": "minority-veto", "diversity": ["role", "ordering", "modelFamily"] },
   "labels": ["supported", "uncertain", "unsupported"],

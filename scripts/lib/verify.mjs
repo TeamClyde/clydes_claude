@@ -2,7 +2,10 @@
 // Named exports only — never export default (engine bundle strip regex).
 
 export const VERIFY_PROTOCOL = {
-  protocolVersion: '1.1', // 1.1: Tier-1 and Tier-3 dispatch batched/chunked; decision rules unchanged
+  // 1.1: Tier-1 and Tier-3 dispatch batched/chunked; decision rules unchanged
+  // 1.2: Tier-3 consensus is measured against the frames that RETURNED, with a quorum floor;
+  //      Tier-2 cluster failure is contained to its own cluster. Both surface as `partial`.
+  protocolVersion: '1.2',
 
   tiers: ['triage', 'clusteredRecheck', 'consensus'],
   consensus: { voters: 3, surviveAtLeast: 2, rule: 'minority-veto', diversity: ['role', 'ordering', 'modelFamily'] },
@@ -161,7 +164,10 @@ function batchRefutePrompt(findings, voter) {
  * @param {Function} opts.agent       - Workflow agent(prompt, opts) => Promise<result>.
  * @param {number}   [opts.perTierTimeoutMs=120_000]
  * @param {Function} [opts.clusterBy] - Custom cluster key fn (f) => string.
- * @returns {Promise<{findings, contested, counts, degraded, verifyEmptied?}>}
+ * @returns {Promise<{findings, contested, counts, degraded, partial?, verifyEmptied?}>}
+ *   `degraded` — the verify did not run; treat `findings` as unverified.
+ *   `partial`  — the verify ran and its output is usable, but some tier agents were lost, so it
+ *                was less adversarial than the protocol promises. Never conflate the two.
  */
 export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_000, clusterBy }) {
   try {
@@ -258,8 +264,16 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
 
     // Clusters run concurrently — they are independent, and one agent call per cluster is already
     // well inside the runtime concurrency ceiling. (Was a sequential await per cluster: pure wall-clock loss.)
-    const clusterResults = await Promise.all(
-      [...clusters].map(async ([key, members]) => {
+    //
+    // allSettled, NOT all. Under Promise.all a single cluster's rejection propagated to the outer
+    // catch and degraded the WHOLE verify: completed Tier-1 work discarded, Tier 3 never run, every
+    // finding returned unverified. Measured recheck durations spread 114s-409s, so one slow cluster
+    // is the expected case, not the exceptional one. The protocol's fallback rule is per-tier-INPUT
+    // ("never to an empty set") — applied per cluster, that means a failed cluster keeps all its own
+    // members and they go on to face Tier 3. Containment, not a bypass.
+    const clusterEntries = [...clusters];
+    const clusterResults = await Promise.allSettled(
+      clusterEntries.map(async ([key, members]) => {
         const r = await withDeadline(
           agent(recheckPrompt(members), { label: `verify:recheck:${key}`, schema: RECHECK_SCHEMA, model: 'claude-sonnet-4-6' }),
           perTierTimeoutMs,
@@ -268,8 +282,18 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
       }),
     );
 
-    for (const [members, r] of clusterResults) {
+    let clustersSucceeded = 0;
+    for (const [i, settled] of clusterResults.entries()) {
+      const members = clusterEntries[i][1];
+
+      if (settled.status !== 'fulfilled') {
+        contestedTail.push(...members);   // fall back to this cluster's own input set
+        continue;
+      }
+      clustersSucceeded++;
+
       // Build keep-set keyed by GLOBAL _idx (not cluster position).
+      const [, r] = settled.value;
       const keepSet = new Map();
       for (const entry of r?.keep ?? []) {
         keepSet.set(entry.index, entry.keep); // entry.index is the global _idx
@@ -285,6 +309,9 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
       }
     }
 
+    // Fraction of clusters that actually returned a re-check.
+    const recheckCoverage = clusterEntries.length ? clustersSucceeded / clusterEntries.length : 1;
+
     // ── Tier 3: Minority-Veto 3-Voter Consensus (BATCHED) ────────────────────
     // One agent per voter frame per chunk — NOT one agent per finding. Frames run concurrently within
     // a chunk, chunks run in sequence, so at most `voters` (3) agents are in flight here. Cost is
@@ -292,7 +319,10 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
     const finalSurvivors = [];
     const contested      = [];
     const contestedChunks = chunkArr(contestedTail, TRIAGE_CHUNK);
+    const VOTERS  = VERIFY_PROTOCOL.consensus.voters;
+    const SURVIVE = VERIFY_PROTOCOL.consensus.surviveAtLeast;
     let framesSucceeded = 0;
+    let framesExpected  = 0;
 
     for (const [chunkIdx, members] of contestedChunks.entries()) {
       const frames = await Promise.allSettled(
@@ -311,20 +341,41 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
       // Count refutations per GLOBAL _idx. A frame that omits an index has NOT refuted it — silence
       // defaults to keeper, mirroring Tier 2's absent-entry rule. Without this a truncating frame
       // would silently refute its own tail.
+      //
+      // `chunkFrames` is per-CHUNK on purpose. It was previously only accumulated into the global
+      // `framesSucceeded`, which meant one healthy chunk kept the total-wipeout guard quiet while a
+      // sibling chunk that lost every frame passed through as clean consensus.
       const refutedBy = new Map();
+      let chunkFrames = 0;
       for (const fr of frames) {
         if (fr.status !== 'fulfilled') continue;
-        framesSucceeded++;
+        chunkFrames++;
         for (const v of fr.value?.votes ?? []) {
           if (v.refuted === true) refutedBy.set(v.index, (refutedBy.get(v.index) ?? 0) + 1);
         }
       }
+      framesSucceeded += chunkFrames;
+      framesExpected  += VOTERS;
+
+      // Quorum gate. Below `surviveAtLeast` returning frames there is no consensus to compute at
+      // all: "≥2 of 3 failed to refute" is unanswerable when fewer than 2 voted. Keep the members
+      // (a frame that never ran is not evidence against a finding — the same rule as an omitted
+      // index) but mark every one contested, so the caller can see the consensus did not happen.
+      // Previously this scored `voters - refutals` = 3 - 0 = 3 and read as a CLEAN unanimous keep.
+      if (chunkFrames < SURVIVE) {
+        finalSurvivors.push(...members);
+        contested.push(...members);
+        continue;
+      }
 
       for (const f of members) {
         const refutals = refutedBy.get(f._idx) ?? 0;
-        const keepers  = VERIFY_PROTOCOL.consensus.voters - refutals;
+        // Denominator is the frames that RETURNED, never the hardcoded voter count. Frames dispatch
+        // with allSettled, so a rejected frame is simply absent — counting it as a silent keeper let
+        // a refutation be outvoted by voters that never ran.
+        const keepers  = chunkFrames - refutals;
 
-        if (keepers >= VERIFY_PROTOCOL.consensus.surviveAtLeast) {
+        if (keepers >= SURVIVE) {
           // Survives
           finalSurvivors.push(f);
           if (refutals > 0) {
@@ -346,6 +397,17 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
     // Combine: Tier-1 supported + Tier-3 survivors
     const survivors = [...supported, ...finalSurvivors];
 
+    // Fraction of Tier-3 voter frames that returned.
+    const consensusCoverage = framesExpected ? framesSucceeded / framesExpected : 1;
+
+    // `partial` is DISTINCT from `degraded` and the difference is load-bearing. `degraded` means the
+    // verify did not run and its findings must be treated as unverified — callers respond by
+    // discarding the verify output wholesale. `partial` means the verify DID run and its output is
+    // usable, but some tier agents were lost, so it was less adversarial than the protocol promises.
+    // Folding this into `degraded` would make one timed-out voter frame throw away an entire
+    // otherwise-good verify pass — a worse outcome than the fail-open it replaces.
+    const partial = recheckCoverage < 1 || consensusCoverage < 1;
+
     return {
       findings:  stripIdx(survivors),
       contested: stripIdx(contested),
@@ -354,8 +416,11 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
         dropped:    work.length - survivors.length,
         contested:  contested.length,
         triageCoverage,
+        recheckCoverage,
+        consensusCoverage,
       },
       degraded: false,
+      partial,
     };
   } catch {
     // Degraded path: return the caller's ORIGINAL findings (never the _idx-stamped copies).

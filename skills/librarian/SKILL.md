@@ -50,7 +50,14 @@ Use when the user asks for:
 4. **Workflow tool** — invoke the workflow script via the Workflow tool (requires user opt-in), passing `{ brief, subQuestions, seedText? }` as `args`. Set `scriptPath` to an **absolute** path: take the *Base directory for this skill* injected at skill start and join `librarian.workflow.mjs` (i.e. `<skill-base-dir>/librarian.workflow.mjs`). The script is co-located in the skill directory (a symlink that resolves to the built bundle in the workflow repo), so the absolute path works **regardless of your current working directory**. Do NOT pass a cwd-relative path like `scripts/librarian.workflow.mjs` — that resolves only when your cwd is the workflow repo, and is the cause of the "scripts don't exist" failure. One Sonnet-pinned agent per sub-question fans out via `parallelFanout` (`maxInFlight: 6`); each runs WebSearch/WebFetch and returns cited findings.
 5. **Adversarial verify** — the workflow runs ONE `dimensionalReview` verify pass that re-checks each claim against its cited source and labels support (`supported` / `uncertain` / `unsupported`). Never per-finding voting.
 6. **Synthesize** — a Sonnet agent produces the final cited report grouped by sub-question, with confidence, contradictions surfaced, and a "what this means for the build" section.
-7. **Return** — `{ report, sources, subQuestionCount, findingCount, degraded, verifyDegraded }`. If `degraded: true` (fewer sub-questions than quorum succeeded) or `verifyDegraded: true` (the verify step was abandoned → findings are UNVERIFIED), surface it before presenting.
+7. **Return** — `{ report, sources, subQuestionCount, findingCount, degraded, verifyDegraded, verifyPartial, triageCoverage, recheckCoverage, consensusCoverage, missingSubQuestions }`. Surface any of these before presenting:
+
+| Signal | Meaning |
+|---|---|
+| `degraded: true` | Fewer sub-questions than quorum succeeded — the report is partial. |
+| `verifyDegraded: true` | The verify step was abandoned; the script fell back to the **unverified** findings. |
+| `verifyPartial: true` | The verify **ran and was used**, but some re-check clusters or voter frames were lost, so the findings faced less adversarial pressure than the protocol promises. Distinct from `verifyDegraded` — do not treat a thinned verify as a clean one. |
+| `triageCoverage` / `recheckCoverage` / `consensusCoverage` | Fraction of Tier-1 findings judged, Tier-2 clusters returned, Tier-3 voter frames returned. `< 1` quantifies the shortfall behind `verifyPartial`. |
 
 ## Front-Door Rules Applied
 
@@ -60,13 +67,17 @@ Per `dispatching-parallel-agents` §Key Rules:
 |---|---|
 | Model pinning — never Opus | Research + verify + synthesis agents pinned to `claude-sonnet-4-6` (web research/reading is judgment-heavy; Haiku under-performs) |
 | `maxInFlight ≤ min(16, cores−2)` | `maxInFlight = min(sub-questions, 8)` — one batch for the common case |
-| `perUnitTimeoutMs` always set | 240 000 ms per research unit; 180 000 ms for verify |
+| `perUnitTimeoutMs` always set | 900 000 ms per research unit; 900 000 ms per verify tier |
 | ONE batched verify | `dimensionalReview` with a single adversarial `verify` pass — no per-finding voting |
 | Token budget gating | Pass `getRemainingBudget` if calling from inside a larger Workflow |
 
 ## Watchdog and Degraded-Mode Behavior
 
-Each research unit has a 240 s watchdog. A timed-out unit is abandoned (non-preemptive — the agent runs to natural completion per #61405) and counted in `abandoned`. If `degraded: true` on return, present the partial report with a caveat. If `verifyDegraded: true`, the verify step was abandoned and the script falls back to the **unverified** findings — the report must say so. Do not retry silently.
+Each research unit has a 900 s watchdog, as does each verify tier. A timed-out unit is abandoned (non-preemptive — the agent runs to natural completion) and counted in `abandoned`. Because abandonment is non-preemptive, a budget below the measured workload is not a saving: the agent is still paid for in full and only its result is discarded.
+
+If `degraded: true` on return, present the partial report with a caveat. If `verifyDegraded: true`, the verify step was abandoned and the script falls back to the **unverified** findings — the report must say so. Do not retry silently.
+
+**Verify degrades per unit, not per run.** A single re-check cluster or voter frame that fails is contained: that cluster falls back to keeping its own members, that chunk is marked contested, and the rest of the verify still stands. The run reports `verifyPartial: true` with the coverage fractions rather than discarding the whole pass. Report `verifyPartial` — a verify that was quietly thinned is exactly the case a reader would otherwise mistake for a clean one.
 
 ## Gotchas
 

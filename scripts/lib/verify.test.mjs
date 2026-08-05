@@ -258,3 +258,114 @@ test('triageCoverage is 1 when every finding is judged', async () => {
   const out = await tieredVerify(F, { profile: 'audit', agent: mkAgent(), perTierTimeoutMs: 1000 });
   assert.equal(out.counts.triageCoverage, 1);
 });
+
+// ── Regression: Tier-3 fail-open on lost voter frames ──────────────────────────
+// `keepers` was computed against the hardcoded `consensus.voters` (3) rather than the number of
+// frames that actually returned. Frames dispatch with allSettled, so a rejected frame was skipped
+// and never subtracted from the denominator: 2 of 3 frames timing out scored 3-0 and the finding
+// passed as a CLEAN unanimous consensus — no contested entry, nothing degraded. The verify became
+// least adversarial exactly when it was least healthy, and said nothing.
+
+// One escalated finding, all frames of a chunk configured by `frameFails` to reject.
+const oneUncertain = [{ id: 'x1', where: 'x.mjs:1', summary: 'needs consensus' }];
+
+// Agent whose consensus frames can be made to reject per (voter, chunk).
+function consensusAgent({ findings, frameRejects = () => false, refute = () => false }) {
+  return async (prompt, opts) => {
+    if (opts.label === 'verify:triage') {
+      return { verdicts: findings.map((_, i) => ({ index: i, support: 'uncertain' })) };
+    }
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [] };   // absent → keep
+    if (opts.label?.startsWith('verify:consensus')) {
+      const [, , voter, chunk] = opts.label.split(':').map((s, i) => (i >= 2 ? Number(s) : s));
+      if (frameRejects(voter, chunk)) throw new Error('frame down');
+      return { votes: findings.map((_, i) => ({ index: i, refuted: refute(i, voter) })) };
+    }
+  };
+}
+
+test('Tier 3: a chunk below voter quorum is kept but marked contested, never a clean consensus', async () => {
+  // 2 of 3 frames die; the survivor does not refute. Old behaviour: keepers = 3 - 0 = 3 → clean keep.
+  const out = await tieredVerify(oneUncertain, {
+    profile: 'audit',
+    agent: consensusAgent({ findings: oneUncertain, frameRejects: (v) => v < 2 }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.ok(out.findings.map((f) => f.id).includes('x1'), 'silence is not evidence — the finding is kept');
+  assert.ok(out.contested.map((f) => f.id).includes('x1'),
+    'but a chunk that never reached quorum must NOT read as a clean unanimous consensus');
+  assert.equal(out.partial, true, 'lost frames are surfaced to the caller');
+  assert.equal(out.counts.consensusCoverage, 1 / 3);
+  assert.equal(out.degraded, false, 'partial frame loss is not a whole-verify degrade');
+});
+
+test('Tier 3: the keeper denominator counts frames that returned, not the hardcoded voter count', async () => {
+  // 1 frame dies; of the 2 that return, 1 refutes. Correct: keepers = 2 - 1 = 1 < surviveAtLeast → drop.
+  // Old behaviour: keepers = 3 - 1 = 2 → survives as if two voters had cleared it.
+  const out = await tieredVerify(oneUncertain, {
+    profile: 'audit',
+    agent: consensusAgent({
+      findings: oneUncertain,
+      frameRejects: (v) => v === 0,
+      refute: (_i, voter) => voter === 1,
+    }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.ok(!out.findings.map((f) => f.id).includes('x1'),
+    'a refutation from half the surviving frames must not be outvoted by frames that never ran');
+  assert.ok(out.contested.map((f) => f.id).includes('x1'));
+});
+
+test('Tier 3: frame loss in one chunk does not silently vouch for that chunk', async () => {
+  // 60 findings → chunks of 40 and 20. Every frame of chunk 1 dies; chunk 0 is healthy.
+  // Old behaviour: `framesSucceeded` was a GLOBAL counter, so chunk 0's successes kept the
+  // total-wipeout guard quiet and chunk 1's 20 findings passed as clean 3-0 consensus.
+  const many = manyFindings(60);
+  const out = await tieredVerify(many, {
+    profile: 'audit',
+    agent: consensusAgent({ findings: many, frameRejects: (_v, chunk) => chunk === 1 }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.equal(out.findings.length, 60, 'nothing is dropped for a failure that is not evidence');
+  assert.deepEqual(
+    out.contested.map((f) => f.id).sort(),
+    many.slice(40).map((f) => f.id).sort(),
+    'exactly the un-voted chunk is flagged — containment, not blanket suspicion',
+  );
+  assert.equal(out.partial, true);
+  assert.equal(out.counts.consensusCoverage, 3 / 6, 'one of two chunks lost all three frames');
+});
+
+// ── Regression: Tier-2 Promise.all made one slow cluster fatal ─────────────────
+// Clusters ran under Promise.all, so a single cluster's rejection propagated to the outer catch and
+// degraded the ENTIRE verify — completed Tier-1 work discarded, Tier 3 never run, every finding
+// returned UNVERIFIED. The protocol's own fallback rule is per-tier-input, not global.
+
+test('Tier 2: one failing cluster is contained — the rest of the verify still runs', async () => {
+  const C = [
+    { id: 'c1', where: 'a.mjs:1', summary: 'in the failing cluster' },
+    { id: 'c2', where: 'b.mjs:1', summary: 'kept by its cluster' },
+    { id: 'c3', where: 'b.mjs:2', summary: 'dropped by its cluster' },
+  ];
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: C.map((_, i) => ({ index: i, support: 'uncertain' })) };
+    if (opts.label === 'verify:recheck:a.mjs') throw new Error('cluster down');
+    if (opts.label === 'verify:recheck:b.mjs') return { keep: [{ index: 1, keep: true }, { index: 2, keep: false }] };
+    if (opts.label?.startsWith('verify:consensus')) return { votes: [] }; // absent → keeper
+  };
+  const out = await tieredVerify(C, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.degraded, false, 'a single failed cluster must not degrade the whole verify');
+  const ids = out.findings.map((f) => f.id);
+  assert.ok(ids.includes('c1'), "the failed cluster falls back to ITS OWN input (keep-all), not to nothing");
+  assert.ok(ids.includes('c2'), 'the healthy cluster still keeps what it kept');
+  assert.ok(!ids.includes('c3'), 'the healthy cluster still drops what it dropped');
+  assert.equal(out.partial, true, 'the lost cluster is surfaced, not swallowed');
+  assert.equal(out.counts.recheckCoverage, 1 / 2);
+});
+
+test('a fully healthy verify reports full coverage and is not partial', async () => {
+  const out = await tieredVerify(F, { profile: 'audit', agent: mkAgent(), perTierTimeoutMs: 1000 });
+  assert.equal(out.partial, false);
+  assert.equal(out.counts.recheckCoverage, 1);
+  assert.equal(out.counts.consensusCoverage, 1);
+});
