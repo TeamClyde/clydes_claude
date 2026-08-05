@@ -78,18 +78,35 @@ export function deriveEvidenceState({ findings, rawFindings, verifyDegraded, cov
 }
 
 // ── URL membership (section validation layer 1) ─────────────────────────────
-// Stops at whitespace and at the closers that wrap a URL in prose or markdown, so
-// `(https://x/y)` and `[t](https://x/y)` yield the bare URL rather than one with a trailing `)`.
-const PROSE_URL_RE = /https?:\/\/[^\s<>"'`)\]]+/gi;
+// `)` is allowed IN the match because it is legitimate URL path content
+// (…/wiki/Bird_(disambiguation)), then unbalanced trailing `)` are trimmed because a `)` is far
+// more often the closer of a wrapping `(` or a markdown `[t](…)` link than part of the path.
+// Excluding `)` from the class outright — the obvious move — silently truncates the parenthetical
+// case, and because unknownUrls compares against the finding's exact source, a correctly cited
+// URL then reads as smuggled.
+const PROSE_URL_RE = /https?:\/\/[^\s<>"'`\]]+/gi;
 
 // Sentence-final punctuation is not part of a URL. Without this, "see https://x/y." never matches
 // the finding's own `https://x/y` and every section would fail validation on its last sentence.
 const stripTrailingPunct = (u) => u.replace(/[.,;:!?]+$/, '');
 
+// Trims trailing `)` one at a time only while they are unbalanced (more closers than openers seen
+// so far), so `(https://x/y)` → `https://x/y` (the wrapper is unbalanced) but
+// `.../wiki/Bird_(disambiguation)` is left intact (the pair is balanced). Must run AFTER
+// stripTrailingPunct: a trailing `,`/`.` (e.g. "(https://x/y),") sits outside the paren and would
+// otherwise mask the unbalanced `)` underneath it from this check.
+const trimUnbalancedParens = (u) => {
+  let out = u;
+  while (out.endsWith(')') && (out.match(/\(/g) ?? []).length < (out.match(/\)/g) ?? []).length) {
+    out = out.slice(0, -1);
+  }
+  return out;
+};
+
 /** @param {string} markdown @returns {string[]} deduped URLs appearing in the prose */
 export function urlsInProse(markdown) {
   const hits = String(markdown ?? '').match(PROSE_URL_RE) ?? [];
-  return [...new Set(hits.map(stripTrailingPunct))];
+  return [...new Set(hits.map((u) => trimUnbalancedParens(stripTrailingPunct(u))))];
 }
 
 /**
@@ -98,6 +115,14 @@ export function urlsInProse(markdown) {
  * This is the free, deterministic half of section validation: set membership, no agent. It catches
  * the section writer inventing or importing a source, which is the mechanism behind a report
  * claiming more provenance than the evidence supports.
+ *
+ * Comparison is byte-exact: a case difference or a trailing-slash-only difference between the
+ * prose citation and the finding's `source` counts as a DIFFERENT url, so it is reported as
+ * unknown even though a human would read them as the same page. This is deliberate, not an
+ * oversight — the safe failure direction for a provenance gate is over-flagging. Byte-exact can
+ * only produce extra (spurious) flags; it can never let a fabricated or substituted citation pass
+ * as known. A normalizing comparison (case-fold, trailing-slash-insensitive) would close that gap
+ * at the cost of occasionally waving through a URL that merely resembles a known one.
  *
  * @param {string} markdown
  * @param {Array<{source?: unknown}>} findings - THIS section's slice, never the whole run

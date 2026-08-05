@@ -139,3 +139,41 @@ test('unknownUrls: [] when every cited URL is in the slice', () => {
 test('unknownUrls: tolerates findings with a missing or non-string source', () => {
   assert.deepEqual(unknownUrls('see https://x.example/1', [{}, { source: 42 }]), ['https://x.example/1']);
 });
+
+test('urlsInProse: keeps a balanced parenthetical URL intact (Wikipedia-style)', () => {
+  const md = 'See https://en.wikipedia.org/wiki/Bird_(disambiguation) for details.';
+  assert.deepEqual(urlsInProse(md), ['https://en.wikipedia.org/wiki/Bird_(disambiguation)']);
+});
+
+test('urlsInProse: trims the unbalanced closer from a markdown-wrapped parenthetical URL', () => {
+  const md = '[t](https://x/wiki/Bird_(disambiguation))';
+  assert.deepEqual(urlsInProse(md), ['https://x/wiki/Bird_(disambiguation)']);
+});
+
+test('unknownUrls: does not flag a parenthetical URL that IS in the section findings', () => {
+  const findings = [{ source: 'https://en.wikipedia.org/wiki/Bird_(disambiguation)' }];
+  assert.deepEqual(
+    unknownUrls('see https://en.wikipedia.org/wiki/Bird_(disambiguation) for context', findings),
+    [],
+  );
+});
+
+test('unknownUrls: a case or trailing-slash difference counts as a different source (byte-exact policy)', () => {
+  const findings = [{ source: 'https://known.example/path' }];
+  assert.deepEqual(
+    unknownUrls('see https://known.example/PATH and https://known.example/path/', findings),
+    ['https://known.example/PATH', 'https://known.example/path/'],
+  );
+});
+
+test('assessCoverage tolerates duplicate subQuestion values; hasAnySource rejects whitespace-embedded URLs', () => {
+  const c = assessCoverage(Q, [f('q1'), f('q1'), f('q2')]);
+  assert.equal(c.answered, 2, 'duplicate q1 findings must not inflate answered beyond unique brief coverage');
+  assert.deepEqual(c.missing, ['q3', 'q4']);
+
+  assert.equal(
+    hasAnySource([{ source: 'https://x.com/a fake trailing text' }]),
+    false,
+    'prose containing a URL is not itself a citation',
+  );
+});
