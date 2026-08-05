@@ -32,6 +32,7 @@ assertion** — that gap between the two ledgers is the point of keeping them ap
 | 2026-08-02 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Third consecutive day with no worker fire.** PR #164 now unmerged ~80h. Pipeline is deadlocked, not slow. See detail. |
 | 2026-08-03 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Fourth consecutive day with no worker fire.** PR #164 now unmerged ~105h. The only commits on `main` in four days are this review job's own. See detail. |
 | 2026-08-04 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Fifth consecutive day with no worker fire.** PR #164 now unmerged ~129h. No branch in the repository has moved in 129h except `main`, and only by this job. See detail. |
+| 2026-08-05 | _(none opened)_ | — | n/a — no PR was opened in the window | _no verdict_ | n/a | **Sixth consecutive day with no worker fire.** PR #164 now unmerged ~153h. New this time: the *remaining* rows' merge routes are also blocked — merging #164 would not restore throughput. See detail. |
 
 **Verdict values:** `IMPROVEMENT` · `NEUTRAL CHURN` · `REGRESSION`
 
@@ -565,3 +566,106 @@ being reported on accurately; it is a dead pipeline with a live monitor attached
 The one thing this job must not do is let a steady cadence of tidy daily entries
 read as steady work. The `[STALLED]` subject line is the only part of this
 system still doing what it was built to do.
+
+---
+
+## 2026-08-05 — detail
+
+**Nothing to review, for the sixth consecutive day.** No pull request was opened
+in the 24h window. The newest PR in the repository is still #164, created
+`2026-07-30T05:33:35Z` — six days and nine hours ago. `git log --since='24 hours
+ago'` returns empty on every branch. Part 1 of this job had no input; Part 2 ran
+in full.
+
+Measured state, not inherited from yesterday's entry:
+
+- Queue on `main`: `q001`, `q002`, `q003` — **all `pending`**, all `attempts` 0,
+  all `deferrals` 0.
+- Run ledger on `main`: still `_(no entries yet)_`.
+- `origin/main` == local `HEAD` (`8a2acc0`). The five prior review commits all
+  landed, so **pushing to `main` from an unattended run demonstrably works** —
+  which is worth stating precisely because #164's author assumed it would not.
+
+### Every problem bucket is still empty — and that still rules something out
+
+No row is `blocked`; none is stuck `in-progress`; no `deferrals` anywhere; no
+`released` outcome in the ledger. The two categories the daily brief must keep
+apart — *could not be done* (`blocked`) versus *could not be afforded*
+(`released`/`deferred`) — are **both empty for the sixth day**. A cadence-too-dense
+or token-budget-exhausted explanation would leave fingerprints in the second
+bucket. There are none. Whatever is wrong remains upstream of the queue: the
+worker never reaches the point where it could record either kind of failure.
+Tuning schedule density or token budget would still be treating the wrong thing.
+
+### New this time: merging #164 would not restart the pipeline
+
+Previous entries correctly identified #164's merge as the blocking human action.
+That framing is incomplete, and today's check shows why. Tracing each remaining
+row to the branch it must merge into:
+
+| Row | Weight | Base | State of that base | Route out |
+|-----|--------|------|--------------------|-----------|
+| `q001` | 1 | `main` | done on `fix/docs-refresh-agent-tool-116` | PR #164 — open, untouched **153h** |
+| `q003` | 2 | `chore/refresh-reference-artifacts` | PR #111 — open since `2026-07-22`, **14 days** | a PR stacked onto a 14-day-stale PR |
+| `q002` | 3 | `fix/verify-chunking` (`a388254`) | **no pull request exists, in any state** | a PR into a branch with no route to `main` |
+
+`fix/verify-chunking` was confirmed by direct query: filtering pull requests by
+that head branch across all states returns `[]`. The branch is pushed and,
+per the queue's own note, green — but nothing proposes it for merge.
+
+Three consequences:
+
+1. **The single-merge fix is a false hope.** If Jason merges #164 today, the
+   queue holds `q002` (weight 3) and `q003` (weight 2). Both exceed the weight-1
+   batching case, so each owns an entire fire, and both terminate in PRs that
+   land on branches which are *themselves* unmerged. Throughput would not
+   resume; the backlog of unmerged work would deepen.
+2. **The stall is not one late merge — it is that the merge step has no owner.**
+   Every route out of this queue ends at a human merge, and that step has now
+   failed on three independent branches with three different ages (6 days, 14
+   days, and never-proposed). One late merge is an oversight; three is the
+   pipeline's terminal stage being absent.
+3. **The queue's expansion trigger stays unmet for a compounding reason.** The
+   Wave 1–4 rows are gated on the proof unit producing a real PR, evaluated
+   against `main`. That gate was already stuck. Even if released, the rows it
+   would add are the *cheap* weight-1 work (#114, #148) — meaning the queue is
+   simultaneously starved of runnable work and holding two rows that cannot
+   usefully run.
+
+### Condition D — not triggered, standing caveat restated
+
+No unit is marked `shipped` on `main`, so there is no unevidenced claim to
+audit. The `run-20260730T053122Z` evidence was verified genuine on 2026-08-01
+and is unchanged; its defect remains *location*, not integrity. The standing
+criticism of `q001`'s `done-when` also stands unrevised for six days: both
+`grep`s interrogate the very text the edit changed, so they assert the diff
+applied, not that any behaviour differs.
+
+### Could not assess
+
+- **Whether the worker is scheduled at all, or rejected at start.** Still
+  structurally unreachable from inside a run; the 2026-08-03 entry established
+  that the cron-listing tool is scoped to the calling session and does not list
+  even this demonstrably-firing job. Only Jason inspecting the scheduler
+  configuration settles it.
+- **Why #164, and now #111, have gone unmerged.** Deliberate hold versus
+  forgotten is not visible from the repository.
+- **Whether `fix/verify-chunking` was meant to have a PR.** Its absence may be
+  intentional staging or an oversight; the repo does not say.
+- The design doc `plans/autonomous-backlog-scheduling/autonomous-backlog-scheduling-design.md`
+  remains absent from `main`, so the queue's rationale still cannot be checked
+  against its source.
+- The `decide` column remains undefined in the queue's own Rules section.
+- The queue's closing note still asserts "No fire will pick them up, because the
+  worker routine does not exist yet." A fire ran on 07-30 and shipped `q001`, so
+  that sentence has been false for six days; the correction sits on the unmerged
+  branch. Flagged 07-30 through 08-04 — and again here.
+
+### Assessment
+
+Six days, zero units, and a monitor that is the only moving part. The one new
+fact today is the one that should change Jason's response: the fix is not "merge
+#164." Three separate branches are waiting on a merge step that nothing in this
+system performs or escalates, and the two rows behind #164 land on two of them.
+Restarting the worker without addressing that would produce more unmerged
+branches, faster.
