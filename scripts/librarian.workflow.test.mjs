@@ -130,12 +130,27 @@ test('the stitcher agent is gone — assembly is concatenation (#152.2)', () => 
   assert.doesNotMatch(BODY, /label: 'synth:stitch'/);
   assert.doesNotMatch(BODY, /Stitch the sections below together/);
   assert.match(BODY, /const body = orderedSections\s*\n?\s*\.map/);
-  assert.match(BODY, /const report = `\$\{body\}/);
+  assert.match(BODY, /const report = `\$\{banner\}\$\{body\}/);
 });
 
 test('exactly ONE agent remains in the assembly path, fed the digest not the prose', () => {
-  const assembly = BODY.slice(BODY.indexOf('const body = orderedSections'));
+  // Bounded at BOTH ends. Open-ended to EOF would make this assert "no agent call anywhere below",
+  // so an unrelated later addition would fail it with a bare count mismatch and no clue why.
+  const start = BODY.indexOf('const body = orderedSections');
+  const end = BODY.indexOf('const report = `');
+  assert.ok(start !== -1 && end > start, 'assembly block boundaries must resolve');
+  const assembly = BODY.slice(start, end);
   assert.equal((assembly.match(/await agent\(/g) ?? []).length, 1);
   assert.match(assembly, /FINDINGS DIGEST: \$\{JSON\.stringify\(digest\)\}/);
   assert.doesNotMatch(assembly, /JSON\.stringify\(orderedSections\)/);
+});
+
+test('the unanswered-brief notice is built in code and leads the report (#96)', () => {
+  // Prepended by code rather than requested of the closing agent, whose text is guaranteed to land
+  // last — so "open the report with this" was unsatisfiable as an instruction.
+  assert.match(BODY, /const banner = gaps\.length/);
+  assert.match(BODY, /const report = `\$\{banner\}\$\{body\}/);
+  const bannerBlock = BODY.slice(BODY.indexOf('const gaps = []'), BODY.indexOf('const report = `'));
+  assert.match(bannerBlock, /missingSubQuestions\.length/);
+  assert.match(bannerBlock, /missingSections\.length/);
 });

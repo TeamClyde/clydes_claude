@@ -1074,11 +1074,16 @@ const body = orderedSections
   .map((sec) => `### Q: ${sec.subQuestion}\n\n${sectionByQ.get(sec.subQuestion)}`)
   .join('\n\n');
 
-// The ONE remaining agent in the assembly path, and its input is BOUNDED: the findings digest
-// (claims grouped by sub-question), never the section prose. Input size no longer tracks dossier
-// size, so a 40-section dossier costs this stage no more than a 4-section one.
+// The ONE remaining agent in the assembly path, and its input is BOUNDED — not by section count but
+// by CLAIM SIZE. digest holds one short `claim` per vetted finding (never the `detail` field and
+// never the prose), so this stage's input is O(findings) with a small constant, against sections
+// measured at 14-24k chars each. That is a large constant-factor cut, not an asymptotic decoupling:
+// a dossier with hundreds of findings still produces a sizeable digest.
 const digest = orderedSections.map((sec) => ({
   subQuestion: sec.subQuestion,
+  // `?? []` cannot fire today — `sections` is built from sectionMap.entries() and orderedSections
+  // only narrows it. It guards a future change that derives sections from elsewhere, which would
+  // otherwise silently hand the closing agent zero claims for a section that has visible prose.
   claims: (sectionMap.get(sec.subQuestion) ?? []).map((f) => f.claim).filter(Boolean),
 }));
 
@@ -1088,6 +1093,8 @@ const closing = await agent(
   `Do NOT write source URLs. Do NOT state a numeric count of sub-questions.\n` +
   `Return MARKDOWN in your final message. Do NOT publish it, do NOT create or update an Artifact, ` +
   `and do NOT return a URL in place of the text.\n` +
+  `Return ONLY the body text of that synthesis — do NOT write a heading or title of your own; the ` +
+  `heading is added by the caller.\n` +
   (brief ? `RESEARCH GOAL (context only — do NOT expand scope beyond the digest): ${brief}\n` : '') +
   (verifyDegraded ? `NOTE: adversarial verification did not complete — treat every claim as UNVERIFIED and say so explicitly.\n` : '') +
   (triageCoverage != null && triageCoverage < 1 ? `NOTE: verification triage judged only ${Math.round(triageCoverage * 100)}% of collected findings; the remainder were carried on the adversarial tiers alone. Say so explicitly.\n` : '') +
@@ -1096,7 +1103,27 @@ const closing = await agent(
   `FINDINGS DIGEST: ${JSON.stringify(digest)}`,
   { label: 'synth:closing', phase: 'Synthesize', model: 'claude-sonnet-4-6' });
 
-const report = `${body}\n\n### What this means\n\n${closing}`;
+// The heading is added below, so a self-authored one would double it. Instructed above AND stripped
+// here: the section writers get a validate/retry loop to enforce their constraints, this single
+// call does not, so its one structural risk is closed in code rather than left to the prompt.
+const closingBody = String(closing ?? '').replace(/^\s*#{1,6}\s*what this means[^\n]*\n+/i, '');
+
+// Built in CODE and prepended, not asked of an agent. The old stitcher prompt told the model to
+// "open the report with" this notice; the new layout guarantees the closing agent's text lands
+// LAST, so that instruction did not merely weaken — it became unsatisfiable. The most
+// safety-critical signal in the document must not depend on a model's placement choice. Slice 2
+// replaces this with the dossier entry's code-rendered coverage line, which is the same idea
+// applied to the whole entry.
+const gaps = [];
+if (missingSubQuestions.length) {
+  gaps.push(`**${missingSubQuestions.length} of ${subQuestions.length} sub-questions are UNANSWERED** — this report does not cover: ${missingSubQuestions.join('; ')}`);
+}
+if (missingSections.length) {
+  gaps.push(`**${missingSections.length} section(s) could not be written** and are absent: ${missingSections.join('; ')}`);
+}
+const banner = gaps.length ? `${gaps.map((g) => `> ${g}`).join('\n>\n')}\n\n` : '';
+
+const report = `${banner}${body}\n\n### What this means\n\n${closingBody}`;
 
 const sources = [...new Set(vetted.map((f) => f.source).filter(Boolean))];
 const evidenceState = deriveEvidenceState({ findings: vetted, rawFindings: allFindings, verifyDegraded, coverage });
