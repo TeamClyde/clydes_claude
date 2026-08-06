@@ -13,3 +13,10 @@ test('input is declared before its first use (TDZ guard — regression for A1)',
   assert.ok(useIdx !== -1, 'input.cap usage must exist');
   assert.ok(declIdx < useIdx, `const input (idx ${declIdx}) must be declared before first use input.cap (idx ${useIdx})`);
 });
+
+test('the audit consumer forwards degradedAtTier (#119) — a consumer-body edit no gate covers', () => {
+  // Slice from the end marker so the assertion cannot match inside the GENERATED block and pass
+  // vacuously — the generated engine defines degradedAtTier, the consumer body must forward it.
+  const BODY = SRC.slice(SRC.indexOf('// <ENGINE-BUNDLE:end>'));
+  assert.match(BODY, /verifyDegradedAtTier: verified\.degradedAtTier/);
+});

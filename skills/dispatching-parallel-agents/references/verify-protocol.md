@@ -43,6 +43,12 @@ The triage call also flags two additional conditions per finding (non-exclusive 
 
 Output set after Tier 1 (profile-aware): `supported` findings pass through directly; any finding whose label or flag is in the active profile's `escalateOn` set escalates to Tier 2 (e.g. `uncertain` + `disagree` for most profiles; additionally `unsupported` + `thin-source` for `web-research`), as does any unjudged finding; all remaining `unsupported` findings are dropped.
 
+`thinSource` is judged on the **source**, not the claim, and independently of `support`. A finding
+can be `supported: true, thinSource: true` — well-argued from a single low-authority page — and
+that combination is precisely the one Tier 1 must not wave through. The flag is carried onto the
+finding so it survives into the consumer's own output; verify is the only stage that re-read the
+sources, so this judgement cannot be reconstructed downstream.
+
 ---
 
 ## Tier 2 — Clustered Adversarial Re-Check
@@ -127,21 +133,58 @@ Each consumer has an asymmetric cost model that controls which findings escalate
 | `plan-review` | `balanced` | Balanced cost: escalate on `uncertain` and `disagree`. Neither false-positive nor missed-finding is systematically worse. |
 | `audit` | `balanced` | Same as `plan-review`. Audit surfaces patterns; both false-positive and missed-finding carry costs. |
 
+### What each escalation reason means
+
+Escalation reasons are not interchangeable. They differ in what the signal says about the finding
+and in what Tier 1 does with it — though every escalated finding reaches the same Tiers 2 and 3.
+
+| Reason | What it says about the finding | What Tier 1 does |
+|---|---|---|
+| `uncertain`, `disagree` | The claim may be **wrong**. | Escalate for adversarial challenge. |
+| `unsupported` | The premise is not supported. | Drop — unless the profile escalates it instead. `web-research` does, per its `guard-unsupported` bias. |
+| `thin-source` | The claim may be **right but poorly evidenced**. | Escalate a finding Tier 1 would otherwise have passed straight through as `supported`. |
+
+**Thinness is never a drop reason.** It is a judgement about the *source*, not a verdict against the
+claim, so on its own it never removes a finding — it buys the finding more scrutiny, and the flag is
+stamped onto it so the reader sees it in the evidence table. A vendor blog that names the right
+technique is a working pointer, and deleting it loses the pointer without gaining accuracy.
+
+**An escalated thin finding is not drop-proof, though.** It joins the same escalation set as every
+other reason, and Tiers 2 and 3 can still drop it — Tier 2 on a `keep: false` re-check, Tier 3 on a
+majority refutation. When that happens the drop is a verdict on the *claim* — Tier 2 by re-reading
+the source, Tier 3 by adversarial reasoning over the recorded finding — not a penalty for thinness.
+
+> **Not implemented.** Routing a thin finding toward *better* evidence — re-researching it against
+> new sources — is a separate stage that does not exist in this engine. Tier 2 re-reads the
+> cluster's **existing** source and never seeks a new one. Here `thin-source` is a scrutiny signal,
+> not a remediation path.
+
 ---
 
 ## Graceful Degradation
 
-Each tier runs inside a bounded deadline. On timeout or unrecoverable failure:
+Each tier runs inside a bounded deadline. On timeout or unrecoverable failure, the tier that failed falls back to its own input set — never to an empty set — and reports what happened via `degraded`, `degradedAtTier`, and `partial`.
 
-1. **Tier 1 timeout:** Return all findings stamped `degraded: true`. No triage label applied — caller must treat the full set as unverified.
-2. **Tier 2 timeout:** Return the post-Tier-1 set (labels applied, drops respected) stamped `degraded: true`. Tier 2 clustering was not applied — caller sees partially-verified output.
-3. **Tier 3 timeout:** Return the post-Tier-2 set stamped `degraded: true`. Contested findings are included unresolved; `contested` log entries are not written.
+In all degradation cases the result carries `degraded: true` and `degradedAtTier`, naming the tier
+that fell back. On a clean run `degradedAtTier` is `null` — it is a **cause**, not a status. Callers
+MUST check `degraded` before trusting findings.
 
-In all degradation cases: the returned findings include a `degraded: true` field and a `degradedAtTier` field indicating which tier failed. Callers MUST check `degraded` before trusting findings — the same check as `verifyDegraded` in `dimensionalReview`.
+`degradedAtTier` takes one of **`'triage'`, `'consensus'`, or `null`** — deliberately not the full
+`tiers` vocabulary. There is no `'clusteredRecheck'` value, because losing every Tier-2 cluster is
+not a degradation: each cluster falls back to keeping its own members, those members go on to face
+Tier 3, and the verify still produces a real judgement. That case reports `partial: true` with
+`recheckCoverage: 0`, which is containment working as designed. Only Tier 1 (nothing was ever
+judged) and Tier 3 (no voter frame returned, so consensus never happened) leave the run without a
+usable verdict for the findings that reached them.
 
-**Fallback rule:** On tier failure, always fall back to **that tier's input set** — never to an empty set. Dropping everything on timeout is worse than returning unverified findings with a clear `degraded` flag.
+**Scope the fallback to the unit that failed.** Tiers 2 and 3 dispatch many independent agents (one
+per cluster, three per chunk). When one is lost, the fallback applies to *that cluster* or *that
+chunk* — not the whole run. A whole-tier collapse is reserved for a whole-tier failure.
 
-**Scope the fallback to the unit that failed.** Tiers 2 and 3 dispatch many independent agents (one per cluster, three per chunk). When one of them is lost, the fallback applies to *that cluster* or *that chunk* — not to the whole run. A whole-tier collapse is reserved for a whole-tier failure.
+**And a whole-tier collapse does not unwind the tiers below it.** A lost Tier 3 returns the Tier-1
+`supported` set plus the contested tail; a lost Tier 2 passes its own escalation set on to Tier 3.
+Completed tier work is never discarded because a later tier failed — that discard was the defect
+in the single-outer-`try` structure this replaces.
 
 ### `degraded` vs `partial` — distinct signals
 
