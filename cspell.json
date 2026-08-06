@@ -297,6 +297,7 @@
   ],
   "ignorePaths": [
     "node_modules",
-    ".git"
+    ".git",
+    "research/"
   ]
 }

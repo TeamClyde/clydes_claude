@@ -1,4 +1,9 @@
 {
+  "cSpell.ignorePaths": [
+    "node_modules",
+    ".git",
+    "research/"
+  ],
   "cSpell.words": [
     "adr",
     "adrs",
