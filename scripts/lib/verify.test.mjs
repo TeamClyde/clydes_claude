@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tieredVerify, VERIFY_PROTOCOL } from './verify.mjs';
+import { tieredVerify, VERIFY_PROTOCOL, TRIAGE_SCHEMA } from './verify.mjs';
 
 const F = [
   { id: 'a', where: 'x.mjs:1', summary: 'real',   _seed: 'supported' },
@@ -368,4 +368,125 @@ test('a fully healthy verify reports full coverage and is not partial', async ()
   assert.equal(out.partial, false);
   assert.equal(out.counts.recheckCoverage, 1);
   assert.equal(out.counts.consensusCoverage, 1);
+});
+
+// ── Regression: #118 thin-source escalation ─────────────────────────────────────
+// Fixtures for thin-source: one authoritative, one thin, both triaged `supported` so that ONLY the
+// thinSource flag can be responsible for escalation.
+const T = [
+  { id: 'auth', source: 'https://arxiv.org/abs/1', claim: 'well-sourced' },
+  { id: 'thin', source: 'https://vendor.example/blog', claim: 'single low-authority source' },
+];
+
+function mkThinAgent({ recheckKeeps = true, refute = () => false } = {}) {
+  return async (prompt, opts) => {
+    if (opts.label === 'verify:triage') {
+      return { verdicts: [
+        { index: 0, support: 'supported', thinSource: false },
+        { index: 1, support: 'supported', thinSource: true },
+      ] };
+    }
+    if (opts.label?.startsWith('verify:recheck')) return { keep: T.map((_, i) => ({ index: i, keep: recheckKeeps })) };
+    if (opts.label?.startsWith('verify:consensus')) {
+      const voter = Number(opts.label.split(':')[2]);
+      return { votes: T.map((f, i) => ({ index: i, refuted: refute(f.id, voter) })) };
+    }
+  };
+}
+
+test('TRIAGE_SCHEMA accepts thinSource as a boolean property', () => {
+  assert.equal(TRIAGE_SCHEMA.properties.verdicts.items.properties.thinSource.type, 'boolean');
+});
+
+test('the triage prompt asks for thinSource — a schema field nobody is asked to fill stays empty', async () => {
+  let seen = '';
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') { seen = prompt; return { verdicts: [{ index: 0, support: 'supported' }] }; }
+    return {};
+  };
+  await tieredVerify([T[0]], { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
+  assert.match(seen, /thinSource/);
+});
+
+test('#118: a supported-but-thin finding ESCALATES under web-research', async () => {
+  // Both are `supported`. Under the old code both pass Tier 1 untouched. The thin one must now
+  // reach the adversarial tiers — that is the defect the issue reports.
+  let recheckSaw = [];
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') {
+      return { verdicts: [{ index: 0, support: 'supported', thinSource: false }, { index: 1, support: 'supported', thinSource: true }] };
+    }
+    if (opts.label?.startsWith('verify:recheck')) { recheckSaw = promptIndices(prompt.replace(/^<(\d+)>:/gm, '[$1]')); return { keep: [{ index: 1, keep: true }] }; }
+    if (opts.label?.startsWith('verify:consensus')) return { votes: [{ index: 1, refuted: false }] };
+  };
+  const out = await tieredVerify(T, { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
+  assert.deepEqual(recheckSaw, [1], 'only the thin finding escalated');
+  assert.equal(out.findings.length, 2, 'both survive — escalation is scrutiny, not a drop');
+});
+
+test('#118: thinSource does NOT escalate under a profile that does not declare it', async () => {
+  let escalated = false;
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') {
+      return { verdicts: [{ index: 0, support: 'supported', thinSource: true }] };
+    }
+    if (opts.label?.startsWith('verify:recheck')) { escalated = true; return { keep: [] }; }
+    return { votes: [] };
+  };
+  await tieredVerify([T[0]], { profile: 'code-review', agent, perTierTimeoutMs: 1000 });
+  assert.equal(escalated, false, 'code-review does not declare thin-source in escalateOn');
+});
+
+test('#118: the thinSource flag is carried through to the surviving finding, not consumed', async () => {
+  const out = await tieredVerify(T, { profile: 'web-research', agent: mkThinAgent(), perTierTimeoutMs: 1000 });
+  const thin = out.findings.find((f) => f.id === 'thin');
+  assert.equal(thin.thinSource, true, 'the reader must see the flag in the evidence table');
+  assert.equal(out.findings.find((f) => f.id === 'auth').thinSource, false);
+});
+
+test('#118: a finding with no thinSource verdict is not treated as thin', async () => {
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: [{ index: 0, support: 'supported' }] };
+    return {};
+  };
+  const out = await tieredVerify([T[0]], { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.findings[0].thinSource, false, 'absent means not-flagged, never unknown-as-thin');
+});
+
+// ── The `support` stamp. Without it every downstream consumer of a REAL run sees no label:
+// renderDossierEntry's Support column reads `unlabelled` for every row, and slice 4's
+// thinSubQuestions / mergeReframed (which gate on `support === 'supported'`) are inert. Unit
+// tests that hand-construct fixtures with an explicit `.support` would still pass — which is
+// exactly why these tests drive it through the real tieredVerify instead.
+test('the Tier-1 label is STAMPED onto the surviving finding, not just read into a local', async () => {
+  const out = await tieredVerify(T, { profile: 'web-research', agent: mkThinAgent(), perTierTimeoutMs: 1000 });
+  assert.equal(out.findings.find((f) => f.id === 'auth').support, 'supported');
+  assert.equal(out.findings.find((f) => f.id === 'thin').support, 'supported');
+});
+
+test('an escalated finding carries its label through Tiers 2 and 3', async () => {
+  const out = await tieredVerify(F, { profile: 'audit', agent: mkAgent(), perTierTimeoutMs: 1000 });
+  assert.equal(out.findings.find((f) => f.id === 'c').support, 'uncertain',
+    'c escalated as uncertain and must still say so in the evidence table');
+});
+
+test('an UNJUDGED finding is stamped `unjudged`, never left blank', async () => {
+  // Triage returns a verdict for index 0 only; index 1 passes through unjudged and escalates.
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: [{ index: 0, support: 'supported' }] };
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [{ index: 1, keep: true }] };
+    if (opts.label?.startsWith('verify:consensus')) return { votes: [{ index: 1, refuted: false }] };
+  };
+  const out = await tieredVerify(T, { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.findings.find((f) => f.id === 'thin').support, 'unjudged');
+});
+
+test('a degraded verify returns the caller findings UNSTAMPED — no label is honest, a fake one is not', async () => {
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') throw new Error('boom');
+    return {};
+  };
+  const out = await tieredVerify(T, { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.degraded, true);
+  assert.equal(out.findings[0].support, undefined, 'verify did not run, so there IS no label');
 });

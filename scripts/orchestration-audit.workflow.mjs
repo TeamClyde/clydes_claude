@@ -272,6 +272,8 @@ const VERIFY_PROTOCOL = {
 };
 
 // JSON schemas passed as agent `schema` option.
+// Exported so tests can assert the contract directly — a schema field the prompt never asks for is
+// a silent no-op, and that is precisely the #118 defect one layer down.
 const TRIAGE_SCHEMA = {
   type: 'object', required: ['verdicts'],
   properties: {
@@ -283,6 +285,10 @@ const TRIAGE_SCHEMA = {
           index:   { type: 'integer' },
           support: { enum: ['supported', 'uncertain', 'unsupported'] },
           disagree: { type: 'boolean' },
+          // #118: declared in the web-research profile since the protocol was written, never
+          // implemented. A claim resting on one low-authority source was triaged `supported` and
+          // passed straight through Tier 1, never reaching an adversarial tier.
+          thinSource: { type: 'boolean' },
         },
       },
     },
@@ -376,7 +382,12 @@ function triagePrompt(findings) {
     .join('\n');
   return (
     'Triage these findings. For EACH (by index) label `supported`/`uncertain`/`unsupported` from its premise + your knowledge; ' +
-    'set `disagree:true` if it conflicts with another. Do NOT re-research. Terse.\n\n' +
+    'set `disagree:true` if it conflicts with another. ' +
+    // Independent of `support`. A claim can be perfectly well-supported BY a source that is itself
+    // a single low-authority page — that combination is the whole point of the flag.
+    'Set `thinSource:true` if the finding rests on a SINGLE source, or on a shallow/low-authority one ' +
+    '(vendor blog, SEO content, unattributed figure, unidentifiable preprint) — judge the SOURCE, not the claim. ' +
+    'Do NOT re-research. Terse.\n\n' +
     list
   );
 }
@@ -481,20 +492,34 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
 
     for (const f of work) {
       const v = verdictMap.get(f._idx);
-      // No verdict → ESCALATE, never drop. An unjudged finding carries no evidence against it;
-      // dropping it is the partial-coverage form of the bug the anyJudged guard above catches
-      // wholesale. Route it down the same path as `uncertain` and let Tiers 2/3 decide.
-      if (!v) { escalation.push(f); continue; }
+      // No verdict → ESCALATE, never drop. An unjudged finding carries no evidence against it.
+      // Stamp it `unjudged` rather than leaving `support` absent: a missing field renders as a
+      // blank Support cell, which a reader parses as "no concern found" — the opposite of "this
+      // claim was never judged". Only Tier 1 assigns labels, so a finding that survives Tiers 2/3
+      // unjudged genuinely has no label, and saying so is the honest rendering.
+      if (!v) { f.support = 'unjudged'; escalation.push(f); continue; }
 
       const label   = v.support;       // 'supported' | 'uncertain' | 'unsupported'
       const disagree = v.disagree === true;
+      const thin     = v.thinSource === true;
 
-      // A finding escalates if its label is in escalateOn, OR if it has disagree:true
-      // and 'disagree' is in escalateOn. These are two SEPARATE predicates.
-      const labelEscalates   = escalateOn.has(label);
+      // A finding escalates if its label is in escalateOn, OR if it carries a flag that is in
+      // escalateOn. These are SEPARATE predicates — `thin-source` fires on a `supported` finding,
+      // which is exactly the case Tier 1 used to wave through.
+      const labelEscalates    = escalateOn.has(label);
       const disagreeEscalates = disagree && escalateOn.has('disagree');
+      const thinEscalates     = thin && escalateOn.has('thin-source');
 
-      if (labelEscalates || disagreeEscalates) {
+      // Carry BOTH judgements onto the finding so they survive into the caller's evidence table.
+      // Verify is the only stage that RE-READ the sources, so neither can be reconstructed
+      // downstream. `label` was previously read into a local and thrown away, which left every
+      // surviving finding with no `support` field at all — the consumer's Support column would
+      // render `unlabelled` for every row, voiding the trust contract the column exists to carry.
+      f.support = label;
+      if (thin) f.thinSource = true;
+      else if (f.thinSource === undefined) f.thinSource = false;
+
+      if (labelEscalates || disagreeEscalates || thinEscalates) {
         escalation.push(f);
       } else if (label === 'supported') {
         supported.push(f);
