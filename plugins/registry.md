@@ -9,14 +9,17 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
 ## skill-creator
 
 - **Source:** https://github.com/claude-ai/skill-creator (claude-plugins-official)
-- **State:** Integrated
-- **Pinned version:** unknown (installed 2026-04-20; no git SHA recorded by plugin system)
-- **Skills provided:** `skill-creator:skill-creator`
-- **Domain ownership:** CSO benchmarking and A/B description comparison — delegated to via the eval phase in `writing-skills`.
-- **Last audited:** 2026-04-20
+- **State:** Removed (uninstalled 2026-08-06, user scope)
+- **Skills provided:** `skill-creator:skill-creator` (was ~112 always-on tokens)
+- **Domain ownership:** None. Formerly CSO benchmarking and A/B description comparison.
+- **Last audited:** 2026-08-06
 - **Notes:**
-  - Routed through `writing-skills` eval phase. Do not invoke `skill-creator:skill-creator` directly.
-  - Windows patches applied at install time.
+  - Removed for coherence, not budget. Three tools audited skill quality — `writing-skills`
+    (TDD cycle), `pulser` (static lint), and this — and no artifact owned the boundary between
+    them. This entry claimed **Integrated / never invoke directly** while
+    `rules/plugin-lifecycle.md` claimed **Active / invoke directly if needed**. Rules outrank
+    the registry, so the rule was authoritative and this entry was simply wrong.
+  - `rules/plugin-lifecycle.md` § "Currently Active" must drop its `skill-creator` paragraph.
 
 ---
 
@@ -128,12 +131,18 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
 ## marketing-skills (project-scoped)
 
 - **Source:** `github.com/coreyhaines31/marketingskills` (marketingskills marketplace — third-party, not Anthropic-official)
-- **State:** Active (project: `template-image-generator`)
-- **Pinned version:** `1.9.0` (`114587831efb`)
-- **Provides:** Marketing / Amazon-listing skills.
+- **State:** Active (project: `template-image-generator`) — **user-scope install removed 2026-08-06**
+- **Pinned version:** `2.8.1` (was recorded here as `1.9.0`)
+- **Provides:** 47 marketing skills. **~12,006 always-on tokens in every session.**
 - **Domain ownership:** `template-image-generator` repo only. Niche; not global.
-- **Last audited:** 2026-06-18
-- **Notes:** Only installed plugin from a non-official marketplace — apply the Pre-Install Checklist / install-vetting funnel on any update.
+- **Last audited:** 2026-08-06
+- **Notes:**
+  - This entry said project-scoped since 2026-06-18. It was installed at **user** scope, so it
+    loaded into every session in every repo — 74% of all plugin always-on cost here, and more
+    than the entire ~10,000-token skill-listing budget on a 1M-context model by itself. Nothing
+    compared this claim against `installed_plugins.json`, so the divergence ran for seven weeks.
+  - Reinstall inside that repo with `--scope project`, never at user scope.
+  - Only installed plugin from a non-official marketplace — apply the Pre-Install Checklist / install-vetting funnel on any update.
 
 ---
 
