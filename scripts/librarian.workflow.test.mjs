@@ -154,3 +154,56 @@ test('the unanswered-brief notice is built in code and leads the report (#96)', 
   assert.match(bannerBlock, /missingSubQuestions\.length/);
   assert.match(bannerBlock, /missingSections\.length/);
 });
+
+// ── Task 8 — L2 section audit ───────────────────────────────────────────────
+
+test('section validation runs L1 before L2 — the free check gates the paid one', () => {
+  const validateBlock = BODY.slice(BODY.indexOf('validate: async (v) => {'), BODY.indexOf('work: async (repair)'));
+  const l1 = validateBlock.indexOf('unknownUrls(');
+  // The L2 marker is `withWatchdog(`, NOT `await agent(` — the audit call is a thunk passed to the
+  // watchdog (`() => agent(`), so no `await agent(` exists here. Asserting on the un-wrapped shape
+  // would fail against the only correct implementation.
+  const l2 = validateBlock.indexOf('withWatchdog(');
+  assert.ok(l1 !== -1 && l2 !== -1, 'both layers must exist');
+  assert.ok(l1 < l2, 'the deterministic check must precede the audit agent');
+});
+
+test('repair exhaustion KEEPS the section and records integrity — never drops it (#96)', () => {
+  assert.match(BODY, /integrity\.push\(\{ subQuestion: section\.subQuestion/);
+  const validateBlock = BODY.slice(BODY.indexOf('validate: async (v) => {'), BODY.indexOf('work: async (repair)'));
+  // BOTH validation layers preserve on exhaustion — L1 (stray URL) and L2 (untraceable claim).
+  assert.equal((validateBlock.match(/if \(lastAttempt\) \{/g) ?? []).length, 2);
+});
+
+test('validate takes ONE argument and counts attempts in a closure, never via ctx', () => {
+  // runUnit calls `await validate(res.value)` — one argument (fail-successfully.mjs:88). A
+  // `ctx.attempt` read here is undefined forever, which would make the keep-and-flag branch
+  // unreachable and silently drop sections — the #96 failure this branch exists to prevent.
+  assert.doesNotMatch(BODY, /validate: async \(v, ctx\)/);
+  assert.doesNotMatch(BODY, /ctx\?\.attempt/);
+  assert.match(BODY, /let attempts = 0;/);
+});
+
+test('the last-attempt threshold DERIVES from the retry budget — no magic number to drift', () => {
+  assert.match(BODY, /const SECTION_VALIDATION_RETRIES = 2;/);
+  assert.match(BODY, /const lastAttempt = attempts >= SECTION_VALIDATION_RETRIES \+ 1;/);
+  assert.match(BODY, /maxValidationRetries: SECTION_VALIDATION_RETRIES/);
+});
+
+test('the audit agent inside validate is watchdog-bounded and fails OPEN', () => {
+  // runUnit watchdog-wraps only work() (fail-successfully.mjs:76); validate is awaited bare at
+  // :88. quorumBarrier is a plain Promise.all (:118) that depends on runUnit never hanging or
+  // rejecting — so an unwrapped agent call here would stall or kill the whole section batch.
+  assert.match(BODY, /const audit = await withWatchdog\(\s*\n?\s*\(\) => agent\(/);
+  assert.match(BODY, /AUDIT_TIMEOUT_MS/);
+  assert.match(BODY, /if \(audit\.outcome !== 'done'\) \{[\s\S]*?return \{ ok: true \};/,
+    'an audit that could not run keeps the section and records that it was unaudited');
+  assert.match(BODY, /audit\.value\?\.untraceable/, 'withWatchdog returns a discriminated result, not the value');
+});
+
+test('the auditor judges traceability only — never truth, never new research', () => {
+  // Seam-tolerant: the phrase spans a template-literal concatenation boundary (` + \n + `), so a
+  // contiguous regex cannot match it. Where the prompt happens to wrap is layout, not intent — the
+  // bounded gap keeps the assertion about the instruction rather than about the line width.
+  assert.match(BODY, /do NOT judge whether[\s\S]{0,40}a claim is TRUE in the world/);
+});

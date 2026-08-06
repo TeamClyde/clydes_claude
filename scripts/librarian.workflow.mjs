@@ -1155,34 +1155,151 @@ const sectionPrompt = (section) =>
 // below and (from Task 8) the `lastAttempt` check inside `validate` read this one value.
 const SECTION_VALIDATION_RETRIES = 2;
 
-const sectionUnits = sections.map((section) => ({
-  // work returns { subQuestion, markdown } so assembly can reconstruct by KEY, not by position —
-  // parallelFanout's `confirmed` is a COMPACT array (abandoned sections are absent), so a
-  // positional sections[i] map would mislabel neighbours after any abandon.
-  validate: (v) => {
-    if (!v || typeof v.markdown !== 'string' || v.markdown.length === 0) {
-      return { ok: false, reason: 'empty section' };
-    }
-    // Validation layer 1 — deterministic and free: every URL in the prose must belong to THIS
-    // section's own findings. Set membership, no agent. This is the check that makes "prose cannot
-    // claim more provenance than the evidence supports" structural rather than instructed.
-    const unknown = unknownUrls(v.markdown, section.findings);
-    if (unknown.length) {
-      return {
-        ok: false,
-        reason: `the prose cites URL(s) that are not in this section's findings: ${unknown.slice(0, 3).join(', ')}. `
-          + `Remove every source URL from the text — provenance is rendered separately from the findings.`,
-      };
-    }
-    return { ok: true };
+// The auditor answers ONE closed question — "is each claim traceable to these findings?" — and
+// returns only the failures. Asking for the failures rather than a per-claim verdict keeps the
+// output bounded on the common (clean) path.
+const AUDIT_SCHEMA = {
+  type: 'object', required: ['untraceable'],
+  properties: {
+    untraceable: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['claim', 'reason'],
+        properties: { claim: { type: 'string' }, reason: { type: 'string' } },
+      },
+    },
   },
-  work: async (repair) => ({
-    subQuestion: section.subQuestion,
-    markdown: await agent(
-      sectionPrompt(section) + (repair ? `\nPREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.` : ''),
-      { label: `synth:${section.subQuestion.slice(0, 48)}`, phase: 'Synthesize', model: 'claude-sonnet-4-6' }),
-  }),
-}));
+};
+
+// Populated by the section audit. Kept OUTSIDE the unit closures because a section that exhausts
+// its repair budget is still published — its flagged claims must survive into the dossier's
+// `### Integrity` block rather than vanishing with the failed validation attempt.
+const integrity = [];
+
+// The audit runs INSIDE `validate`, which runUnit does not watchdog — so this deadline is the only
+// thing bounding it. Well under the 600s section budget: the auditor reads prose that is already
+// in hand and does no research.
+const AUDIT_TIMEOUT_MS = 180_000;
+
+const sectionUnits = sections.map((section) => {
+  // Attempt counting lives in a CLOSURE, not in a `ctx` argument.
+  //
+  // `runUnit` calls `validate` with exactly ONE argument — `const verdict = await validate(res.value)`
+  // (fail-successfully.mjs:88). The structured `ctx` is threaded into `work(repair, ctx)`
+  // (:76) and refreshed for the NEXT work() call (:82, :97); it never reaches `validate`.
+  // Reading `ctx.attempt` inside validate would therefore be `undefined` forever, the
+  // last-attempt branch below would never fire, and a section that kept failing the audit would
+  // exhaust its budget and reach ABANDONED — silently DROPPED. That is precisely the
+  // discarded-paid-for-work failure (#96) this branch exists to prevent, so it must not depend
+  // on a value the engine does not supply.
+  //
+  // validate runs once per attempt: 1 initial + SECTION_VALIDATION_RETRIES.
+  // Derived, never a literal. A bare `3` here would silently fire one attempt early — or never —
+  // if the retry budget at the parallelFanout call were ever changed, regressing exactly the
+  // discard behavior this branch exists to prevent.
+  let attempts = 0;
+  return {
+    validate: async (v) => {
+      attempts++;
+      const lastAttempt = attempts >= SECTION_VALIDATION_RETRIES + 1;
+
+      // An empty section has nothing to preserve, so this one always retries and, on exhaustion,
+      // is correctly abandoned. Every other failure below is preservable.
+      if (!v || typeof v.markdown !== 'string' || v.markdown.length === 0) {
+        return { ok: false, reason: 'empty section' };
+      }
+
+      // ── Layer 1 — deterministic and free: every URL in the prose must belong to THIS section's
+      // own findings. Set membership, no agent. This is the check that makes "prose cannot claim
+      // more provenance than the evidence supports" structural rather than instructed.
+      const unknown = unknownUrls(v.markdown, section.findings);
+      if (unknown.length) {
+        if (lastAttempt) {
+          // Preserve rather than drop, same rule as layer 2. Prose carrying a stray URL is worth
+          // more than a missing section, and the discrepancy is recorded rather than hidden.
+          for (const u of unknown) {
+            integrity.push({ subQuestion: section.subQuestion, claim: u, reason: 'cited URL is not in this section’s findings' });
+          }
+          return { ok: true };
+        }
+        return {
+          ok: false,
+          reason: `the prose cites URL(s) that are not in this section's findings: ${unknown.slice(0, 3).join(', ')}. `
+            + `Remove every source URL from the text — provenance is rendered separately from the findings.`,
+        };
+      }
+
+      // ── Layer 2 — audit agent. Runs ONLY on prose that passed layer 1: the same
+      // cheap-scan-then-expensive-verify asymmetry the engine uses everywhere else. Bounded at 3
+      // audit calls per section per run (one per attempt), and only for sections that reach L2.
+      //
+      // WRAPPED IN withWatchdog — load-bearing, not defensive padding.
+      // `runUnit` watchdog-wraps only `work()` (fail-successfully.mjs:76); `validate` is awaited
+      // BARE at :88, with no deadline and no try/catch anywhere in runUnit. The engine's own
+      // contract (:36-37) reads "runUnit ALWAYS resolves to a terminal state — it never rejects
+      // and never hangs... This is what lets quorumBarrier be safe", and `quorumBarrier` is a
+      // plain `Promise.all` (:118) that depends on exactly that.
+      //
+      // This is the only agent-calling `validate` in the codebase. Left unwrapped, a hung audit
+      // stalls the ENTIRE section batch forever (Promise.all never settles), and a rejected one
+      // propagates uncaught through runUnit → quorumBarrier → parallelFanout and kills the run
+      // with no dossier at all — strictly worse than the #96 failure this plan exists to fix.
+      //
+      // withWatchdog is the right primitive: exported from the engine bundle, and it returns a
+      // discriminated result instead of throwing, so it restores both halves of the invariant.
+      const audit = await withWatchdog(
+        () => agent(
+          `You are auditing a research section for traceability. For EVERY factual claim in the PROSE, ` +
+          `decide whether it is supported by the FINDINGS below. Return ONLY the claims that are NOT ` +
+          `traceable — an empty array means every claim traces. Do NOT research, do NOT judge whether ` +
+          `a claim is TRUE in the world; judge only whether these findings say it. Terse.\n\n` +
+          `PROSE:\n${v.markdown}\n\nFINDINGS: ${JSON.stringify(section.findings)}`,
+          { label: `audit:${section.subQuestion.slice(0, 40)}`, phase: 'Synthesize', schema: AUDIT_SCHEMA, model: 'claude-sonnet-4-6' }),
+        AUDIT_TIMEOUT_MS);
+
+      // Fail OPEN, and say so. The audit is an ADDITIONAL check on prose that already passed L1;
+      // if it could not run, the honest outcome is to keep the section and record that it was not
+      // audited. Failing closed would drop a section over a transport error — the discard
+      // behavior this task exists to remove.
+      if (audit.outcome !== 'done') {
+        integrity.push({
+          subQuestion: section.subQuestion,
+          claim: '(whole section)',
+          reason: `traceability audit did not complete (${audit.outcome}) — claims in this section are unaudited`,
+        });
+        return { ok: true };
+      }
+
+      const bad = audit.value?.untraceable ?? [];
+      if (bad.length) {
+        // On the LAST attempt, stop failing and record instead. Repair exhaustion must not drop
+        // the section: dropping violates preservation and re-creates #96's discarded-work
+        // complaint. A flagged section is more useful than a missing one.
+        if (lastAttempt) {
+          for (const b of bad) {
+            integrity.push({ subQuestion: section.subQuestion, claim: b.claim, reason: b.reason });
+          }
+          return { ok: true };
+        }
+        return {
+          ok: false,
+          reason: `these claims are not traceable to this section's findings — remove or rewrite them: `
+            + bad.slice(0, 3).map((b) => `"${b.claim}" (${b.reason})`).join('; '),
+        };
+      }
+      return { ok: true };
+    },
+    // work returns { subQuestion, markdown } so assembly can reconstruct by KEY, not by position —
+    // parallelFanout's `confirmed` is a COMPACT array (abandoned sections are absent), so a
+    // positional sections[i] map would mislabel neighbours after any abandon.
+    work: async (repair) => ({
+      subQuestion: section.subQuestion,
+      markdown: await agent(
+        sectionPrompt(section) + (repair ? `\nPREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.` : ''),
+        { label: `synth:${section.subQuestion.slice(0, 48)}`, phase: 'Synthesize', model: 'claude-sonnet-4-6' }),
+    }),
+  };
+});
 // 600s (was 240s): measured section writers produce 14-24k chars. At 240s two units were abandoned
 // and — because the watchdog is NON-PREEMPTIVE — were still paid for in full, while their retries
 // returned ~1.6k-char stubs. A budget below the measured workload buys nothing and loses the work.
