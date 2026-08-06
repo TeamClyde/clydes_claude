@@ -12,7 +12,9 @@
     "Claude Code loads every skill name+description into context. The budget is 1% of the",
     "model context window; on overflow it drops descriptions starting with the LEAST-invoked",
     "skills, so rarely-used skills lose their trigger keywords and become harder to invoke,",
-    "which keeps them at the front of the drop queue. Overlap evicts your own skills."
+    "which keeps them at the front of the drop queue. Overlap evicts your own skills.",
+    "",
+    "The target this file enforces toward is written up in docs/reference/skill-surface-standard.md."
   ],
 
   "plugins": {
@@ -21,13 +23,14 @@
       "atlassian@claude-plugins-official": ["user"],
       "aws-serverless@claude-plugins-official": ["user"],
       "claude-md-management@claude-plugins-official": ["user"],
-      "context7@claude-plugins-official": ["local", "user"],
+      "context7@claude-plugins-official": ["user"],
       "explanatory-output-style@claude-plugins-official": ["user"],
       "frontend-design@claude-plugins-official": ["project"],
       "playwright@claude-plugins-official": ["user"],
-      "plugin-dev@claude-plugins-official": ["user"],
       "pyright-lsp@claude-plugins-official": ["user"],
-      "security-guidance@claude-plugins-official": ["local", "user"],
+      "security-guidance@claude-plugins-official": ["user"],
+
+      "$stray-local-records": "context7 and security-guidance were declared [local, user] until 2026-08-06. The local record was a duplicate enable in template-image-generator that registry.md had claimed was purged on 2026-06-18; it never was, and declaring the observed state as expected turned a known defect into policy. Removed via the casing fix below. They are NOT in the `removed` set -- the plugin itself is still wanted at user scope, and `removed` is keyed by plugin name, so listing one there would fail the resurrection check against its own legitimate install.",
 
       "$project-scoped": "Scoped to another repo, so they never appear in user-level enabledPlugins and cost this repo nothing. marketing-skills moved user -> project on 2026-08-06: it was 47 skills and ~12006 always-on tokens in EVERY session, more than the entire ~10000-token listing budget on a 1M-context model and 74% of all plugin cost here. registry.md had claimed it was project-scoped since 2026-06-18 while it sat at user scope.",
       "marketing-skills@marketingskills": ["project"],
@@ -37,7 +40,8 @@
       "$comment": "Deleted deliberately. Reinstalling one fails the check until this file says otherwise.",
       "skill-creator@claude-plugins-official": "Only ~112 tokens, so this is a coherence fix rather than a budget one. Shadowed by writing-skills (TDD cycle) and pulser (static lint); registry.md called it Integrated while rules/plugin-lifecycle.md called it Active. Three tools audited skill quality and no artifact owned the boundary.",
       "superpowers@claude-plugins-official": "Superseded -- every skill has a local equivalent in skills/. Marked Removed in registry.md on 2026-06-18 and back by 06-30; removed again 2026-08-06 and this time the check enforces it.",
-      "feature-dev@claude-plugins-official": "Superseded by brainstorming / writing-plans / architect / Explore / requesting-code-review. Same 2026-06-18 removal and 06-30 return as superpowers."
+      "feature-dev@claude-plugins-official": "Superseded by brainstorming / writing-plans / architect / Explore / requesting-code-review. Same 2026-06-18 removal and 06-30 return as superpowers.",
+      "plugin-dev@claude-plugins-official": "~2349 always-on tokens, plus an always-on rule (rules/plugin-lifecycle.md, now deleted) whose entire substantive content was a list of its own skills not to invoke. All 8 skills were read before grading on 2026-08-06: 2 dead (delegations already severed), 1 obsolete upstream (commands merged into skills), 3 inapplicable (they cover authoring a plugin; this repo authors none), 1 rejected (its gitignored .local.md config pattern conflicts with the committed project.json), and hook-development -- the only one with a live claim -- stale and WRONG: it says settings.json takes no `hooks` wrapper, which would produce a silently-ignored hooks block, and documents 9 of the platform's 31 events. Replaced by skills/creating-tools/hooks-reference.md, derived from the official docs and this repo's nine working hooks."
     },
     "$casing-hazard": [
       "ROOT CAUSE of the repeated superpowers/feature-dev returns, diagnosed 2026-08-06.",
@@ -56,10 +60,15 @@
       "restored the deleted records. Not a daemon regenerating state; a lost update. Hand-edit only",
       "with other sessions closed, and prefer the CLI.",
       "",
-      "STILL LOWERCASE and therefore un-uninstallable until patched: context7 (local),",
-      "security-guidance (local), frontend-design (project). Left alone deliberately -- all three",
-      "work today and repointing a live plugin's projectPath risks breaking its loading. Patch the",
-      "casing at removal time, not before."
+      "CONFIRMED FIX, applied 2026-08-06 to context7 (local) and security-guidance (local): patch",
+      "the record's projectPath from `c:` to `C:`, THEN run `claude plugin uninstall X --scope",
+      "local` from the target repo. Both succeeded on the first attempt after the patch, having",
+      "failed repeatedly before it. Patch the casing at removal time, not before -- repointing a",
+      "live plugin's projectPath is only safe when the next step deletes the record anyway.",
+      "",
+      "STILL LOWERCASE and deliberately untouched: frontend-design (project, klondike_gui). It is",
+      "legitimately project-scoped and wanted there, so it costs this repo nothing and needs no",
+      "removal. Patch it only if it ever has to come out."
     ]
   },
 

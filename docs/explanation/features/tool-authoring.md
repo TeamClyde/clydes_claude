@@ -11,7 +11,7 @@
   - `skills/creating-tools/routing-table.md` — per-artifact routing details
   - `skills/writing-skills/SKILL.md`, `skills/writing-agents/SKILL.md`, `skills/writing-rules/SKILL.md` — the specialist authoring skills
   - `skills/pulser/SKILL.md`, `skills/adherence-audit/SKILL.md` — structural + semantic quality checks
-  - `rules/plugin-lifecycle.md` — creating-tools routing + plugin conflict suppression
+  - `skills/creating-tools/routing-table.md` — per-artifact routing, all references owned locally
 ---
 
 # Tool Authoring
@@ -42,7 +42,7 @@ Five components participate, grouped into two layers.
 
 `writing-skills` (`skills/writing-skills/SKILL.md`) — handles skill creation. Applies TDD adapted to process documentation: baseline pressure test (RED), write the skill (GREEN), close loopholes (REFACTOR), then Pulser structural eval. Structural conventions come from `skills/creating-tools/frontmatter-reference.md` and the bundled `anthropic-best-practices.md`.
 
-`writing-agents` (`skills/writing-agents/SKILL.md`) — handles agent creation. Requires a bare baseline invocation (no system prompt) before any content is written. Documents actual failures verbatim, then writes the system prompt to address them. Structural field conventions come from `skills/creating-tools/frontmatter-reference.md`, which is owned locally rather than delegated — `rules/plugin-lifecycle.md` forbids invoking the plugin that previously held them. Requires explicit `model:` selection as repo policy (the platform defaults to `inherit`); agent descriptions state what the agent is for and when Claude should delegate to it.
+`writing-agents` (`skills/writing-agents/SKILL.md`) — handles agent creation. Requires a bare baseline invocation (no system prompt) before any content is written. Documents actual failures verbatim, then writes the system prompt to address them. Structural field conventions come from `skills/creating-tools/frontmatter-reference.md`, which is owned locally rather than delegated — the plugin that previously held them was uninstalled 2026-08-06. Requires explicit `model:` selection as repo policy (the platform defaults to `inherit`); agent descriptions state what the agent is for and when Claude should delegate to it.
 
 `writing-rules` (`skills/writing-rules/SKILL.md`) — handles rule creation. Rules are always-on context injections, not on-demand skills. Authoring principle: short, scannable, single-concern, with decision tables over prose. No Pulser eval; testing is observational (2–3 live sessions). Supports two rule types: global (no frontmatter) and path-scoped (`paths:` frontmatter).
 
@@ -58,9 +58,8 @@ graph TD
     CT -->|artifact = skill| WS[writing-skills]
     CT -->|artifact = agent| WA[writing-agents]
     CT -->|artifact = rule| WR[writing-rules]
-    CT -->|artifact = hook| HD[plugin-dev:hook-development]
-    CT -->|artifact = command| CD[plugin-dev:command-development]
-    CT -->|artifact = plugin| CP[plugin-dev:create-plugin]
+    CT -->|artifact = hook| HD[test-driven-development<br/>+ hooks-reference.md]
+    CT -->|artifact = command| WS
     WS --> PL[pulser]
     PL --> AA[adherence-audit]
     WA --> AA
@@ -82,14 +81,13 @@ The typical flow for creating a new skill (the most common case):
 
 For agents, step 4 is a bare `Agent` tool dispatch (no agent definition file loaded). For rules, steps 4–6 are replaced by direct authoring (no TDD loop); testing is deferred to live observational sessions.
 
-**Routing constraint.** When the user's intent resolves to a hook, command, or full plugin, `creating-tools` delegates directly to the corresponding `plugin-dev` sub-skill. These routes have no process wrapper — `plugin-dev` provides its own guided workflow.
+**Routing constraint.** No route delegates to a plugin. A hook routes to `test-driven-development` against `skills/creating-tools/hooks-reference.md`; a command routes to `writing-skills`, because the platform merged custom commands into skills (a command is a skill carrying `disable-model-invocation: true`); full-plugin authoring has no route, because this repo consumes plugins rather than authoring them.
 
 ## Dependencies
 
-- `plugin-dev` plugin (Integrated state) — provides guided workflows for hooks, commands, and full plugins, which `creating-tools` routes to directly. It is **not** a dependency of `writing-skills` or `writing-agents`: `rules/plugin-lifecycle.md` forbids invoking its skills, so skill and agent structural conventions are owned locally in `skills/creating-tools/frontmatter-reference.md`.
 - `skills/creating-tools/frontmatter-reference.md` — the repo's own verified frontmatter inventory for both agents and skills, including the packaging-spec field limit that governs cloud and routine uploads.
+- `skills/creating-tools/hooks-reference.md` — the repo's own hook reference: event taxonomy, exit-code and deny contract, settings.json wiring, and house pattern. Written from the official hooks documentation and the repo's nine working hooks.
 - `pulser` CLI — external tool for static structural evaluation of skill files. Invoked by `writing-skills`. Requires `pulser` to be installed and accessible on `$PATH`.
-- `rules/plugin-lifecycle.md` — always-on global rule that suppresses direct invocation of Integrated plugin skills. Both this rule file and `skills/creating-tools/SKILL.md` must be symlinked into `~/.claude/rules/` and `~/.claude/skills/` respectively for conflict suppression to be active.
 - `skills/creating-tools/routing-table.md` — the per-artifact detail table consumed by `creating-tools` at decision time. Lists process skill, structure skill, eval mechanism, and notes for each artifact type.
 
 ## Decisions
@@ -103,7 +101,7 @@ _(No accepted ADRs yet.)_
 - **The Iron Law applies to edits as well as new files.** Modifying an existing skill still requires a failing baseline test first. Adding a section, updating a description, or closing a loophole all require observing the failure before writing the fix.
 - **Pulser is structural; `adherence-audit` is semantic.** A skill that passes Pulser may still introduce a dead reference, a convention conflict, or an invocation mismatch. Run `adherence-audit` after adding or modifying any component to catch cross-corpus drift.
 - **Agent and skill frontmatter differ in ways that fail silently.** Agents restrict tools with `tools:` and deny with `disallowedTools:` (camelCase); skills grant with `allowed-tools:` and restrict with `disallowed-tools:` (kebab-case). A key written for the wrong surface is dropped without an error, so the declaration reads as correct and does nothing — this is how an agent ships unrestricted. Diff declared frontmatter against what the runtime renders. Both surfaces want the same description shape: what the component is for, plus when to use it — never its internal steps.
-- **`plugin-lifecycle.md` requires both files to be symlinked.** Conflict suppression is soft enforcement — it depends on the rule being present in the system prompt. If `rules/plugin-lifecycle.md` is not symlinked into `~/.claude/rules/`, Integrated plugin skills can be triggered directly, bypassing `creating-tools`.
+- **Own the reference rather than suppressing the plugin that holds it.** Structural guidance for every artifact type now lives in this repo. The prior arrangement paid twice — a plugin's always-on skill listing, plus an always-on rule (`rules/plugin-lifecycle.md`) listing its skills as not-to-invoke — and the suppression was soft, so it drifted: the registry and the rule stated opposite lifecycle states for the same plugin for weeks. Both the plugin and the rule were removed 2026-08-06. A cached plugin snapshot also goes stale silently: the hook skill still asserted a settings.json format that has not worked for some time. See `plugins/registry.md` § plugin-dev.
 - **Observational testing for rules has no feedback loop.** Rules cannot fail a Pulser eval or a subagent pressure scenario. The only validation is running 2–3 real sessions that should trigger the rule and observing whether the constraint is followed. This means rule drift (a rule that reads as advisory despite using mandatory language) can go undetected for extended periods.
 - **`adherence-audit` reports only — it never fixes.** Running the audit during a fix attempt contaminates the inventory built in Phase 1. The correct sequence is: run the audit, record findings, exit the audit, then address findings in a separate step.
 
@@ -127,7 +125,7 @@ Authoring quality is observed through three signals:
 
 **Hard gate** — The mandatory ambiguity check in `creating-tools` before any routing decision is made. If the artifact type cannot be determined from the user's message, `creating-tools` asks exactly one clarifying question and waits. It does not guess.
 
-**Integrated (plugin state)** — A plugin whose sub-skills are suppressed from direct invocation and must be accessed exclusively through `creating-tools`. Currently: `plugin-dev`. Contrast with Active (`skill-creator`), which may be invoked directly.
+**Integrated (plugin state)** — A plugin whose sub-skills are suppressed from direct invocation and must be accessed exclusively through `creating-tools`. **No plugin currently holds this state**, and the always-on rule that enforced it was deleted with the last one. Retained in the lifecycle vocabulary (`plugins/registry.md`) as a legal transition, not a current fact.
 
 **Iron Law** — The inviolable constraint shared by `writing-skills` and `writing-agents`: no skill content before a failing baseline test; no system prompt before a bare baseline invocation. Applies to edits as well as new files.
 

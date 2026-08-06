@@ -13,6 +13,7 @@ flowchart LR
   brainstorming --> researcher
   brainstorming --> using_git_worktrees
   brainstorming --> writing_plans
+  creating_tools --> test_driven_development
   creating_tools --> writing_agents
   creating_tools --> writing_rules
   creating_tools --> writing_skills
@@ -110,8 +111,6 @@ flowchart LR
   planning --> researcher
   planning --> subagent_driven_development
   planning --> test_strategy
-  plugin_lifecycle --> creating_tools
-  plugin_lifecycle --> using_superpowers
   project_setup --> e2e_init
   project_setup --> git_manager
   project_setup --> infra_init
@@ -193,6 +192,7 @@ flowchart LR
 | brainstorming | researcher |
 | brainstorming | using-git-worktrees |
 | brainstorming | writing-plans |
+| creating-tools | test-driven-development |
 | creating-tools | writing-agents |
 | creating-tools | writing-rules |
 | creating-tools | writing-skills |
@@ -290,8 +290,6 @@ flowchart LR
 | planning | researcher |
 | planning | subagent-driven-development |
 | planning | test-strategy |
-| plugin-lifecycle | creating-tools |
-| plugin-lifecycle | using-superpowers |
 | project-setup | e2e-init |
 | project-setup | git-manager |
 | project-setup | infra-init |

@@ -4,9 +4,9 @@ Canonical field reference for both surfaces. Verified against official documenta
 2026-08-06: [code.claude.com/docs/en/sub-agents](https://code.claude.com/docs/en/sub-agents)
 and [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills).
 
-This file is the repo's own reference. It is not a pointer to a plugin — do not replace it
-with a citation to `plugin-dev:agent-development`, which `rules/plugin-lifecycle.md` forbids
-invoking.
+This file is the repo's own reference. It is not a pointer to a plugin — do not replace it with
+a citation to `plugin-dev:agent-development`, which was uninstalled 2026-08-06. See
+`hooks-reference.md` § "Why this file exists" for what a cached plugin snapshot drifts into.
 
 ## Contents
 
@@ -195,7 +195,7 @@ the document and hides real choices.
 |---|---|
 | Every agent declares `model:` explicitly | **Repo policy.** The platform defaults to `inherit`. The policy exists so dispatch cost is a deliberate choice, and so the model-pinning hook can see it. |
 | Agents pin full model IDs, not short aliases | **Repo policy.** Both forms are platform-valid. The repo-authored agents use full IDs; the five vendored agents use aliases and are the exception, not the pattern. Check the model-pinning hook before choosing a form — it may match only one. |
-| Skill and agent creation routes through `creating-tools` | **Repo policy**, from `rules/plugin-lifecycle.md`. Not a platform behavior. |
+| Skill and agent creation routes through `creating-tools` | **Repo policy**, from `skills/creating-tools/routing-table.md`. Not a platform behavior. |
 
 When writing guidance, say which of the two a rule is. "Required" without qualification reads
 as a platform constraint and will be trusted as one.

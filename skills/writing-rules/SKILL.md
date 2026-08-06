@@ -36,7 +36,7 @@ Use for: universal constraints (never call Jira MCP directly), routing directive
 Content here.
 ```
 
-Examples: `rules/mcp-governance.md`, `rules/cspell.md`, `rules/plugin-lifecycle.md`
+Examples: `rules/mcp-governance.md`, `rules/cspell.md`, `rules/secrets-handling.md`
 
 ### Path-Scoped Rules (paths: frontmatter)
 

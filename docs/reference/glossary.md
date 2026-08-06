@@ -68,7 +68,7 @@ The pre-execution gate skill. Runs automatically after `writing-plans`. Sequence
 The skill that keeps TODO.md current. Invoked after every Jira ticket creation or status transition. Never edit TODO.md manually.
 
 **rule**
-A Markdown file in `rules/` that loads with higher priority than skills. Rules override skill defaults silently. Current rules: `workflow-phases.md`, `planning.md`, `plan-docs.md`, `mcp-governance.md`, `plugin-lifecycle.md`, `cspell.md`, `filesystem/efficiency.md`, `new-repo-setup.md`, `integration-test-constraints.md`.
+A Markdown file in `rules/` that loads with higher priority than skills. Rules override skill defaults silently. Current rules: `workflow-phases.md`, `planning.md`, `plan-docs.md`, `mcp-governance.md`, `cspell.md`, `delivery-cadence.md`, `doc-tools.md`, `install-vetting.md`, `secrets-handling.md`, `stack-hats.md`, `filesystem/efficiency.md`, `filesystem/path-portability.md`, `new-repo-setup.md`, `integration-test-constraints.md`.
 
 **SETUP REQUIRED**
 A test-runner result class. `.claude/testing-plan.md` not found. Returned immediately — no test run attempted. Resolution: run `e2e-init`.

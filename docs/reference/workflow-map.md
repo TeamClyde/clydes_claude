@@ -65,7 +65,9 @@ flowchart TD
 
 **Routing rule:** `creating-tools` must be the entry point for all component creation.
 Do not invoke `writing-skills`, `writing-agents`, or `writing-rules` directly.
-See `rules/plugin-lifecycle.md` — this is enforced by rule priority.
+Each of those three carries "Route through creating-tools, not directly" in its own description —
+that is where the constraint lives. See `skills/creating-tools/routing-table.md` for the
+per-artifact detail.
 
 ---
 
@@ -198,7 +200,7 @@ Rules are in `rules/` and `CLAUDE.md`.
 | `rules/plan-docs.md` | When plan docs are created, location, skip conditions | S/M → no plan doc; `plans/` is gitignored (session artifacts); committed docs go in `docs/` |
 | `rules/filesystem/efficiency.md` | Search and read patterns | No unscoped globs; plan-doc-first during execution; **graph tools are the default** for code navigation when graph is present (Grep is fallback for non-source files); project name lives in project's CLAUDE.md "Codebase Knowledge Graph" section |
 | `rules/mcp-governance.md` | MCP tool access | No direct Atlassian MCP calls; JQL must include `project=` filter |
-| `rules/plugin-lifecycle.md` | Plugin routing, conflict suppression | Integrated plugins route via `creating-tools`; do not invoke directly |
+| `docs/reference/skill-surface-policy.json` | Declared plugin + skill-listing surface | Enforced by `npm test`; a removed plugin returning fails the check |
 | `rules/cspell.md` | Spellcheck false positives | Auto-add to `cspell.json` and `.vscode/settings.json` without asking |
 | `rules/secrets-handling.md` | Credential and secret handling in any workflow | Never ask user to paste a secret into chat; walk through store-once recipe (OS credential manager / `~/.netrc` / shell env var); retrieve at runtime via tool, never echo to stdout |
 | `rules/stack-hats.md` | Per-stack best-practice layer | Active hats resolved from `project.json` `stacks` → `~/.claude/stacks/<stack>.md` `## Hat`; leveraged at session start (hook), code-generation (`executing-plans`/`subagent-driven-development`), and architect review |

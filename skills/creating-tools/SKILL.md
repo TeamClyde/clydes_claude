@@ -32,11 +32,20 @@ Do not pick a route unilaterally under time pressure or convenience. The gate ho
 | skill | `writing-skills` | Full TDD cycle + Pulser eval — see routing-table.md |
 | agent | `writing-agents` | TDD process + frontmatter conventions, both owned locally |
 | rule | `writing-rules` | Global or path-scoped |
-| hook | `plugin-dev:hook-development` | Direct delegation |
-| command | `plugin-dev:command-development` | Direct delegation |
-| full plugin | `plugin-dev:create-plugin` | 8-phase guided workflow |
+| hook | `test-driven-development` | Structure in `hooks-reference.md` (owned locally) |
+| command | `writing-skills` | A command **is** a skill upstream — see below |
+| full plugin | — | Not authored in this repo — see below |
 
 For full details on what each route covers, see `routing-table.md` in this directory.
+
+**Commands are skills.** The platform merged custom commands into skills: `.claude/commands/deploy.md`
+and `.claude/skills/deploy/SKILL.md` both produce `/deploy`. Author one as a skill with
+`disable-model-invocation: true` (manual `/name` only) — both fields are documented in
+`frontmatter-reference.md`. There is no separate command route.
+
+**This repo authors no plugins.** It consumes them; see `plugins/registry.md`. If that ever
+changes, the official plugin docs are the reference — do not reinstate a delegation to
+`plugin-dev`, which was removed 2026-08-06 for the reasons in `hooks-reference.md`.
 
 ## Coordinator Constraint
 
@@ -78,4 +87,4 @@ These thoughts mean you are violating the coordinator constraint:
 | "The user wants a skill — I know what to do" | Route to writing-skills. Do not start writing. |
 | "I'll do a quick draft while loading the skill" | No. The delegated skill does the drafting. |
 | "This is simple enough to handle directly" | The coordinator constraint has no exceptions. |
-| "I'll route to both writing-agents and plugin-dev" | Never two routes simultaneously. Pick one. |
+| "I'll route to both writing-agents and writing-skills" | Never two routes simultaneously. Pick one. |
