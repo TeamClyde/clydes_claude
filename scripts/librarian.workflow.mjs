@@ -846,7 +846,17 @@ if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing
 // robust to both object and stringified delivery — the front-door exemplar must not
 // assume the happy path.
 const input = typeof args === 'string' ? JSON.parse(args) : args;
-const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf } = input;
+const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf, now, cap } = input;
+// `now` (ISO string) is the ONLY time source: Date.now, Math.random, and an argless `new Date`
+// all THROW in the Workflow sandbox — they would break run resumption, so the sandbox forbids them.
+// Main context computes the timestamp and passes it in.
+//
+// `cap`: os.cpus() is unavailable in-sandbox, so main context computes min(16, cores − 2) and
+// passes it — the same pattern orchestration-audit.workflow.mjs uses. This matters because
+// parallelFanout BATCHES at maxInFlight and every batch is a BARRIER: batch 2 cannot start until
+// every unit in batch 1 is terminal. A hardcoded 8 does not remove that cliff, it relocates it to
+// the 9th sub-question. Default 8 preserves today's behavior when `cap` is absent.
+const MAX_CONCURRENT = (cap && cap > 0) ? cap : 8;
 // maxSearchesPerLeaf: when set, appends a "search at most N times then synthesize" instruction to the
 // research-leaf prompt. Measure actual token spend before lowering — a tight cap can cut recall on
 // deep sub-questions. Default: unset (no cap); generous is better than aggressive for quality.
@@ -878,16 +888,45 @@ const units = subQuestions.map((q) => ({
     (seedText ? `\n--- SEED CONTEXT (the user's draft; use only as a topic map — VERIFY its claims against live sources, do not treat it as ground truth) ---\n${seedText}` : ''),
     { label: `research:${q.slice(0, 48)}`, phase: 'Research', schema: FINDINGS, model: LEAF_MODEL }),
 }));
-// maxInFlight = min(units, 8): keeps all units in ONE batch for the common case (≤8 sub-questions),
-// so the runtime's rolling concurrency fills slots instead of parallelFanout imposing a batch barrier
-// (a hardcoded 6 made a 7th sub-question wait for the whole first batch). 8 ≤ runtime cap min(16, cores−2).
+// maxInFlight = min(units, MAX_CONCURRENT): keeps all units in ONE batch whenever the caller's cap
+// allows, so the runtime's rolling concurrency fills slots instead of parallelFanout imposing a
+// batch barrier. The cap comes from args.cap = min(16, cores − 2), computed in main context.
+// A hardcoded value here cannot be right: it is either below the machine's real ceiling (a wasted
+// barrier) or above it (agents queue while their watchdogs already tick).
 // 900s watchdog: measured research units run 293-562s (WebSearch + several WebFetch reads per unit).
 // A budget below that floor is not a saving — the watchdog is NON-PREEMPTIVE, so a timed-out agent
 // still runs to completion and is still paid for; only its result is discarded. Worse, with
 // maxRetries:1 each timeout spawns a retry ALONGSIDE the still-running original, so a too-tight
 // budget doubles the in-flight agent count and then throws away most of what it bought.
-const review = await parallelFanout(units, { perUnitTimeoutMs: 900_000, maxInFlight: Math.min(subQuestions.length, 8), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet' });
+const review = await parallelFanout(units, { perUnitTimeoutMs: 900_000, maxInFlight: Math.min(subQuestions.length, MAX_CONCURRENT), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet' });
 const allFindings = review.confirmed.flatMap((r) => r.findings ?? []);
+
+// ── Coverage gate (#96) — the primary fix ───────────────────────────────────
+// `review.degraded` has been computed here since the L1 work and never read. The #96 run set it
+// correctly to true and the pipeline synthesized anyway, burning ~1.1M tokens to return an empty
+// report. Worse, parallelFanout defaults quorum to ceil(units.length / 2) and this consumer never
+// passes one — so a run can lose HALF the brief and still report degraded: false.
+//
+// The gate is authoritative here, not `review.degraded`: it measures the brief actually answered
+// (sub-questions with findings) rather than units that merely returned.
+const coverage = assessCoverage(subQuestions, allFindings);
+if (!coverage.ok) {
+  // Stop BEFORE verify and synthesis spend. The raw findings are returned rather than discarded —
+  // #96's own complaint was that recoverable work was thrown away, so a stopped run must still
+  // hand over everything it bought.
+  return {
+    report: null,
+    stoppedAt: 'coverage-gate',
+    rawFindings: allFindings,
+    coverage,
+    evidenceState: deriveEvidenceState({ findings: [], rawFindings: allFindings, verifyDegraded: false, coverage }),
+    runDate: now ?? null,
+    subQuestionCount: subQuestions.length,
+    findingCount: 0,
+    sources: [...new Set(allFindings.map((f) => f.source).filter(Boolean))],
+    degraded: review.degraded,
+  };
+}
 
 phase('Verify');
 // 900s, matching the research leaves above. The previous 300s was justified on the grounds that
@@ -898,6 +937,29 @@ phase('Verify');
 const verified = await tieredVerify(allFindings, { profile: 'web-research', agent, perTierTimeoutMs: 900_000 });
 const verifyDegraded = verified.degraded;
 const vetted = verifyDegraded ? allFindings : verified.findings;
+
+// ── Evidence floor (#96, #80) — backstop ────────────────────────────────────
+// Never enter the synthesis path over an empty vetted set. This should be unreachable when the
+// coverage gate above works; it exists because it is free and because #96 proves the failure is
+// real. The mechanism: vetted [] → sectionMap empty → sections [] → parallelFanout([]) returns
+// confirmed: [] → orderedSections [] → .map().join() yields '' → the prompt ends at
+// "--- SECTIONS (stitch in this order) ---" with nothing after it. The interpolation is CORRECT;
+// it faithfully renders an empty list. Nothing prevented synthesis from running over zero findings.
+if (vetted.length === 0) {
+  return {
+    report: null,
+    stoppedAt: 'evidence-floor',
+    rawFindings: allFindings,
+    coverage,
+    evidenceState: deriveEvidenceState({ findings: [], rawFindings: allFindings, verifyDegraded, coverage }),
+    runDate: now ?? null,
+    subQuestionCount: subQuestions.length,
+    findingCount: 0,
+    sources: [...new Set(allFindings.map((f) => f.source).filter(Boolean))],
+    degraded: review.degraded,
+    verifyDegraded,
+  };
+}
 // < 1 means triage passed over some findings without judging them. Surfaced, never swallowed.
 const triageCoverage = verified.counts?.triageCoverage ?? null;
 // DISTINCT from verifyDegraded. `degraded` means the verify did not run, so we fall back to the raw
@@ -972,4 +1034,5 @@ const report = await agent(
   { label: 'synth:stitch', phase: 'Synthesize', model: 'claude-sonnet-4-6' });
 
 const sources = [...new Set(vetted.map((f) => f.source).filter(Boolean))];
-return { report, subQuestionCount: subQuestions.length, findingCount: vetted.length, sources, degraded: review.degraded, verifyDegraded, verifyPartial, missingSubQuestions, triageCoverage, recheckCoverage, consensusCoverage };
+const evidenceState = deriveEvidenceState({ findings: vetted, rawFindings: allFindings, verifyDegraded, coverage });
+return { report, runDate: now ?? null, coverage, evidenceState, subQuestionCount: subQuestions.length, findingCount: vetted.length, sources, degraded: review.degraded, verifyDegraded, verifyPartial, missingSubQuestions, triageCoverage, recheckCoverage, consensusCoverage };
