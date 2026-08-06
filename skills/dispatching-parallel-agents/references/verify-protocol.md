@@ -133,22 +133,31 @@ Each consumer has an asymmetric cost model that controls which findings escalate
 | `plan-review` | `balanced` | Balanced cost: escalate on `uncertain` and `disagree`. Neither false-positive nor missed-finding is systematically worse. |
 | `audit` | `balanced` | Same as `plan-review`. Audit surfaces patterns; both false-positive and missed-finding carry costs. |
 
-### Subtractive vs remediative escalation
+### What each escalation reason means
 
-Every escalation reason except one routes a finding toward tiers that can only **drop** it. The
-`thin-source` reason under `web-research` is **remediative**: it routes toward better evidence.
+Escalation reasons are not interchangeable. They differ in what the signal says about the finding
+and in what Tier 1 does with it — though every escalated finding reaches the same Tiers 2 and 3.
 
-The asymmetry follows from what each signal means:
-
-| Reason | What it says | Right response |
+| Reason | What it says about the finding | What Tier 1 does |
 |---|---|---|
-| `uncertain`, `disagree` | The claim may be **wrong**. | Adversarial challenge — drop it if it cannot survive. |
-| `unsupported` | The premise is not supported. | Drop, unless the profile guards against that. |
-| `thin-source` | The claim may be **right but poorly evidenced**. | Better evidence. Deleting a working pointer to a weak source loses the pointer without gaining accuracy. |
+| `uncertain`, `disagree` | The claim may be **wrong**. | Escalate for adversarial challenge. |
+| `unsupported` | The premise is not supported. | Drop — unless the profile escalates it instead. `web-research` does, per its `guard-unsupported` bias. |
+| `thin-source` | The claim may be **right but poorly evidenced**. | Escalate a finding Tier 1 would otherwise have passed straight through as `supported`. |
 
-Only the `web-research` profile uses the remediative path, and only after Tier 1 has flagged the
-finding. Thin findings are **never dropped for being thin** — they are kept, flagged, and shown to
-the reader as thin. A vendor blog that names the right technique is a working pointer.
+**Thinness is never a drop reason.** It is a judgement about the *source*, not a verdict against the
+claim, so on its own it never removes a finding — it buys the finding more scrutiny, and the flag is
+stamped onto it so the reader sees it in the evidence table. A vendor blog that names the right
+technique is a working pointer, and deleting it loses the pointer without gaining accuracy.
+
+**An escalated thin finding is not drop-proof, though.** It joins the same escalation set as every
+other reason, and Tiers 2 and 3 can still drop it — Tier 2 on a `keep: false` re-check, Tier 3 on a
+majority refutation. When that happens the drop is a verdict on the *claim* — Tier 2 by re-reading
+the source, Tier 3 by adversarial reasoning over the recorded finding — not a penalty for thinness.
+
+> **Not implemented.** Routing a thin finding toward *better* evidence — re-researching it against
+> new sources — is a separate stage that does not exist in this engine. Tier 2 re-reads the
+> cluster's **existing** source and never seeks a new one. Here `thin-source` is a scrutiny signal,
+> not a remediation path.
 
 ---
 
