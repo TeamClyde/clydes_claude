@@ -427,3 +427,146 @@ test('the reframe stage runs before the evidence floor, so a rescue is counted',
   assert.ok(floorIdx !== -1, 'the evidence floor must exist');
   assert.ok(reframeIdx < floorIdx, 'a reframe that rescues a sub-question must be counted by the floor');
 });
+
+// ── Task 19 — re-verify, merge bar, recorded diagnosis ──────────────────────
+
+test('reframed findings are re-verified BEFORE merging — no unverified claim enters the dossier', () => {
+  // PRE-FLIGHTED 2026-08-06 — the `-1` family, FOURTH instance in this slice. Both markers fed an
+  // UNGUARDED `indexOf` into `slice`: a missing end marker yields `slice(start, -1)`, which means
+  // "to the second-to-last character", not "not found", so the block silently expands to EOF and
+  // the ordering check below bounds nothing. Guard before slicing, using the idiom this file
+  // already established.
+  const blockStart = BODY.indexOf('let candidates = [];');
+  const blockEnd = BODY.indexOf('vetted = [...vetted.filter');
+  assert.ok(blockStart !== -1 && blockEnd > blockStart, 're-verify block markers must resolve');
+  // Comment-stripped before the indices are taken, same as the quorum count and the by-KEY test.
+  // Defensive, not load-bearing today: the assertions below search for the CALL forms
+  // (`tieredVerify(`, `mergeReframed(`) while this block's rationale comments write the bare names,
+  // so the strip changes no outcome as the source stands. It exists because those comments already
+  // name both symbols in prose — a future comment that writes one of them with its paren attached
+  // would move an unstripped index onto the EXPLANATION rather than the call.
+  const block = BODY.slice(blockStart, blockEnd)
+    .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const verifyIdx = block.indexOf('await tieredVerify(');
+  const mergeIdx = block.indexOf('mergeReframed(');
+  assert.ok(verifyIdx !== -1 && mergeIdx !== -1);
+  assert.ok(verifyIdx < mergeIdx, 're-verify must precede the merge');
+});
+
+test('the merge/record loop is gated on plans, NOT on reframed — a no-improvement round still records', () => {
+  // `plans` and `reframed` come from independent fan-outs. Re-research validly returning zero
+  // findings is the documented common case, and gating the merge on `reframed.length` would drop
+  // the `improved: false` diagnosis stamp exactly then — the signal slice 4's accepted
+  // measurability risk names as its own mitigation.
+  //
+  // PRE-FLIGHTED 2026-08-06. The original second assertion here was
+  //   assert.doesNotMatch(BODY, /if \(reframed\.length\) \{[\s\S]{0,4000}?mergeReframed\(/);
+  // and it FAILS against this task's own specified code, for two independent reasons:
+  //   1. `if (reframed.length) {` sits 1472 chars above `mergeReframed(` — inside the 4000 window.
+  //      Proximity is not containment; the regex cannot tell "gated by" from "appears before".
+  //   2. The explanatory comment above the merge loop itself contains both `reframed.length` and
+  //      `mergeReframed`, so the task's own comment trips its own test.
+  // Replaced with both-ends-bounded marker slicing, which tests containment directly.
+  const gA = BODY.indexOf('if (reframed.length) {');
+  const gB = BODY.indexOf('if (plans.length) {');
+  assert.ok(gA !== -1 && gB !== -1 && gA < gB, 'the re-verify guard opens before the merge guard');
+
+  // Both regions are comment-stripped. Defensive, not load-bearing today: the negative assertion
+  // forbids the CALL form `mergeReframed(`, and the prose between the two guards writes the bare
+  // name, so the strip changes no outcome as the source stands. It exists because that prose names
+  // the symbol at all — a future comment that writes `mergeReframed(` with its paren would fail an
+  // unstripped check on a wording change rather than a code change.
+  const stripComments = (s) => s.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const verifyOnly = stripComments(BODY.slice(gA, gB));
+  assert.ok(verifyOnly.includes('tieredVerify('), '`reframed.length` gates the re-verify');
+  assert.ok(!verifyOnly.includes('mergeReframed('), 'and never reaches the merge');
+
+  // Containment, not proximity: the reframed guard must CLOSE before the merge guard opens. This is
+  // the mutation the ordering assertions above cannot see — a merge block physically NESTED inside
+  // `if (reframed.length)` while still spelling `if (plans.length)` has identical runtime behaviour
+  // to swapping the guard, and loses the `improved: false` stamp in exactly the case the outcome §
+  // Slice 4 — Accepted Risks names as this stage's only mitigation.
+  //
+  // NOT brace-depth counting: this asserts the PRESENCE of one closing brace in a comment-stripped
+  // two-statement window, never a depth tally, and reads no indentation. Its honest limit is that it
+  // false-PASSES (never false-fails) if a future edit inserts an unrelated braced block in that
+  // window — a strictly better failure profile than depth counting, which false-fails.
+  const candIdx = BODY.indexOf('candidates = reVerified.degraded');
+  assert.ok(candIdx !== -1 && candIdx < gB, 'the candidates assignment must precede the merge guard');
+  assert.ok(stripComments(BODY.slice(candIdx, gB)).includes('}'),
+    'the `reframed.length` guard must close before `if (plans.length)` opens');
+
+  // Same `-1` guard as above — an unguarded end marker would expand this block to EOF and make the
+  // containment check below meaningless.
+  const mergeEnd = BODY.indexOf('vetted = [...vetted.filter');
+  assert.ok(mergeEnd > gB, 'the merge-block end marker must resolve after the guard');
+  const mergeBlock = stripComments(BODY.slice(gB, mergeEnd));
+  assert.ok(mergeBlock.includes('mergeReframed('), 'the merge loop lives inside the plans.length guard');
+});
+
+test('re-verification uses the ORIGINAL sub-question, not the reformulated query (drift check)', () => {
+  assert.match(BODY, /\{ \.\.\.f, subQuestion: _plan\.subQuestion \}/);
+});
+
+test('a degraded re-verify contributes NO candidates — the reframe cannot bypass scrutiny', () => {
+  assert.match(BODY, /reVerified\.degraded \? \[\] : reVerified\.findings/);
+});
+
+test('the diagnosis and the shift are recorded, which is what makes the stage improvable', () => {
+  assert.match(BODY, /diagnosis: plan\.diagnosis, shift: plan\.shift/);
+});
+
+test('vetted is `let` — the reframe merge is the one place it is reassigned', () => {
+  assert.match(BODY, /^let vetted = verifyDegraded \? allFindings : verified\.findings;$/m);
+  assert.equal((BODY.match(/^\s*vetted = /gm) ?? []).length, 1);
+});
+
+test('`_plan` is stripped before the re-verify — the internal carrier never reaches vetted', () => {
+  // `_plan` is a workflow-internal carrier bolted onto each re-researched finding so the plan can be
+  // recovered by KEY rather than by array position. It must not survive the strip: what comes back
+  // becomes `candidates`, then merged `vetted` — which is the verify payload, the Evidence table,
+  // and findings.json on disk. This is exactly the wiring-regression class this file exists to catch.
+  const start = BODY.indexOf('const reVerified = await tieredVerify(');
+  const end = BODY.indexOf('candidates = reVerified.degraded');
+  assert.ok(start !== -1 && end > start, 're-verify call markers must resolve');
+  const stripComments = (s) => s.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const call = stripComments(BODY.slice(start, end));
+  // The rest-destructure is what removes the carrier; `_plan` may then appear ONLY as that binding
+  // and as the source of the original sub-question — never in the object literal being built.
+  assert.match(call, /\(\{ _plan, \.\.\.f \}\)/, 'the rest-destructure is what drops the carrier');
+  assert.equal((call.match(/_plan/g) ?? []).length, 2,
+    '`_plan` appears only as the binding and as `_plan.subQuestion`');
+  // And nothing downstream re-introduces it into the merged set.
+  assert.ok(!stripComments(BODY.slice(end)).includes('_plan'),
+    'no code after the strip may re-introduce the internal carrier');
+});
+
+test('the section prompt payload cannot carry the agent-written `diagnosis` prose', () => {
+  // `sections` is the ONLY value the section-writer and L2 traceability-audit prompts stringify, and
+  // post-merge every finding may carry `reframe: { diagnosis, shift, improved }` — where `diagnosis`
+  // is deliberately unconstrained free text the reframe agent wrote about the PIPELINE. The section
+  // writer is told to use ONLY these findings, so that pipeline-meta prose is permitted material it
+  // can state as a fact about the SUBJECT — and the traceability auditor passes it, because it
+  // genuinely IS in the findings JSON. The projection at this one seam is what prevents that.
+  const start = BODY.indexOf('const sections = [...sectionMap.entries()]');
+  const end = BODY.indexOf('const sectionPrompt =');
+  assert.ok(start !== -1 && end > start, 'the sections construction must resolve');
+  const ctor = BODY.slice(start, end).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  assert.match(ctor, /reframe: \{ improved: f\.reframe\.improved \}/,
+    'the reframe stamp must be projected down to the one code-owned boolean');
+  assert.doesNotMatch(ctor, /\bdiagnosis\b|\bshift\b/,
+    'neither free-text field may be reconstructed onto the prompt payload');
+  // The projection only bounds the prompts if the prompts read the projected value. Both do.
+  assert.ok(BODY.includes('FINDINGS: ${JSON.stringify(section.findings)}'),
+    'the section-writer prompt reads section.findings');
+  assert.ok(BODY.includes('PROSE:\\n${v.markdown}\\n\\nFINDINGS: ${JSON.stringify(section.findings)}'),
+    'the traceability auditor reads section.findings');
+});
+
+test('findings.json and the Evidence table keep the FULL reframe stamp — the projection is prompt-only', () => {
+  // The projection above must not leak into the durable record: `diagnosis` and `shift` are the
+  // recorded-diagnosis signal that makes this stage improvable, and they are written to disk.
+  assert.match(BODY, /findings: vetted, supersedes, integrity/, 'findings.json is built from `vetted`');
+  assert.match(BODY, /findings: sectionMap\.get\(sec\.subQuestion\) \?\? \[\]/,
+    'the Evidence table renders from `sectionMap`, not from the projected `sections`');
+});

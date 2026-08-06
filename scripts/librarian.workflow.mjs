@@ -1340,7 +1340,7 @@ phase('Verify');
 // is non-preemptive the abandoned clusters were still paid for in full.
 const verified = await tieredVerify(allFindings, { profile: 'web-research', agent, perTierTimeoutMs: 900_000 });
 const verifyDegraded = verified.degraded;
-const vetted = verifyDegraded ? allFindings : verified.findings;
+let vetted = verifyDegraded ? allFindings : verified.findings;
 
 // ── Diagnose-then-shift reframe (#118 extension — EXPERIMENTAL) ─────────────
 // Fires only for sub-questions with NO supported non-thin finding. Exactly one round. The trigger
@@ -1467,6 +1467,52 @@ if (thinQs.length) {
 
   const reResearch = await parallelFanout(researchUnits, { perUnitTimeoutMs: 900_000, maxInFlight: Math.min(researchUnits.length, MAX_CONCURRENT), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet', quorum: 0 });
   reframed = reResearch.confirmed.flatMap((r) => r.findings.map((f) => ({ ...f, _plan: r.plan })));
+
+  // Re-verified BEFORE merging, and — critically — against the ORIGINAL sub-question, never the
+  // reformulated query. A finding that answers the reformulation but not the original one IS
+  // drift; triage labels it accordingly rather than admitting it. This is the mechanical form of
+  // the anchor. ReformIR suppresses drift with ranker FEEDBACK anchored to the original query;
+  // telling the reframe agent to stay on topic is the weaker, prompt-only form.
+  //
+  // Only the VERIFY call is gated on `reframed.length` — an empty re-research has nothing to
+  // verify, so the pass would be pure waste.
+  let candidates = [];
+  if (reframed.length) {
+    const reVerified = await tieredVerify(
+      reframed.map(({ _plan, ...f }) => ({ ...f, subQuestion: _plan.subQuestion })),
+      { profile: 'web-research', agent, perTierTimeoutMs: 900_000 },
+    );
+    // A degraded re-verify yields NO candidates. The merge bar is `supported && !thinSource`, and
+    // unverified findings have neither label — admitting them would let the reframe bypass exactly
+    // the scrutiny it was triggered by.
+    candidates = reVerified.degraded ? [] : reVerified.findings;
+  }
+
+  // The MERGE is gated on `plans`, NOT on `reframed.length` — and the `plans.length` guard is a
+  // pure optimization: with `plans` empty the loop body never runs and the reassignment below
+  // would be an identity copy.
+  //
+  // `plans` and `reframed` come from two independent fan-outs: a plan can exist while its
+  // re-research validly returns zero findings — Task 18's own prompt invites exactly that ("return
+  // an EMPTY findings array — that is a valid and useful answer, not a failure"), and with three of
+  // six moves unvalidated it is likely the COMMON outcome. Gating this loop on `reframed.length`
+  // would skip `mergeReframed` in precisely that case, losing the `improved: false` stamp — which
+  // is the recorded-diagnosis signal that Slice 4's accepted measurability risk names as its own
+  // partial mitigation. A stage whose failures go unrecorded cannot be improved.
+  if (plans.length) {
+    const merged = [];
+    for (const plan of plans) {
+      const thinForQ = vetted.filter((f) => f.subQuestion === plan.subQuestion);
+      merged.push(...mergeReframed(
+        thinForQ,
+        candidates.filter((f) => f.subQuestion === plan.subQuestion),
+        { subQuestion: plan.subQuestion, diagnosis: plan.diagnosis, shift: plan.shift },
+      ));
+    }
+    // Replace only the reframed sub-questions' findings; everything else is untouched.
+    const touched = new Set(plans.map((p) => p.subQuestion));
+    vetted = [...vetted.filter((f) => !touched.has(f.subQuestion)), ...merged];
+  }
 }
 
 // ── Evidence floor (#96, #80) — backstop ────────────────────────────────────
@@ -1510,7 +1556,21 @@ const sectionMap = vetted.reduce((acc, f) => {
   acc.get(key).push(f);
   return acc;
 }, new Map());
-const sections = [...sectionMap.entries()].map(([subQuestion, findings]) => ({ subQuestion, findings }));
+// `sections` exists to feed two AGENT PROMPTS — the section writer and the L2 traceability auditor
+// — and nothing else: the Evidence table and findings.json both read `sectionMap`/`vetted`, which
+// keep the full reframe stamp. So the stamp is projected down HERE, at the single seam, to the one
+// code-owned boolean.
+//
+// `reframe.diagnosis` is deliberately unconstrained free text the reframe agent wrote about the
+// PIPELINE. The section writer is instructed to work from ONLY these findings, which puts that
+// pipeline-meta prose inside its permitted material — "no authoritative literature exists yet on
+// this topic" can be written into the report as a statement about the SUBJECT. The traceability
+// auditor would then pass it, because it genuinely is in the findings JSON: the guard against
+// fabrication would certify pipeline metadata as sourced research.
+const sections = [...sectionMap.entries()].map(([subQuestion, findings]) => ({
+  subQuestion,
+  findings: findings.map((f) => (f.reframe ? { ...f, reframe: { improved: f.reframe.improved } } : f)),
+}));
 
 const sectionPrompt = (section) =>
   `Write the DETAILED report section for sub-question "${section.subQuestion}" using ONLY these ` +
