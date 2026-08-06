@@ -847,7 +847,7 @@ if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing
 // assume the happy path.
 const input = typeof args === 'string' ? JSON.parse(args) : args;
 const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf, now, cap } = input;
-// `now` (ISO string) is the ONLY time source: Date.now, Math.random, and an argless `new Date`
+// `now` (ISO string) is the ONLY time source: Date.now(), Math.random(), and an argless `new Date()`
 // all THROW in the Workflow sandbox — they would break run resumption, so the sandbox forbids them.
 // Main context computes the timestamp and passes it in.
 //
@@ -856,7 +856,11 @@ const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf, now, cap }
 // parallelFanout BATCHES at maxInFlight and every batch is a BARRIER: batch 2 cannot start until
 // every unit in batch 1 is terminal. A hardcoded 8 does not remove that cliff, it relocates it to
 // the 9th sub-question. Default 8 preserves today's behavior when `cap` is absent.
-const MAX_CONCURRENT = (cap && cap > 0) ? cap : 8;
+// 16 is the Workflow runtime's own hard ceiling on concurrent agents (min(16, cores − 2)), so a
+// larger cap cannot buy parallelism — it only puts every unit in one batch and lets the runtime
+// queue them while their watchdogs already tick, which is the failure the note above describes.
+// Floor because a fractional cap reaches parallelFanout's chunk() as a fractional slice size.
+const MAX_CONCURRENT = (cap && cap > 0) ? Math.min(Math.floor(cap), 16) : 8;
 // maxSearchesPerLeaf: when set, appends a "search at most N times then synthesize" instruction to the
 // research-leaf prompt. Measure actual token spend before lowering — a tight cap can cut recall on
 // deep sub-questions. Default: unset (no cap); generous is better than aggressive for quality.

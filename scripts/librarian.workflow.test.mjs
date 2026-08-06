@@ -28,7 +28,7 @@ test('input is destructured before its first use (TDZ guard)', () => {
 });
 
 test('args.cap feeds maxInFlight — the >8 batching cliff is caller-controlled', () => {
-  assert.match(BODY, /const MAX_CONCURRENT = \(cap && cap > 0\) \? cap : 8;/);
+  assert.match(BODY, /const MAX_CONCURRENT = \(cap && cap > 0\) \? Math\.min\(Math\.floor\(cap\), 16\) : 8;/);
   assert.match(BODY, /maxInFlight: Math\.min\(subQuestions\.length, MAX_CONCURRENT\)/);
   assert.doesNotMatch(BODY, /maxInFlight: Math\.min\(subQuestions\.length, 8\)/,
     'the hardcoded 8 must be gone — it is a moved cliff, not a removed one');
@@ -63,8 +63,14 @@ test('every exit path reports evidenceState — trust signals are never omitted 
 });
 
 test('args.now is the only time source — Date.now() throws in the Workflow sandbox', () => {
-  assert.doesNotMatch(BODY, /Date\.now\(\)/);
-  assert.doesNotMatch(BODY, /new Date\(\s*\)/);
-  assert.doesNotMatch(BODY, /Math\.random\(\)/);
+  // Strip `//` comment lines first. These regexes look for CALLS; without the strip they also match
+  // the API names written as prose, so a future editor explaining the constraint in a comment would
+  // break the build. (That already happened once: the sandbox note above the destructure had to be
+  // reworded to drop its parentheses.) Line-level stripping is enough — this file has no block
+  // comments, and a `//` inside a string would at worst hide a call from the check, never invent one.
+  const CODE = BODY.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  assert.doesNotMatch(CODE, /Date\.now\(\)/);
+  assert.doesNotMatch(CODE, /new Date\(\s*\)/);
+  assert.doesNotMatch(CODE, /Math\.random\(\)/);
   assert.match(BODY, /runDate: now \?\? null/);
 });
