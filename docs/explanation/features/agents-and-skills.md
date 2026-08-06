@@ -216,6 +216,27 @@ Re-running the skill reads `progress.json` and resumes from the first incomplete
 
 **Shared tiered-adversarial verify protocol:** All six regulated fan-out consumers — the architect panel, `adherence-audit`, `requesting-code-review`, `subagent-driven-development`'s two-lens review, the `librarian` workflow, and the `orchestration-audit` workflow — route their post-fan-out finding verification through one shared protocol (`skills/dispatching-parallel-agents/references/verify-protocol.md`) instead of per-skill ad-hoc verify. The protocol has three tiers: (1) a cheap batched triage that labels findings `supported`/`uncertain`/`unsupported`; (2) a clustered adversarial re-check on the escalation set, one re-check per cluster; (3) a minority-veto 3-voter consensus on the contested tail only. A finding survives Tier 3 iff ≥2 of 3 structurally-diverse voters fail to refute it. This is codified in ADR-0006.
 
+### The Librarian's Durable Artifact Contract
+
+The `librarian` workflow no longer returns a report string. It returns a **dossier entry** (assembled in code) and a **findings document** (the complete `findings.json` payload), and the skill writes both to `research/<slug>/`. The Workflow sandbox has no filesystem, so the split is not incidental: the workflow computes and the skill persists.
+
+```mermaid
+flowchart LR
+    MC["main context<br/>(librarian skill)"] -->|"args: brief, subQuestions,<br/>now, cap, priorFindings?"| WF["librarian.workflow.mjs<br/>(sandbox — no filesystem)"]
+    WF -->|"dossierEntry<br/>dossierHeader (first run only)<br/>findingsDoc"| MC
+    MC -->|"append, never edit"| DOS["research/&lt;slug&gt;/dossier.md"]
+    MC -->|"rewrite wholesale"| FJ["research/&lt;slug&gt;/findings.json"]
+    FJ -.->|"read back on a follow-up<br/>as args.priorFindings"| MC
+```
+
+`dossier.md` is **append-only history**; `findings.json` is **data**, rewritten wholesale each run. That split is what lets supersession be recorded mechanically without editing a prior narrative entry. No finding is ever deleted from `findings.json` — superseded records are *stamped* with the run that replaced them and why, so a later session following a stale pointer still sees what happened to it.
+
+The `#### Evidence` table in each entry is a **projection of the findings**: an agent never types a URL, a support label, or a flag. That is the mechanism that makes the two files structurally unable to disagree, and it is why section writers are instructed to write explanation only. Any tabular gap the entry reports — unanswered sub-questions, sections whose write-up failed, claims that failed the traceability audit — is rendered from the same arrays the reader is being shown.
+
+A run reports an **`evidenceState`** — `verified`, `unverified`, `no-results`, `web-unavailable`, or `research-incomplete` — derived entirely from data the pipeline already has. The enum is *cause-bearing* and its order is load-bearing: the most upstream cause wins, so a run with no reachable web reports `web-unavailable` rather than the `research-incomplete` its empty findings would otherwise imply. `web-unavailable` derives from the fan-out's own output (zero resolvable source URLs across every sub-question) rather than from a start-of-run probe, so it is a pure function of the findings and unit-testable — the probe was analysed and rejected precisely because its failure branch was not.
+
+All three exits — the coverage gate, the evidence floor, and the success path — return the same keys, so a caller reads one shape instead of branching on which gate stopped the run. A stopped run carries `stoppedAt` and a `null` `dossierEntry`, and writes nothing.
+
 ---
 
 ## Dependencies

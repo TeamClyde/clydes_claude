@@ -7,6 +7,7 @@
     "adversarially",
     "Ahrefs",
     "allowlist",
+    "analysed",
     "Anima",
     "Animus",
     "anthropic",
@@ -26,6 +27,7 @@
     "aws",
     "Azalio",
     "base64",
+    "behaviourally",
     "bitbucket",
     "booleans",
     "branch→plan",
@@ -85,6 +87,7 @@
     "followups",
     "forksCount",
     "frontmatter",
+    "generalisation",
     "gh",
     "ghcr",
     "GHSA",
@@ -295,6 +298,7 @@
   ],
   "ignorePaths": [
     "node_modules",
-    ".git"
+    ".git",
+    "research/"
   ]
 }

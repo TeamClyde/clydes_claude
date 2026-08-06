@@ -838,6 +838,160 @@ function unknownUrls(markdown, findings) {
   return urlsInProse(markdown).filter((u) => !known.has(u));
 }
 
+// ── Rendering ───────────────────────────────────────────────────────────────
+// Every table below is a PROJECTION of the findings. An agent never types a URL, a support label,
+// or a flag — which is what makes dossier.md and findings.json structurally unable to disagree.
+
+// A literal | terminates a markdown cell, and a newline terminates the row. Claims are free text
+// and URLs carry query strings, so both must be neutralised before rendering: an unescaped pipe
+// silently shifts every subsequent column, which is exactly the quiet corruption a code-rendered
+// evidence table exists to prevent.
+const escapeCell = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+
+/**
+ * @param {string[]} headers
+ * @param {Array<Array<unknown>>} rows
+ * @returns {string} a GitHub-flavoured markdown table
+ */
+function renderTable(headers, rows) {
+  const head = `| ${headers.join(' | ')} |`;
+  const sep = `| ${headers.map(() => '---').join(' | ')} |`;
+  // A header with no body renders as a broken stub in most viewers. Emit an explicit placeholder
+  // so "no rows" reads as a fact rather than as a rendering failure.
+  if (!rows.length) return `${head}\n${sep}\n| ${headers.map((_, i) => (i ? '' : '_none_')).join(' | ')} |`;
+  const body = rows.map((r) => `| ${r.map(escapeCell).join(' | ')} |`).join('\n');
+  return `${head}\n${sep}\n${body}`;
+}
+
+/**
+ * The file-level header, written ONCE when research/<slug>/dossier.md is created.
+ *
+ * No run counter and no "latest" date: dossier.md is append-only, so a later write cannot reach
+ * back and update a number at the top of the file. Both values are machine-available from
+ * findings.json `runs[]`, which IS rewritten wholesale each run.
+ */
+function renderDossierHeader(topic, runDate) {
+  return `# Research: ${topic}\n\n`
+    + `> Topic first researched ${runDate}\n`
+    + `> Machine-readable findings: ./findings.json\n`;
+}
+
+/**
+ * Render ONE dated entry, to be appended to dossier.md. Prior entries are never edited.
+ *
+ * @param {{runDate:string, title:string, coverage:{answered:number,total:number,missing:string[]},
+ *          evidenceState:string, supersedes:Array, sections:Array, closing:string, integrity:Array}} run
+ * @returns {string}
+ */
+function renderDossierEntry(run) {
+  const out = [];
+  out.push(`---`, ``, `## ${run.runDate} — ${run.title}`);
+  out.push(`> ${run.coverage.answered} of ${run.coverage.total} sub-questions answered · evidence: ${run.evidenceState}`, ``);
+
+  if (run.supersedes?.length) {
+    out.push(`### Supersedes`, ``);
+    out.push(renderTable(['Prior finding', 'From', 'Why'],
+      run.supersedes.map((s) => [s.claim, s.priorRunDate, s.reason])), ``);
+  }
+
+  for (const section of run.sections ?? []) {
+    out.push(`### Q: ${section.subQuestion}`, ``);
+    // Verbatim. The section writer's prose is the payload; compressing it here would re-create
+    // exactly the loss the stitcher was deleted for.
+    out.push(section.markdown, ``);
+    out.push(`#### Evidence`, ``);
+    out.push(renderTable(['Source', 'Covers', 'Support', 'Flags'],
+      (section.findings ?? []).map((f) => [
+        f.source ?? '',
+        f.claim ?? '',
+        // `unlabelled` rather than blank: an empty Support cell reads as "no concern found",
+        // which is the opposite of "this claim was never judged".
+        f.support ?? 'unlabelled',
+        [f.thinSource ? 'thin source' : '', f.reframe?.improved ? 'reframed' : ''].filter(Boolean).join(', '),
+      ])), ``);
+  }
+
+  // Coverage below 100% is reported IN the dossier, not only in the return value — a reader of the
+  // file must be able to see which parts of the brief it does not answer.
+  if (run.coverage.missing?.length) {
+    out.push(`### Unanswered`, ``);
+    out.push(run.coverage.missing.map((q) => `- ${q}`).join('\n'), ``);
+  }
+
+  // A DIFFERENT gap from the one above, and it must not be folded into it. `coverage.missing` is
+  // derived from FINDINGS, so a sub-question that produced findings but whose section writer was
+  // abandoned is absent from it — yet its prose is missing from this entry too. Reported separately
+  // because the cause and the remedy differ: `### Unanswered` means the research found nothing,
+  // this means the research succeeded and the write-up did not. Without this block such a
+  // sub-question disappears from the dossier while the coverage line above still claims it was
+  // answered — silently discarding paid-for work, which is the #96 failure this plan exists to fix.
+  if (run.missingSections?.length) {
+    out.push(`### Sections not written`, ``);
+    out.push(run.missingSections.map((q) => `- ${q}`).join('\n'), ``);
+  }
+
+  out.push(`### What this means`, ``, run.closing, ``);
+
+  // Present ONLY when claims failed the audit after repair — and then never silently omitted.
+  if (run.integrity?.length) {
+    out.push(`### Integrity`, ``);
+    out.push(renderTable(['Sub-question', 'Claim', 'Reason'],
+      run.integrity.map((i) => [i.subQuestion, i.claim, i.reason])), ``);
+  }
+
+  return out.join('\n');
+}
+
+/**
+ * Merge this run into the prior findings.json payload.
+ *
+ * dossier.md is append-only HISTORY; findings.json is DATA, rewritten wholesale each run. That
+ * split is what lets supersession be recorded mechanically without editing a prior narrative entry.
+ * No finding is ever deleted here — superseded records are STAMPED, so a later session following a
+ * stale pointer still sees why it was replaced.
+ *
+ * The workflow performs this merge, not main context: it is the only place holding both
+ * args.priorFindings and this run's output, and handing JSON reconstruction to a model is the same
+ * non-deterministic-component-holds-the-payload failure this whole design removes. The workflow
+ * still writes no files — main context stringifies this object to disk.
+ *
+ * @param {object|null} prior - parsed findings.json, or null/garbage on a first run
+ * @param {object} run
+ * @returns {{topic:string, runs:Array, findings:Array, integrity:Array}}
+ */
+function mergeFindingsDoc(prior, run) {
+  const base = prior && typeof prior === 'object' && !Array.isArray(prior) ? prior : {};
+  const priorRuns = Array.isArray(base.runs) ? base.runs : [];
+  const priorFindings = Array.isArray(base.findings) ? base.findings : [];
+  const priorIntegrity = Array.isArray(base.integrity) ? base.integrity : [];
+
+  // Key on (runDate, claim). A claim string is not globally unique, but it IS unique within a run,
+  // and the supersession pass emits the prior run's own date alongside it.
+  const supKey = (d, c) => `${d}::${c}`;
+  const superseded = new Map((run.supersedes ?? []).map((s) => [supKey(s.priorRunDate, s.claim), s]));
+
+  const stamped = priorFindings.map((f) => {
+    const hit = superseded.get(supKey(f.runDate, f.claim));
+    return hit ? { ...f, supersededBy: { runDate: run.runDate, reason: hit.reason } } : f;
+  });
+
+  return {
+    topic: base.topic ?? run.topic,
+    runs: [
+      { date: run.runDate, brief: run.brief, coverage: run.coverage, evidenceState: run.evidenceState },
+      ...priorRuns,
+    ],
+    findings: [
+      ...(run.findings ?? []).map((f) => ({ runDate: run.runDate, ...f })),
+      ...stamped,
+    ],
+    integrity: [
+      ...(run.integrity ?? []).map((i) => ({ runDate: run.runDate, ...i })),
+      ...priorIntegrity,
+    ],
+  };
+}
+
 // <LIBRARIAN-CORE:end>
 
 if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing timer — cannot guarantee liveness');
@@ -919,16 +1073,17 @@ if (!coverage.ok) {
   // #96's own complaint was that recoverable work was thrown away, so a stopped run must still
   // hand over everything it bought.
   return {
-    report: null,
-    stoppedAt: 'coverage-gate',
+    dossierEntry: null,
+    findingsDoc: null,
+    findings: [],
     rawFindings: allFindings,
+    supersedes: [],
     coverage,
     evidenceState: deriveEvidenceState({ findings: [], rawFindings: allFindings, verifyDegraded: false, coverage }),
     runDate: now ?? null,
-    subQuestionCount: subQuestions.length,
-    findingCount: 0,
-    sources: [...new Set(allFindings.map((f) => f.source).filter(Boolean))],
-    degraded: review.degraded,
+    stoppedAt: 'coverage-gate',
+    verify: null,
+    integrity: [],
   };
 }
 
@@ -951,17 +1106,17 @@ const vetted = verifyDegraded ? allFindings : verified.findings;
 // it faithfully renders an empty list. Nothing prevented synthesis from running over zero findings.
 if (vetted.length === 0) {
   return {
-    report: null,
-    stoppedAt: 'evidence-floor',
+    dossierEntry: null,
+    findingsDoc: null,
+    findings: [],
     rawFindings: allFindings,
+    supersedes: [],
     coverage,
     evidenceState: deriveEvidenceState({ findings: [], rawFindings: allFindings, verifyDegraded, coverage }),
     runDate: now ?? null,
-    subQuestionCount: subQuestions.length,
-    findingCount: 0,
-    sources: [...new Set(allFindings.map((f) => f.source).filter(Boolean))],
-    degraded: review.degraded,
-    verifyDegraded,
+    stoppedAt: 'evidence-floor',
+    verify: { degraded: verifyDegraded, partial: verified.partial === true, degradedAtTier: verified.degradedAtTier ?? null, triageCoverage: verified.counts?.triageCoverage ?? null, recheckCoverage: null, consensusCoverage: null },
+    integrity: [],
   };
 }
 // < 1 means triage passed over some findings without judging them. Surfaced, never swallowed.
@@ -1013,34 +1168,151 @@ const sectionPrompt = (section) =>
 // below and (from Task 8) the `lastAttempt` check inside `validate` read this one value.
 const SECTION_VALIDATION_RETRIES = 2;
 
-const sectionUnits = sections.map((section) => ({
-  // work returns { subQuestion, markdown } so assembly can reconstruct by KEY, not by position —
-  // parallelFanout's `confirmed` is a COMPACT array (abandoned sections are absent), so a
-  // positional sections[i] map would mislabel neighbours after any abandon.
-  validate: (v) => {
-    if (!v || typeof v.markdown !== 'string' || v.markdown.length === 0) {
-      return { ok: false, reason: 'empty section' };
-    }
-    // Validation layer 1 — deterministic and free: every URL in the prose must belong to THIS
-    // section's own findings. Set membership, no agent. This is the check that makes "prose cannot
-    // claim more provenance than the evidence supports" structural rather than instructed.
-    const unknown = unknownUrls(v.markdown, section.findings);
-    if (unknown.length) {
-      return {
-        ok: false,
-        reason: `the prose cites URL(s) that are not in this section's findings: ${unknown.slice(0, 3).join(', ')}. `
-          + `Remove every source URL from the text — provenance is rendered separately from the findings.`,
-      };
-    }
-    return { ok: true };
+// The auditor answers ONE closed question — "is each claim traceable to these findings?" — and
+// returns only the failures. Asking for the failures rather than a per-claim verdict keeps the
+// output bounded on the common (clean) path.
+const AUDIT_SCHEMA = {
+  type: 'object', required: ['untraceable'],
+  properties: {
+    untraceable: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['claim', 'reason'],
+        properties: { claim: { type: 'string' }, reason: { type: 'string' } },
+      },
+    },
   },
-  work: async (repair) => ({
-    subQuestion: section.subQuestion,
-    markdown: await agent(
-      sectionPrompt(section) + (repair ? `\nPREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.` : ''),
-      { label: `synth:${section.subQuestion.slice(0, 48)}`, phase: 'Synthesize', model: 'claude-sonnet-4-6' }),
-  }),
-}));
+};
+
+// Populated by the section audit. Kept OUTSIDE the unit closures because a section that exhausts
+// its repair budget is still published — its flagged claims must survive into the dossier's
+// `### Integrity` block rather than vanishing with the failed validation attempt.
+const integrity = [];
+
+// The audit runs INSIDE `validate`, which runUnit does not watchdog — so this deadline is the only
+// thing bounding it. Well under the 600s section budget: the auditor reads prose that is already
+// in hand and does no research.
+const AUDIT_TIMEOUT_MS = 180_000;
+
+const sectionUnits = sections.map((section) => {
+  // Attempt counting lives in a CLOSURE, not in a `ctx` argument.
+  //
+  // `runUnit` calls `validate` with exactly ONE argument — `const verdict = await validate(res.value)`
+  // (fail-successfully.mjs:88). The structured `ctx` is threaded into `work(repair, ctx)`
+  // (:76) and refreshed for the NEXT work() call (:82, :97); it never reaches `validate`.
+  // Reading `ctx.attempt` inside validate would therefore be `undefined` forever, the
+  // last-attempt branch below would never fire, and a section that kept failing the audit would
+  // exhaust its budget and reach ABANDONED — silently DROPPED. That is precisely the
+  // discarded-paid-for-work failure (#96) this branch exists to prevent, so it must not depend
+  // on a value the engine does not supply.
+  //
+  // validate runs once per attempt: 1 initial + SECTION_VALIDATION_RETRIES.
+  // Derived, never a literal. A bare `3` here would silently fire one attempt early — or never —
+  // if the retry budget at the parallelFanout call were ever changed, regressing exactly the
+  // discard behavior this branch exists to prevent.
+  let attempts = 0;
+  return {
+    validate: async (v) => {
+      attempts++;
+      const lastAttempt = attempts >= SECTION_VALIDATION_RETRIES + 1;
+
+      // An empty section has nothing to preserve, so this one always retries and, on exhaustion,
+      // is correctly abandoned. Every other failure below is preservable.
+      if (!v || typeof v.markdown !== 'string' || v.markdown.length === 0) {
+        return { ok: false, reason: 'empty section' };
+      }
+
+      // ── Layer 1 — deterministic and free: every URL in the prose must belong to THIS section's
+      // own findings. Set membership, no agent. This is the check that makes "prose cannot claim
+      // more provenance than the evidence supports" structural rather than instructed.
+      const unknown = unknownUrls(v.markdown, section.findings);
+      if (unknown.length) {
+        if (lastAttempt) {
+          // Preserve rather than drop, same rule as layer 2. Prose carrying a stray URL is worth
+          // more than a missing section, and the discrepancy is recorded rather than hidden.
+          for (const u of unknown) {
+            integrity.push({ subQuestion: section.subQuestion, claim: u, reason: 'cited URL is not in this section’s findings' });
+          }
+          return { ok: true };
+        }
+        return {
+          ok: false,
+          reason: `the prose cites URL(s) that are not in this section's findings: ${unknown.slice(0, 3).join(', ')}. `
+            + `Remove every source URL from the text — provenance is rendered separately from the findings.`,
+        };
+      }
+
+      // ── Layer 2 — audit agent. Runs ONLY on prose that passed layer 1: the same
+      // cheap-scan-then-expensive-verify asymmetry the engine uses everywhere else. Bounded at 3
+      // audit calls per section per run (one per attempt), and only for sections that reach L2.
+      //
+      // WRAPPED IN withWatchdog — load-bearing, not defensive padding.
+      // `runUnit` watchdog-wraps only `work()` (fail-successfully.mjs:76); `validate` is awaited
+      // BARE at :88, with no deadline and no try/catch anywhere in runUnit. The engine's own
+      // contract (:36-37) reads "runUnit ALWAYS resolves to a terminal state — it never rejects
+      // and never hangs... This is what lets quorumBarrier be safe", and `quorumBarrier` is a
+      // plain `Promise.all` (:118) that depends on exactly that.
+      //
+      // This is the only agent-calling `validate` in the codebase. Left unwrapped, a hung audit
+      // stalls the ENTIRE section batch forever (Promise.all never settles), and a rejected one
+      // propagates uncaught through runUnit → quorumBarrier → parallelFanout and kills the run
+      // with no dossier at all — strictly worse than the #96 failure this plan exists to fix.
+      //
+      // withWatchdog is the right primitive: exported from the engine bundle, and it returns a
+      // discriminated result instead of throwing, so it restores both halves of the invariant.
+      const audit = await withWatchdog(
+        () => agent(
+          `You are auditing a research section for traceability. For EVERY factual claim in the PROSE, ` +
+          `decide whether it is supported by the FINDINGS below. Return ONLY the claims that are NOT ` +
+          `traceable — an empty array means every claim traces. Do NOT research, do NOT judge whether ` +
+          `a claim is TRUE in the world; judge only whether these findings say it. Terse.\n\n` +
+          `PROSE:\n${v.markdown}\n\nFINDINGS: ${JSON.stringify(section.findings)}`,
+          { label: `audit:${section.subQuestion.slice(0, 40)}`, phase: 'Synthesize', schema: AUDIT_SCHEMA, model: 'claude-sonnet-4-6' }),
+        AUDIT_TIMEOUT_MS);
+
+      // Fail OPEN, and say so. The audit is an ADDITIONAL check on prose that already passed L1;
+      // if it could not run, the honest outcome is to keep the section and record that it was not
+      // audited. Failing closed would drop a section over a transport error — the discard
+      // behavior this task exists to remove.
+      if (audit.outcome !== 'done') {
+        integrity.push({
+          subQuestion: section.subQuestion,
+          claim: '(whole section)',
+          reason: `traceability audit did not complete (${audit.outcome}) — claims in this section are unaudited`,
+        });
+        return { ok: true };
+      }
+
+      const bad = audit.value?.untraceable ?? [];
+      if (bad.length) {
+        // On the LAST attempt, stop failing and record instead. Repair exhaustion must not drop
+        // the section: dropping violates preservation and re-creates #96's discarded-work
+        // complaint. A flagged section is more useful than a missing one.
+        if (lastAttempt) {
+          for (const b of bad) {
+            integrity.push({ subQuestion: section.subQuestion, claim: b.claim, reason: b.reason });
+          }
+          return { ok: true };
+        }
+        return {
+          ok: false,
+          reason: `these claims are not traceable to this section's findings — remove or rewrite them: `
+            + bad.slice(0, 3).map((b) => `"${b.claim}" (${b.reason})`).join('; '),
+        };
+      }
+      return { ok: true };
+    },
+    // work returns { subQuestion, markdown } so assembly can reconstruct by KEY, not by position —
+    // parallelFanout's `confirmed` is a COMPACT array (abandoned sections are absent), so a
+    // positional sections[i] map would mislabel neighbours after any abandon.
+    work: async (repair) => ({
+      subQuestion: section.subQuestion,
+      markdown: await agent(
+        sectionPrompt(section) + (repair ? `\nPREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.` : ''),
+        { label: `synth:${section.subQuestion.slice(0, 48)}`, phase: 'Synthesize', model: 'claude-sonnet-4-6' }),
+    }),
+  };
+});
 // 600s (was 240s): measured section writers produce 14-24k chars. At 240s two units were abandoned
 // and — because the watchdog is NON-PREEMPTIVE — were still paid for in full, while their retries
 // returned ~1.6k-char stubs. A budget below the measured workload buys nothing and loses the work.
@@ -1065,15 +1337,47 @@ const missingSections = sections.filter((sec) => !sectionByQ.has(sec.subQuestion
 // told which parts of their brief the report does not answer.
 const missingSubQuestions = subQuestions.filter((q) => !sectionByQ.has(q));
 
+// ── Supersession pass — runs ONLY when this is a follow-up on an existing topic ──
+// dossier.md is append-only, so a later run cannot edit a prior narrative entry. Supersession is
+// therefore recorded as DATA: this pass names which prior claims this run replaces and why, and
+// mergeFindingsDoc stamps them onto the prior records without deleting anything.
+const SUPERSEDE_SCHEMA = {
+  type: 'object', required: ['supersedes'],
+  properties: {
+    supersedes: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['priorRunDate', 'claim', 'reason'],
+        properties: { priorRunDate: { type: 'string' }, claim: { type: 'string' }, reason: { type: 'string' } },
+      },
+    },
+  },
+};
+
+let supersedes = [];
+const priorFindings = Array.isArray(input.priorFindings?.findings) ? input.priorFindings.findings : [];
+if (priorFindings.length) {
+  // Compare CLAIMS to CLAIMS, never prose to prose. Both sides are bounded lists, so this stage's
+  // input does not grow with dossier length.
+  const priorDigest = priorFindings
+    .filter((f) => !f.supersededBy)   // an already-superseded claim cannot be superseded again
+    .map((f) => ({ runDate: f.runDate, claim: f.claim }));
+  const nowDigest = vetted.map((f) => f.claim).filter(Boolean);
+  const sup = await agent(
+    `Prior research on this topic recorded the claims in PRIOR. New research just produced NEW. ` +
+    `Identify ONLY the prior claims that the new findings make OUT OF DATE OR WRONG — a claim the ` +
+    `new work supersedes, not one it merely restates or elaborates. Copy each prior claim and its ` +
+    `runDate EXACTLY as given. If nothing is superseded, return an empty array. Terse.\n\n` +
+    `PRIOR: ${JSON.stringify(priorDigest)}\n\nNEW: ${JSON.stringify(nowDigest)}`,
+    { label: 'synth:supersede', phase: 'Synthesize', schema: SUPERSEDE_SCHEMA, model: 'claude-sonnet-4-6' });
+  supersedes = sup?.supersedes ?? [];
+}
+
 // ── Code assembly (#152.2) — the stitcher is DELETED ────────────────────────
 // Concatenation cannot truncate, cannot start mid-sentence, and cannot compress. Wholeness becomes
 // a structural property instead of a hoped-for one. This is the lever on #96 and #152: not "add a
 // guard" but "reduce the number of places a non-deterministic component can silently lose content"
 // — from three (section writer, stitcher, closing synthesis) to one.
-const body = orderedSections
-  .map((sec) => `### Q: ${sec.subQuestion}\n\n${sectionByQ.get(sec.subQuestion)}`)
-  .join('\n\n');
-
 // The ONE remaining agent in the assembly path, and its input is BOUNDED — not by section count but
 // by CLAIM SIZE. digest holds one short `claim` per vetted finding (never the `detail` field and
 // never the prose), so this stage's input is O(findings) with a small constant, against sections
@@ -1108,23 +1412,70 @@ const closing = await agent(
 // call does not, so its one structural risk is closed in code rather than left to the prompt.
 const closingBody = String(closing ?? '').replace(/^\s*#{1,6}\s*what this means[^\n]*\n+/i, '');
 
-// Built in CODE and prepended, not asked of an agent. The old stitcher prompt told the model to
-// "open the report with" this notice; the new layout guarantees the closing agent's text lands
-// LAST, so that instruction did not merely weaken — it became unsatisfiable. The most
-// safety-critical signal in the document must not depend on a model's placement choice. Slice 2
-// replaces this with the dossier entry's code-rendered coverage line, which is the same idea
-// applied to the whole entry.
-const gaps = [];
-if (missingSubQuestions.length) {
-  gaps.push(`**${missingSubQuestions.length} of ${subQuestions.length} sub-questions are UNANSWERED** — this report does not cover: ${missingSubQuestions.join('; ')}`);
-}
-if (missingSections.length) {
-  gaps.push(`**${missingSections.length} section(s) could not be written** and are absent: ${missingSections.join('; ')}`);
-}
-const banner = gaps.length ? `${gaps.map((g) => `> ${g}`).join('\n>\n')}\n\n` : '';
-
-const report = `${banner}${body}\n\n### What this means\n\n${closingBody}`;
-
-const sources = [...new Set(vetted.map((f) => f.source).filter(Boolean))];
 const evidenceState = deriveEvidenceState({ findings: vetted, rawFindings: allFindings, verifyDegraded, coverage });
-return { report, runDate: now ?? null, coverage, evidenceState, subQuestionCount: subQuestions.length, findingCount: vetted.length, sources, degraded: review.degraded, verifyDegraded, verifyPartial, missingSubQuestions, triageCoverage, recheckCoverage, consensusCoverage };
+
+// The entry is rendered by CODE from the section prose plus the findings. The prose is copied
+// verbatim; every URL, support label, and flag in the Evidence tables is a projection of the
+// findings array. That is what makes dossier.md and findings.json unable to disagree.
+//
+// The slice-1 gap banner is SUPERSEDED here, not carried forward: the coverage line is the entry's
+// second line and the gaps become named blocks. Both gap classes it reported must still arrive —
+// `coverage.missing` (no findings) via coverage, and `missingSections` (findings written up but the
+// section writer was abandoned) explicitly. They are NOT the same set, and passing only the first
+// drops a paid-for sub-question from the entry while the coverage line still claims it (#96).
+//
+// `closing: closingBody`, never the raw `closing`. renderDossierEntry writes the
+// "### What this means" heading itself, so the un-stripped value doubles it — the heading moved
+// from this assembly into the renderer, and the strip step above is what keeps that move honest.
+const dossierEntry = renderDossierEntry({
+  runDate: now,
+  title: brief ?? 'research run',
+  coverage,
+  evidenceState,
+  supersedes,
+  sections: orderedSections.map((sec) => ({
+    subQuestion: sec.subQuestion,
+    markdown: sectionByQ.get(sec.subQuestion),
+    findings: sectionMap.get(sec.subQuestion) ?? [],
+  })),
+  missingSections,
+  closing: closingBody,
+  integrity,
+});
+
+// The complete findings.json payload, merged here rather than in main context — the workflow is
+// the only place holding BOTH args.priorFindings and this run's output. Main context stringifies
+// it to disk; the workflow still writes no files. (Plan decision D3.)
+// `topic` is derived from the brief, not passed separately — SKILL.md's args carry no `topic`
+// field. mergeFindingsDoc preserves `base.topic` from the FIRST run on every later merge, so the
+// topic stays stable across follow-ups even though each run's brief differs.
+const findingsDoc = mergeFindingsDoc(input.priorFindings, {
+  topic: brief ?? 'research',
+  runDate: now, brief, coverage, evidenceState,
+  findings: vetted, supersedes, integrity,
+});
+
+return {
+  dossierEntry,        // assembled markdown for THIS run's dated entry — append to dossier.md
+  // Non-null ONLY on a first run (no priorFindings). Rendered here rather than described in
+  // SKILL.md prose for the same reason as findingsDoc: main context writes bytes, it does not
+  // reconstruct format. A header a model retypes each time is a header that drifts.
+  dossierHeader: input.priorFindings ? null : renderDossierHeader(brief ?? 'research', now),
+  findingsDoc,         // complete findings.json payload — write wholesale
+  findings: vetted,    // this run's records, for callers that want them without re-parsing
+  supersedes,          // [] on a first run
+  coverage,            // { answered, total, missing[] }
+  evidenceState,       // verified | unverified | no-results | web-unavailable | research-incomplete
+  runDate: now ?? null,
+  // Sub-questions absent from this entry for a reason `coverage` cannot express: their research
+  // succeeded and the write-up did not. Carried so a caller sees the same gap the dossier names.
+  missingSections,
+  // `coverage` is authoritative for "did we answer the brief", but the fan-out's OWN quorum signal
+  // is a different fact — a fan-out can fall below quorum while coverage still clears, because
+  // coverage counts sub-questions ANSWERED and quorum counts units that RETURNED. Carried rather
+  // than dropped: this plan opens by diagnosing a signal that was computed and never read, and
+  // deleting one here would repeat that.
+  fanoutDegraded: review.degraded,
+  verify: { degraded: verifyDegraded, partial: verifyPartial, degradedAtTier: verified.degradedAtTier ?? null, triageCoverage, recheckCoverage, consensusCoverage },
+  integrity,           // [] when every claim was traceable
+};

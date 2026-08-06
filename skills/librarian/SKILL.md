@@ -10,9 +10,9 @@ allowed-tools: Read, Bash, Workflow
 
 ## Overview
 
-**REQUIRED BACKGROUND:** Use `dispatching-parallel-agents` before proceeding. The librarian is the engine's executable exemplar — a regulated, read-only **web-research** fan-out applying all five front-door rules. The engine lives in `scripts/lib/dispatch.mjs` (`parallelFanout`, `dimensionalReview`) and is inlined into the built bundle `scripts/librarian.workflow.mjs` via `scripts/build-engine-bundle.mjs`. That bundle is the **source** (in the workflow repo); the **runtime** copy the skill invokes is co-located in this skill directory as `librarian.workflow.mjs` (a symlink to the source bundle), so the skill runs from any repo.
+**REQUIRED BACKGROUND:** Use `dispatching-parallel-agents` before proceeding. The librarian is the engine's executable exemplar — a regulated, read-only **web-research** fan-out applying all five front-door rules. The engine lives in `scripts/lib/dispatch.mjs` (`parallelFanout`) and `scripts/lib/verify.mjs` (`tieredVerify`), with the librarian's own pure helpers in `scripts/lib/librarian-core.mjs`; all three are inlined into the built bundle `scripts/librarian.workflow.mjs` via `scripts/build-engine-bundle.mjs`. That bundle is the **source** (in the workflow repo); the **runtime** copy the skill invokes is co-located in this skill directory as `librarian.workflow.mjs` (a symlink to the source bundle), so the skill runs from any repo.
 
-It fans out **one web-research agent per sub-question** (each searches the web and cites its sources), runs **one adversarial verify** over all collected findings, and synthesizes a **cited report**. It brings in *external* information — it does not merely re-analyze the seed.
+It fans out **one web-research agent per sub-question** (each searches the web and cites its sources), runs **one adversarial verify** over all collected findings, and produces a **durable, cited research dossier** on disk — an append-only `dossier.md` plus a machine-readable `findings.json`. It brings in *external* information — it does not merely re-analyze the seed.
 
 The seed is either:
 - A **research brief / question** typed or pasted in the chat, or
@@ -47,17 +47,52 @@ Use when the user asks for:
 1. **Seed** — user supplies a brief or points to a local file.
 2. **Extract (if `.docx`)** — main-context runs the Python snippet above via Bash and captures the plain text.
 3. **Derive sub-questions** — main-context turns the brief/seed into 4–~12 *independent* research sub-questions and agrees the list with the user. Default 4–6; cap at 20.
-4. **Workflow tool** — invoke the workflow script via the Workflow tool (requires user opt-in), passing `{ brief, subQuestions, seedText? }` as `args`. Set `scriptPath` to an **absolute** path: take the *Base directory for this skill* injected at skill start and join `librarian.workflow.mjs` (i.e. `<skill-base-dir>/librarian.workflow.mjs`). The script is co-located in the skill directory (a symlink that resolves to the built bundle in the workflow repo), so the absolute path works **regardless of your current working directory**. Do NOT pass a cwd-relative path like `scripts/librarian.workflow.mjs` — that resolves only when your cwd is the workflow repo, and is the cause of the "scripts don't exist" failure. One Sonnet-pinned agent per sub-question fans out via `parallelFanout` (`maxInFlight: 6`); each runs WebSearch/WebFetch and returns cited findings.
-5. **Adversarial verify** — the workflow runs ONE `dimensionalReview` verify pass that re-checks each claim against its cited source and labels support (`supported` / `uncertain` / `unsupported`). Never per-finding voting.
-6. **Synthesize** — a Sonnet agent produces the final cited report grouped by sub-question, with confidence, contradictions surfaced, and a "what this means for the build" section.
-7. **Return** — `{ report, sources, subQuestionCount, findingCount, degraded, verifyDegraded, verifyPartial, triageCoverage, recheckCoverage, consensusCoverage, missingSubQuestions }`. Surface any of these before presenting:
+4. **Prepare the run.** Derive a kebab-case `<slug>` from the brief → `research/<slug>/`.
+   **A new topic is the default.** Append to an existing topic ONLY when the user explicitly asks
+   to expand prior research, or names an existing slug — never infer a match. A wrong merge
+   corrupts an append-only history that cannot be edited afterwards.
+   - If appending: `Read research/<slug>/findings.json` and pass it as `args.priorFindings`.
+   - Compute `args.now` (ISO date, e.g. `2026-08-05`) and `args.cap` = `min(16, cores − 2)`.
+     The sandbox cannot compute either: `Date.now()` throws, and `os.cpus()` is unavailable.
+5. **Workflow tool** — invoke the script via the Workflow tool (requires user opt-in), passing
+   `{ brief, subQuestions, now, cap, priorFindings?, seedText? }` as `args`. Set `scriptPath` to an
+   **absolute** path: the *Base directory for this skill* joined with `librarian.workflow.mjs`.
+   Never a cwd-relative `scripts/...` path — that resolves only inside the workflow repo.
+6. **Adversarial verify + synthesis** happen inside the workflow. Section writers produce prose
+   only; every URL, support label, and flag is rendered by CODE from the findings.
+7. **Write the artifacts.** The workflow writes nothing — the sandbox has no filesystem. Write
+   exactly what it returned; do not reformat, retype, or summarize any of it.
+   - If `dossierHeader` is non-null (a first run), write it to `research/<slug>/dossier.md` first,
+     then append `dossierEntry`. If it is null, **append `dossierEntry` only** — never edit a prior
+     entry, and never rewrite the header.
+   - Write `JSON.stringify(findingsDoc, null, 2)` to `research/<slug>/findings.json`, wholesale.
+8. **Report before presenting.** Surface the paths written, plus any of:
 
 | Signal | Meaning |
 |---|---|
-| `degraded: true` | Fewer sub-questions than quorum succeeded — the report is partial. |
-| `verifyDegraded: true` | The verify step was abandoned; the script fell back to the **unverified** findings. |
-| `verifyPartial: true` | The verify **ran and was used**, but some re-check clusters or voter frames were lost, so the findings faced less adversarial pressure than the protocol promises. Distinct from `verifyDegraded` — do not treat a thinned verify as a clean one. |
-| `triageCoverage` / `recheckCoverage` / `consensusCoverage` | Fraction of Tier-1 findings judged, Tier-2 clusters returned, Tier-3 voter frames returned. `< 1` quantifies the shortfall behind `verifyPartial`. |
+| `stoppedAt: 'coverage-gate'` | Too little of the brief was answered to be worth verifying. No dossier entry. See `coverage.missing`. |
+| `stoppedAt: 'evidence-floor'` | Verify left zero surviving findings. No dossier entry. |
+| `evidenceState` | `verified` · `unverified` · `no-results` · `web-unavailable` · `research-incomplete` — see the table below. |
+| `coverage.missing` | Sub-questions the run does not answer. Always name them. |
+| `missingSections` | Sub-questions whose research SUCCEEDED but whose write-up was abandoned. Distinct from `coverage.missing` — the evidence exists, the prose does not. |
+| `integrity` (non-empty) | Claims that failed the traceability audit after repair. The section was KEPT and flagged. |
+| `verify.degraded` | Verify did not run; findings are raw and unchecked. |
+| `verify.partial` | Verify ran and was used, but some clusters or voter frames were lost. Do not read a thinned verify as a clean one. |
+| `verify.degradedAtTier` | Which tier fell back, when one did. |
+| `fanoutDegraded` | The research fan-out fell below quorum. Distinct from `coverage` — it counts units that RETURNED, not sub-questions ANSWERED. |
+
+### `evidenceState`
+
+| State | What to tell the user |
+|---|---|
+| `verified` | Trust the labels in the evidence tables. |
+| `unverified` | Findings are raw; treat every claim as unchecked. |
+| `no-results` | The web was reachable; the questions found nothing. |
+| `web-unavailable` | Zero resolvable source URLs across EVERY sub-question — almost certainly an outage, not eight independent fruitless searches. **Re-run rather than concluding anything.** |
+| `research-incomplete` | Partial brief; see `coverage.missing`. |
+
+**Publishing an Artifact is only on explicit request, never the storage mechanism.** Artifacts are
+read back via `WebFetch` and are not greppable — a presentation format, not a data format.
 
 ## Front-Door Rules Applied
 
@@ -66,18 +101,20 @@ Per `dispatching-parallel-agents` §Key Rules:
 | Rule | This skill |
 |---|---|
 | Model pinning — never Opus | Research + verify + synthesis agents pinned to `claude-sonnet-4-6` (web research/reading is judgment-heavy; Haiku under-performs) |
-| `maxInFlight ≤ min(16, cores−2)` | `maxInFlight = min(sub-questions, 8)` — one batch for the common case |
-| `perUnitTimeoutMs` always set | 900 000 ms per research unit; 900 000 ms per verify tier |
-| ONE batched verify | `dimensionalReview` with a single adversarial `verify` pass — no per-finding voting |
+| `maxInFlight ≤ min(16, cores−2)` | `maxInFlight = min(sub-questions, args.cap)` where main context passes `cap = min(16, cores − 2)` |
+| `perUnitTimeoutMs` always set | 900 000 ms per research unit; 900 000 ms per verify tier; 600 000 ms per section writer |
+| ONE batched verify | `tieredVerify` — a batched triage, then escalation of only the contested tail. No per-finding voting. |
 | Token budget gating | Pass `getRemainingBudget` if calling from inside a larger Workflow |
 
 ## Watchdog and Degraded-Mode Behavior
 
 Each research unit has a 900 s watchdog, as does each verify tier. A timed-out unit is abandoned (non-preemptive — the agent runs to natural completion) and counted in `abandoned`. Because abandonment is non-preemptive, a budget below the measured workload is not a saving: the agent is still paid for in full and only its result is discarded.
 
-If `degraded: true` on return, present the partial report with a caveat. If `verifyDegraded: true`, the verify step was abandoned and the script falls back to the **unverified** findings — the report must say so. Do not retry silently.
+If `fanoutDegraded: true` on return, the research fan-out fell below quorum — present the entry with a caveat. If `verify.degraded: true`, the verify step was abandoned and the script falls back to the **unverified** findings — say so. Do not retry silently. Whether the brief was actually answered is a separate question, read from `coverage` and `evidenceState`, never from `fanoutDegraded`.
 
-**Verify degrades per unit, not per run.** A single re-check cluster or voter frame that fails is contained: that cluster falls back to keeping its own members, that chunk is marked contested, and the rest of the verify still stands. The run reports `verifyPartial: true` with the coverage fractions rather than discarding the whole pass. Report `verifyPartial` — a verify that was quietly thinned is exactly the case a reader would otherwise mistake for a clean one.
+**Verify degrades per unit, not per run.** A single re-check cluster or voter frame that fails is contained: that cluster falls back to keeping its own members, that chunk is marked contested, and the rest of the verify still stands. The run reports `verify.partial: true` with the coverage fractions (`verify.triageCoverage` / `verify.recheckCoverage` / `verify.consensusCoverage`) rather than discarding the whole pass. Report `verify.partial` — a verify that was quietly thinned is exactly the case a reader would otherwise mistake for a clean one. `verify.degradedAtTier` names which tier fell back, and is `null` on a clean run.
+
+**A stopped run writes nothing.** If the coverage gate or the evidence floor halts the run, the return carries `stoppedAt` and a `null` `dossierEntry` — do not create `research/<slug>/` at all in that case. Every exit returns the same keys, so read the result without branching on which gate stopped it.
 
 ## Gotchas
 
@@ -87,18 +124,25 @@ If `degraded: true` on return, present the partial report with a caveat. If `ver
 
 3. **Mistaking it for the system `deep-research` skill.** This is NOT Claude's built-in `deep-research`. It is the locally-defined regulated rebuild that runs `scripts/librarian.workflow.mjs` via the Workflow tool.
 
-4. **Breaking a front-door rule.** Use ONE batched adversarial verify (never per-finding voting), pin agents to Sonnet (never Opus), and keep `maxInFlight ≤ min(16, cores−2)` (this workflow uses 6).
+4. **Breaking a front-door rule.** Use ONE batched adversarial verify (never per-finding voting), pin agents to Sonnet (never Opus), and keep `maxInFlight ≤ min(16, cores−2)` (this workflow uses `args.cap`).
 
-5. **`verifyDegraded` fallback.** On verify abandon, `dimensionalReview([], {verify})` returns an empty set; the script falls back to the unverified findings array, and the synthesis is told to mark claims UNVERIFIED. Do not silently present unverified findings as verified.
+5. **`verify.degraded` fallback.** On verify abandon, `tieredVerify` returns `degraded: true`; the script falls back to the unverified findings array, and the synthesis is told to mark claims UNVERIFIED. Do not silently present unverified findings as verified.
 
 6. **Running without the user's Workflow-tool opt-in.** The run requires the user to explicitly opt into the Workflow tool — surface and confirm before invoking it.
 
-7. **"The scripts don't exist."** The `.mjs` files are NOT copied into the installed skill directory — the source bundle lives in the workflow repo's `scripts/`, and the skill directory carries a co-located symlink `librarian.workflow.mjs` pointing at it. Invoke it by the **absolute** skill-base-dir path (see How It Runs step 4), never a cwd-relative `scripts/...` path. A cwd-relative path resolves only when your cwd is the workflow repo — from any other repo it fails and looks like a missing script.
+7. **"The scripts don't exist."** The `.mjs` files are NOT copied into the installed skill directory — the source bundle lives in the workflow repo's `scripts/`, and the skill directory carries a co-located symlink `librarian.workflow.mjs` pointing at it. Invoke it by the **absolute** skill-base-dir path (see How It Runs step 5), never a cwd-relative `scripts/...` path. A cwd-relative path resolves only when your cwd is the workflow repo — from any other repo it fails and looks like a missing script.
+
+8. **Forgetting to write the artifacts.** The workflow returns `dossierEntry` and `findingsDoc` but writes nothing — the sandbox has no filesystem. If main context does not perform step 7, the run's entire output is lost the moment the conversation moves on. This is the #96 failure in a new place: work that was paid for and never handed over.
+
+9. **Appending to the wrong topic.** `dossier.md` is append-only and cannot be edited afterwards, so a wrong merge is not recoverable by a later run. Default to a NEW slug unless the user explicitly asked to extend an existing one.
+
+10. **Reading `coverage.missing` as the whole gap.** It lists sub-questions with no findings. A sub-question whose research succeeded but whose section writer was abandoned appears in `missingSections` instead, and the dossier names it under `### Sections not written`. Report both.
 
 ## Related
 
 - `dispatching-parallel-agents` — the regulated fan-out front-door (canonical reference)
-- `scripts/lib/dispatch.mjs` — `parallelFanout`, `dimensionalReview`
+- `scripts/lib/dispatch.mjs` — `parallelFanout`; `scripts/lib/verify.mjs` — `tieredVerify`
+- `scripts/lib/librarian-core.mjs` — coverage, evidence state, and the dossier / `findings.json` renderers
 - `scripts/librarian.workflow.mjs` — the source Workflow-tool bundle (engine inlined); the skill invokes it through the co-located symlink `skills/librarian/librarian.workflow.mjs`
 - `scripts/build-engine-bundle.mjs` — regenerates the inlined bundle (writes to the source in `scripts/`; the co-located symlink tracks it automatically)
 - `docs/explanation/orchestration-regulation-layer.md` §7 (the deep-research worked example this rebuilds) / §9 (build spec)
