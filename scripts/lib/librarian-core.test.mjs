@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   assessCoverage, deriveEvidenceState, hasAnySource, urlsInProse, unknownUrls,
   COVERAGE_MIN_RATIO, COVERAGE_MIN_ANSWERED,
+  renderTable, renderDossierEntry, renderDossierHeader, mergeFindingsDoc,
 } from './librarian-core.mjs';
 
 const Q = ['q1', 'q2', 'q3', 'q4'];
@@ -203,4 +204,154 @@ test('urlsInProse: stays linear on a degenerate run of trailing closers', () => 
   const elapsed = Date.now() - start;
   assert.deepEqual(result, ['https://x.example/y']);
   assert.ok(elapsed < 2000, `expected under 2000ms, took ${elapsed}ms`);
+});
+
+// ── Rendering ───────────────────────────────────────────────────────────────
+
+test('renderTable escapes pipes and newlines so a free-text claim cannot shift columns', () => {
+  const md = renderTable(['A', 'B'], [['x|y', 'line1\nline2']]);
+  assert.match(md, /\| x\\\|y \| line1 line2 \|/);
+  assert.equal(md.split('\n').length, 3, 'header + separator + one row');
+});
+
+test('renderTable emits a placeholder row rather than a headless table when there are no rows', () => {
+  assert.match(renderTable(['A'], []), /_none_/);
+});
+
+const RUN = {
+  runDate: '2026-11-02',
+  title: 'follow-up: pgvector 0.9 changed the cost curve',
+  coverage: { answered: 2, total: 2, missing: [] },
+  evidenceState: 'verified',
+  supersedes: [],
+  integrity: [],
+  closing: 'It means the cost curve moved.',
+  sections: [
+    {
+      subQuestion: 'Has pgvector closed the recall gap?',
+      markdown: 'Detailed prose about recall.',
+      findings: [
+        { source: 'https://arxiv.org/abs/2401.x', claim: 'HNSW recall vs index size', support: 'supported', thinSource: false },
+        { source: 'https://zylos.ai/research/1', claim: 'cost-per-query', support: 'uncertain', thinSource: true },
+      ],
+    },
+  ],
+};
+
+test('dossier entry: dated heading, coverage line, section prose verbatim, evidence table', () => {
+  const md = renderDossierEntry(RUN);
+  assert.match(md, /^## 2026-11-02 — follow-up: pgvector 0\.9 changed the cost curve$/m);
+  assert.match(md, /^> 2 of 2 sub-questions answered · evidence: verified$/m);
+  assert.match(md, /^### Q: Has pgvector closed the recall gap\?$/m);
+  assert.ok(md.includes('Detailed prose about recall.'), 'prose is verbatim, never compressed');
+  assert.match(md, /^#### Evidence$/m);
+  assert.match(md, /\| https:\/\/arxiv\.org\/abs\/2401\.x \| HNSW recall vs index size \| supported \|  \|/);
+  assert.match(md, /\| https:\/\/zylos\.ai\/research\/1 \| cost-per-query \| uncertain \| thin source \|/);
+});
+
+test('dossier entry: Supersedes block appears only when there is something to supersede', () => {
+  assert.doesNotMatch(renderDossierEntry(RUN), /### Supersedes/);
+  const withSup = { ...RUN, supersedes: [{ claim: 'old claim', priorRunDate: '2026-08-05', reason: '0.9 rewrote index build' }] };
+  const md = renderDossierEntry(withSup);
+  assert.match(md, /### Supersedes/);
+  assert.match(md, /\| old claim \| 2026-08-05 \| 0\.9 rewrote index build \|/);
+});
+
+test('dossier entry: Integrity block is present ONLY when claims failed audit — never silently omitted', () => {
+  assert.doesNotMatch(renderDossierEntry(RUN), /### Integrity/);
+  const flagged = { ...RUN, integrity: [{ subQuestion: 'q', claim: 'unbacked', reason: 'not traceable to any finding' }] };
+  assert.match(renderDossierEntry(flagged), /### Integrity[\s\S]*not traceable to any finding/);
+});
+
+test('dossier entry: unanswered sub-questions are named in the entry, never silently dropped', () => {
+  const partial = { ...RUN, coverage: { answered: 1, total: 3, missing: ['q2', 'q3'] } };
+  const md = renderDossierEntry(partial);
+  assert.match(md, /^> 1 of 3 sub-questions answered/m);
+  assert.match(md, /### Unanswered[\s\S]*- q2[\s\S]*- q3/);
+});
+
+test('dossier entry: a finding with no support label renders `unlabelled`, never blank', () => {
+  const bare = { ...RUN, sections: [{ subQuestion: 'q', markdown: 'p', findings: [{ source: 'https://x/1', claim: 'c' }] }] };
+  assert.match(renderDossierEntry(bare), /\| https:\/\/x\/1 \| c \| unlabelled \|  \|/);
+});
+
+test('dossier header carries the immutable first-researched date and no mutable counter (D4)', () => {
+  const h = renderDossierHeader('vector DB selection', '2026-08-05');
+  assert.match(h, /^# Research: vector DB selection$/m);
+  assert.match(h, /Topic first researched 2026-08-05/);
+  assert.match(h, /\.\/findings\.json/);
+  assert.doesNotMatch(h, /entries/, 'an append-only file cannot rewrite a run counter at its top');
+});
+
+test('mergeFindingsDoc: first run seeds topic, runs[], findings[]', () => {
+  const doc = mergeFindingsDoc(null, {
+    topic: 't', runDate: '2026-08-05', brief: 'b', coverage: { answered: 1, total: 1, missing: [] },
+    evidenceState: 'verified', findings: [{ subQuestion: 'q', claim: 'c', source: 'https://x/1' }],
+    supersedes: [], integrity: [],
+  });
+  assert.equal(doc.topic, 't');
+  assert.equal(doc.runs.length, 1);
+  assert.equal(doc.findings[0].runDate, '2026-08-05', 'runDate is stamped on every finding');
+});
+
+test('mergeFindingsDoc: newest run first; NO prior finding is ever deleted', () => {
+  const prior = {
+    topic: 't',
+    runs: [{ date: '2026-08-05', brief: 'b1', coverage: { answered: 1, total: 1, missing: [] } }],
+    findings: [{ runDate: '2026-08-05', claim: 'old', source: 'https://x/1' }],
+    integrity: [],
+  };
+  const doc = mergeFindingsDoc(prior, {
+    topic: 't', runDate: '2026-11-02', brief: 'b2', coverage: { answered: 1, total: 1, missing: [] },
+    evidenceState: 'verified', findings: [{ claim: 'new', source: 'https://x/2' }],
+    supersedes: [], integrity: [],
+  });
+  assert.deepEqual(doc.runs.map((r) => r.date), ['2026-11-02', '2026-08-05']);
+  assert.equal(doc.findings.length, 2, 'no finding is ever deleted from findings.json');
+  assert.equal(doc.findings[0].claim, 'new', 'this run first');
+});
+
+test('mergeFindingsDoc: supersession is STAMPED onto the prior record, not a deletion', () => {
+  const prior = {
+    topic: 't', runs: [{ date: '2026-08-05' }],
+    findings: [{ runDate: '2026-08-05', claim: 'old', source: 'https://x/1' }], integrity: [],
+  };
+  const doc = mergeFindingsDoc(prior, {
+    topic: 't', runDate: '2026-11-02', brief: 'b', coverage: { answered: 1, total: 1, missing: [] },
+    evidenceState: 'verified', findings: [],
+    supersedes: [{ priorRunDate: '2026-08-05', claim: 'old', reason: '0.9 rewrote index build' }],
+    integrity: [],
+  });
+  const stamped = doc.findings.find((f) => f.claim === 'old');
+  assert.deepEqual(stamped.supersededBy, { runDate: '2026-11-02', reason: '0.9 rewrote index build' });
+  assert.equal(stamped.source, 'https://x/1', 'the original record is otherwise untouched');
+});
+
+test('mergeFindingsDoc: a supersedes entry matching nothing is a no-op, not a crash', () => {
+  const doc = mergeFindingsDoc(
+    { topic: 't', runs: [], findings: [{ runDate: '2026-08-05', claim: 'other' }], integrity: [] },
+    { topic: 't', runDate: '2026-11-02', brief: 'b', coverage: { answered: 1, total: 1, missing: [] },
+      evidenceState: 'verified', findings: [], supersedes: [{ priorRunDate: '2020-01-01', claim: 'ghost', reason: 'r' }], integrity: [] },
+  );
+  assert.equal(doc.findings.length, 1);
+  assert.equal(doc.findings[0].supersededBy, undefined);
+});
+
+test('mergeFindingsDoc: integrity accumulates across runs with runDate stamps', () => {
+  const doc = mergeFindingsDoc(
+    { topic: 't', runs: [], findings: [], integrity: [{ runDate: '2026-08-05', claim: 'a', reason: 'r1' }] },
+    { topic: 't', runDate: '2026-11-02', brief: 'b', coverage: { answered: 1, total: 1, missing: [] },
+      evidenceState: 'verified', findings: [], supersedes: [], integrity: [{ subQuestion: 'q', claim: 'b', reason: 'r2' }] },
+  );
+  assert.equal(doc.integrity.length, 2);
+  assert.equal(doc.integrity[0].runDate, '2026-11-02');
+});
+
+test('mergeFindingsDoc: a malformed or partial prior doc degrades to empty arrays, never throws', () => {
+  const run = { topic: 't', runDate: '2026-11-02', brief: 'b', coverage: { answered: 1, total: 1, missing: [] },
+    evidenceState: 'verified', findings: [], supersedes: [], integrity: [] };
+  for (const bad of [undefined, null, 'garbage', 42, {}, { findings: 'not-an-array' }]) {
+    const doc = mergeFindingsDoc(bad, run);
+    assert.ok(Array.isArray(doc.findings) && Array.isArray(doc.runs) && Array.isArray(doc.integrity));
+  }
 });

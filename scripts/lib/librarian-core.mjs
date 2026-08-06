@@ -150,3 +150,145 @@ export function unknownUrls(markdown, findings) {
   );
   return urlsInProse(markdown).filter((u) => !known.has(u));
 }
+
+// ── Rendering ───────────────────────────────────────────────────────────────
+// Every table below is a PROJECTION of the findings. An agent never types a URL, a support label,
+// or a flag — which is what makes dossier.md and findings.json structurally unable to disagree.
+
+// A literal | terminates a markdown cell, and a newline terminates the row. Claims are free text
+// and URLs carry query strings, so both must be neutralised before rendering: an unescaped pipe
+// silently shifts every subsequent column, which is exactly the quiet corruption a code-rendered
+// evidence table exists to prevent.
+const escapeCell = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+
+/**
+ * @param {string[]} headers
+ * @param {Array<Array<unknown>>} rows
+ * @returns {string} a GitHub-flavoured markdown table
+ */
+export function renderTable(headers, rows) {
+  const head = `| ${headers.join(' | ')} |`;
+  const sep = `| ${headers.map(() => '---').join(' | ')} |`;
+  // A header with no body renders as a broken stub in most viewers. Emit an explicit placeholder
+  // so "no rows" reads as a fact rather than as a rendering failure.
+  if (!rows.length) return `${head}\n${sep}\n| ${headers.map((_, i) => (i ? '' : '_none_')).join(' | ')} |`;
+  const body = rows.map((r) => `| ${r.map(escapeCell).join(' | ')} |`).join('\n');
+  return `${head}\n${sep}\n${body}`;
+}
+
+/**
+ * The file-level header, written ONCE when research/<slug>/dossier.md is created.
+ *
+ * No run counter and no "latest" date: dossier.md is append-only, so a later write cannot reach
+ * back and update a number at the top of the file. Both values are machine-available from
+ * findings.json `runs[]`, which IS rewritten wholesale each run.
+ */
+export function renderDossierHeader(topic, runDate) {
+  return `# Research: ${topic}\n\n`
+    + `> Topic first researched ${runDate}\n`
+    + `> Machine-readable findings: ./findings.json\n`;
+}
+
+/**
+ * Render ONE dated entry, to be appended to dossier.md. Prior entries are never edited.
+ *
+ * @param {{runDate:string, title:string, coverage:{answered:number,total:number,missing:string[]},
+ *          evidenceState:string, supersedes:Array, sections:Array, closing:string, integrity:Array}} run
+ * @returns {string}
+ */
+export function renderDossierEntry(run) {
+  const out = [];
+  out.push(`---`, ``, `## ${run.runDate} — ${run.title}`);
+  out.push(`> ${run.coverage.answered} of ${run.coverage.total} sub-questions answered · evidence: ${run.evidenceState}`, ``);
+
+  if (run.supersedes?.length) {
+    out.push(`### Supersedes`, ``);
+    out.push(renderTable(['Prior finding', 'From', 'Why'],
+      run.supersedes.map((s) => [s.claim, s.priorRunDate, s.reason])), ``);
+  }
+
+  for (const section of run.sections ?? []) {
+    out.push(`### Q: ${section.subQuestion}`, ``);
+    // Verbatim. The section writer's prose is the payload; compressing it here would re-create
+    // exactly the loss the stitcher was deleted for.
+    out.push(section.markdown, ``);
+    out.push(`#### Evidence`, ``);
+    out.push(renderTable(['Source', 'Covers', 'Support', 'Flags'],
+      (section.findings ?? []).map((f) => [
+        f.source ?? '',
+        f.claim ?? '',
+        // `unlabelled` rather than blank: an empty Support cell reads as "no concern found",
+        // which is the opposite of "this claim was never judged".
+        f.support ?? 'unlabelled',
+        [f.thinSource ? 'thin source' : '', f.reframe?.improved ? 'reframed' : ''].filter(Boolean).join(', '),
+      ])), ``);
+  }
+
+  // Coverage below 100% is reported IN the dossier, not only in the return value — a reader of the
+  // file must be able to see which parts of the brief it does not answer.
+  if (run.coverage.missing?.length) {
+    out.push(`### Unanswered`, ``);
+    out.push(run.coverage.missing.map((q) => `- ${q}`).join('\n'), ``);
+  }
+
+  out.push(`### What this means`, ``, run.closing, ``);
+
+  // Present ONLY when claims failed the audit after repair — and then never silently omitted.
+  if (run.integrity?.length) {
+    out.push(`### Integrity`, ``);
+    out.push(renderTable(['Sub-question', 'Claim', 'Reason'],
+      run.integrity.map((i) => [i.subQuestion, i.claim, i.reason])), ``);
+  }
+
+  return out.join('\n');
+}
+
+/**
+ * Merge this run into the prior findings.json payload.
+ *
+ * dossier.md is append-only HISTORY; findings.json is DATA, rewritten wholesale each run. That
+ * split is what lets supersession be recorded mechanically without editing a prior narrative entry.
+ * No finding is ever deleted here — superseded records are STAMPED, so a later session following a
+ * stale pointer still sees why it was replaced.
+ *
+ * The workflow performs this merge, not main context: it is the only place holding both
+ * args.priorFindings and this run's output, and handing JSON reconstruction to a model is the same
+ * non-deterministic-component-holds-the-payload failure this whole design removes. The workflow
+ * still writes no files — main context stringifies this object to disk.
+ *
+ * @param {object|null} prior - parsed findings.json, or null/garbage on a first run
+ * @param {object} run
+ * @returns {{topic:string, runs:Array, findings:Array, integrity:Array}}
+ */
+export function mergeFindingsDoc(prior, run) {
+  const base = prior && typeof prior === 'object' && !Array.isArray(prior) ? prior : {};
+  const priorRuns = Array.isArray(base.runs) ? base.runs : [];
+  const priorFindings = Array.isArray(base.findings) ? base.findings : [];
+  const priorIntegrity = Array.isArray(base.integrity) ? base.integrity : [];
+
+  // Key on (runDate, claim). A claim string is not globally unique, but it IS unique within a run,
+  // and the supersession pass emits the prior run's own date alongside it.
+  const supKey = (d, c) => `${d}::${c}`;
+  const superseded = new Map((run.supersedes ?? []).map((s) => [supKey(s.priorRunDate, s.claim), s]));
+
+  const stamped = priorFindings.map((f) => {
+    const hit = superseded.get(supKey(f.runDate, f.claim));
+    return hit ? { ...f, supersededBy: { runDate: run.runDate, reason: hit.reason } } : f;
+  });
+
+  return {
+    topic: base.topic ?? run.topic,
+    runs: [
+      { date: run.runDate, brief: run.brief, coverage: run.coverage, evidenceState: run.evidenceState },
+      ...priorRuns,
+    ],
+    findings: [
+      ...(run.findings ?? []).map((f) => ({ runDate: run.runDate, ...f })),
+      ...stamped,
+    ],
+    integrity: [
+      ...(run.integrity ?? []).map((i) => ({ runDate: run.runDate, ...i })),
+      ...priorIntegrity,
+    ],
+  };
+}
