@@ -1,6 +1,6 @@
 ---
 name: writing-rules
-description: Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped.
+description: Authors rules files and decides their scope. Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped. Route through creating-tools, not directly.
 allowed-tools: Read, Write
 ---
 
@@ -36,7 +36,7 @@ Use for: universal constraints (never call Jira MCP directly), routing directive
 Content here.
 ```
 
-Examples: `rules/mcp-governance.md`, `rules/cspell.md`, `rules/plugin-lifecycle.md`
+Examples: `rules/mcp-governance.md`, `rules/cspell.md`, `rules/secrets-handling.md`
 
 ### Path-Scoped Rules (paths: frontmatter)
 

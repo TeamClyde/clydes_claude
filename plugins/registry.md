@@ -9,30 +9,50 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
 ## skill-creator
 
 - **Source:** https://github.com/claude-ai/skill-creator (claude-plugins-official)
-- **State:** Integrated
-- **Pinned version:** unknown (installed 2026-04-20; no git SHA recorded by plugin system)
-- **Skills provided:** `skill-creator:skill-creator`
-- **Domain ownership:** CSO benchmarking and A/B description comparison — delegated to via the eval phase in `writing-skills`.
-- **Last audited:** 2026-04-20
+- **State:** Removed (uninstalled 2026-08-06, user scope)
+- **Skills provided:** `skill-creator:skill-creator` (was ~112 always-on tokens)
+- **Domain ownership:** None. Formerly CSO benchmarking and A/B description comparison.
+- **Last audited:** 2026-08-06
 - **Notes:**
-  - Routed through `writing-skills` eval phase. Do not invoke `skill-creator:skill-creator` directly.
-  - Windows patches applied at install time.
+  - Removed for coherence, not budget. Three tools audited skill quality — `writing-skills`
+    (TDD cycle), `pulser` (static lint), and this — and no artifact owned the boundary between
+    them. This entry claimed **Integrated / never invoke directly** while
+    `rules/plugin-lifecycle.md` claimed **Active / invoke directly if needed**. Rules outrank
+    the registry, so the rule was authoritative and this entry was simply wrong.
+  - That contradiction is now unreachable: `rules/plugin-lifecycle.md` was deleted 2026-08-06
+    along with `plugin-dev`, the last Integrated plugin it existed to suppress.
 
 ---
 
 ## plugin-dev
 
 - **Source:** https://github.com/claude-ai/plugin-dev (claude-plugins-official)
-- **State:** Integrated
-- **Pinned version:** unknown (installed 2026-04-20; no git SHA recorded by plugin system)
+- **State:** Removed (uninstalled 2026-08-06, user scope; was ~2,349 always-on tokens)
 - **Skills provided:** `plugin-dev:hook-development`, `plugin-dev:mcp-integration`, `plugin-dev:plugin-structure`, `plugin-dev:plugin-settings`, `plugin-dev:command-development`, `plugin-dev:agent-development`, `plugin-dev:skill-development`, `plugin-dev:create-plugin`
-- **Domain ownership:** Structural guidance for all component types (file structure, frontmatter fields, section conventions). Process guidance for hooks and commands.
-- **Last audited:** 2026-04-20
-- **Notes:**
-  - 7 skills delegated to via `creating-tools`: hook-development, mcp-integration, plugin-structure, plugin-settings, command-development, agent-development, skill-development.
-  - `plugin-dev:create-plugin` (8-phase guided workflow) is also a delegation target.
-  - Never invoke plugin-dev skills directly — always route through `creating-tools`.
-  - Windows patches applied at install time.
+- **Domain ownership:** None. Structural guidance is now owned locally in
+  `skills/creating-tools/frontmatter-reference.md` and `skills/creating-tools/hooks-reference.md`.
+- **Last audited:** 2026-08-06 — every skill read before grading, per #188.
+- **Reason:** Paid twice — the plugin's always-on skill listing, plus an always-on rule
+  (`rules/plugin-lifecycle.md`) whose entire substantive content was a list of its skills not to
+  invoke — to reach skills that turned out to be dead, inapplicable, or wrong.
+
+  | Skill | Disposition on audit |
+  |---|---|
+  | `agent-development` | Dead — delegation severed 2026-08-06; frontmatter owned locally. |
+  | `skill-development` | Dead — the claimed delegation from `writing-skills` never existed. |
+  | `command-development` | Obsolete — upstream merged custom commands into skills. |
+  | `create-plugin` | Unused — this repo authors no plugins (no `plugin.json` anywhere). |
+  | `mcp-integration` | Inapplicable — covers bundling an MCP server *into a plugin*. |
+  | `plugin-structure` | Inapplicable — covers `.claude-plugin/plugin.json` layout. |
+  | `plugin-settings` | Rejected — its `.claude/<name>.local.md` pattern is explicitly gitignored/user-managed, which conflicts with this repo's committed `project.json`. |
+  | `hook-development` | **Stale and wrong.** Claimed settings.json takes no `hooks` wrapper (it does — every working hook here uses one, and an unrecognized top-level key is dropped silently). Documented 9 events; the platform has 31. |
+
+  The last row is why this became a removal rather than a partial keep: the one skill with a live
+  claim was the one actively capable of producing a silently-broken config.
+- **Replacement:** `skills/creating-tools/hooks-reference.md`, derived from the official hooks
+  documentation and this repo's nine working hooks rather than from the plugin.
+- **Follow-through:** `rules/plugin-lifecycle.md` deleted — with no Integrated plugins left, an
+  always-on rule suppressing one had nothing to suppress. See #188 success criterion 3.
 
 ---
 
@@ -66,8 +86,13 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
 - **State:** Active
 - **Provides:** Context7 MCP (`resolve-library-id`, `query-docs`) — live library/framework documentation lookup.
 - **Domain ownership:** Up-to-date external library docs; preferred over web search for library API/config/CLI questions.
-- **Last audited:** 2026-06-18
-- **Notes:** Stray local-scope enable in `template-image-generator` disabled + purged 2026-06-18; user-scope install retained.
+- **Last audited:** 2026-08-06
+- **Notes:**
+  - A stray local-scope record in `template-image-generator` was **purged 2026-08-06**, not
+    2026-06-18 as this entry previously claimed. The 06-18 attempt was defeated by the
+    case-sensitive `projectPath` compare documented in `docs/reference/skill-surface-policy.json`
+    § `$casing-hazard`: the CLI reported success on the *disable* but the install record survived,
+    and nothing checked. User-scope install retained — that is the wanted state.
 
 ---
 
@@ -108,10 +133,12 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
 - **State:** Active
 - **Provides:** PreToolUse hook (`Edit|Write|MultiEdit`) — multi-layer secure-coding review (regex pattern warnings → LLM diff review → agentic commit-time reviewer) for injection / XSS / secrets / unsafe-deserialization in code being written.
 - **Domain ownership:** Continuous edit-time secure-coding review of **own code**. Distinct surface from install-vetting (`vet-*`, which reviews **third-party tools** pre-install) and from `/security-review` (manual, on-demand) — it complements both rather than duplicating them.
-- **Last audited:** 2026-06-18
+- **Last audited:** 2026-08-06
 - **Notes:**
   - Hook shells to `python3` on every edit — verify it resolves on Windows/git-bash per `rules/filesystem/path-portability.md`; if silently erroring, fix or disable.
-  - Stray local-scope enable in `template-image-generator` disabled + purged 2026-06-18; user-scope install retained.
+  - A stray local-scope record in `template-image-generator` was **purged 2026-08-06**, not
+    2026-06-18 as this entry previously claimed — same case-sensitive `projectPath` defect that
+    defeated the context7 purge. User-scope install retained.
 
 ---
 
@@ -128,12 +155,18 @@ It coexists with `~/.claude/plugins/installed_plugins.json`, which is managed by
 ## marketing-skills (project-scoped)
 
 - **Source:** `github.com/coreyhaines31/marketingskills` (marketingskills marketplace — third-party, not Anthropic-official)
-- **State:** Active (project: `template-image-generator`)
-- **Pinned version:** `1.9.0` (`114587831efb`)
-- **Provides:** Marketing / Amazon-listing skills.
+- **State:** Active (project: `template-image-generator`) — **user-scope install removed 2026-08-06**
+- **Pinned version:** `2.8.1` (was recorded here as `1.9.0`)
+- **Provides:** 47 marketing skills. **~12,006 always-on tokens in every session.**
 - **Domain ownership:** `template-image-generator` repo only. Niche; not global.
-- **Last audited:** 2026-06-18
-- **Notes:** Only installed plugin from a non-official marketplace — apply the Pre-Install Checklist / install-vetting funnel on any update.
+- **Last audited:** 2026-08-06
+- **Notes:**
+  - This entry said project-scoped since 2026-06-18. It was installed at **user** scope, so it
+    loaded into every session in every repo — 74% of all plugin always-on cost here, and more
+    than the entire ~10,000-token skill-listing budget on a 1M-context model by itself. Nothing
+    compared this claim against `installed_plugins.json`, so the divergence ran for seven weeks.
+  - Reinstall inside that repo with `--scope project`, never at user scope.
+  - Only installed plugin from a non-official marketplace — apply the Pre-Install Checklist / install-vetting funnel on any update.
 
 ---
 

@@ -38,7 +38,6 @@
 | rule | new-repo-setup |  | All agents and skills are global — they live in `~/.claude/` and are available in every repo without |
 | rule | plan-docs |  | Every top-level plan consists of exactly four files under `plans/<slug>/`: |
 | rule | planning |  | Complete all four phases in order. Do not draft until Phase 3 is resolved. |
-| rule | plugin-lifecycle |  | When a plugin is **Integrated**, always route through `creating-tools`. Do not invoke Integrated plu |
 | rule | secrets-handling |  | Never ask the user to paste a secret, token, or password into the chat. A pasted secret enters the t |
 | rule | stack-hats |  | A **stack hat** is specialist best-practice + tooling guidance for a technology (Python, React, C/C+ |
 | rule | workflow-phases |  | This workflow applies to all repositories. Project-specific settings override global defaults. |
@@ -80,7 +79,7 @@
 | skill | vet-install |  | Use when the workflow or Claude is about to install a tool and needs to vet it before proceeding. En |
 | skill | vet-reputation |  | Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustwort |
 | skill | vet-security |  | Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of  |
-| skill | writing-agents |  | Use when creating a new agent, editing an existing agent's system prompt, or determining agent front |
+| skill | writing-agents |  | Applies TDD to agent system prompts — baseline invocation first, then a prompt targeting the observe |
 | skill | writing-plans |  | Use when you have a spec or requirements for a multi-step task, before touching code — produces a pl |
-| skill | writing-rules |  | Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or de |
+| skill | writing-rules |  | Authors rules files and decides their scope. Use when creating a new rules file, deciding whether a  |
 | skill | writing-skills |  | Use when creating new skills, editing existing skills, or verifying skills work before deployment —  |

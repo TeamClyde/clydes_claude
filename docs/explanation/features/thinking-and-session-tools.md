@@ -212,7 +212,7 @@ _(No accepted ADRs yet.)_
 
 - **`using-superpowers` — subagents skip this skill.** The `<SUBAGENT-STOP>` guard at the top of the skill prevents subagents from running the session-start orientation. This is intentional: subagents receive their own focused context and must not inherit the main session's orientation overhead.
 
-- **`using-superpowers` — plugin skills in Integrated state.** Skills belonging to Integrated plugins (currently `plugin-dev:*`) must be invoked through `creating-tools`, not directly. The `rules/plugin-lifecycle.md` rule enforces this — `using-superpowers` does not override it.
+- **`using-superpowers` — component authoring routes through `creating-tools`.** Creating a skill, agent, rule, hook, or command goes through `creating-tools`, which owns its structural references locally and delegates to no plugin. See `skills/creating-tools/routing-table.md`.
 
 ---
 

@@ -104,7 +104,7 @@ Agents are invoked via the `Agent` tool. The caller passes a structured prompt (
 
 A **rule** is a Markdown file under `~/.claude/rules/` that is injected into the system prompt at session start. Rules are ambient — Claude reads them as background constraints rather than executing them as procedures.
 
-**Rules shape behavior without invocation.** There is no tool call to "run" a rule. The `plugin-lifecycle` rule, for example, suppresses direct invocation of Integrated plugin skills; it takes effect because it is present in the system prompt, not because anything calls it. This makes rules the correct mechanism for constraints that must apply unconditionally across all sessions and all skills.
+**Rules shape behavior without invocation.** There is no tool call to "run" a rule. The `mcp-governance` rule, for example, routes all Jira work through the `jira-workflow-manager` agent; it takes effect because it is present in the system prompt, not because anything calls it. This makes rules the correct mechanism for constraints that must apply unconditionally across all sessions and all skills.
 
 **Rules vs. skills:** When a constraint requires judgment (decide whether to invoke it, branch on conditions, produce an artifact), it belongs in a skill. When a constraint must apply unconditionally as ambient guidance, it belongs in a rule. Path-scoped rules (with YAML frontmatter specifying `paths:`) apply only to sessions where matched files are in scope.
 
@@ -114,7 +114,7 @@ A **rule** is a Markdown file under `~/.claude/rules/` that is injected into the
 
 Skills, agents, and rules are designed to compose across all three dimensions:
 
-**Rules constrain skills and agents.** The `mcp-governance` rule prevents skills from calling Atlassian MCP tools directly; instead they must delegate to the `jira-workflow-manager` agent. The `plugin-lifecycle` rule prevents direct invocation of Integrated plugin skills; instead they must route through the `creating-tools` skill. Rules establish the boundaries; skills and agents operate within them.
+**Rules constrain skills and agents.** The `mcp-governance` rule prevents skills from calling Atlassian MCP tools directly; instead they must delegate to the `jira-workflow-manager` agent. The `secrets-handling` rule forbids asking the user to paste a credential into the transcript, whatever the requesting skill wants. Rules establish the boundaries; skills and agents operate within them.
 
 **Skills orchestrate agents.** The orchestration skills (`brainstorming` → `writing-plans` → `plan-gate` → `executing-plans`) form a chain. Along the chain, skills dispatch agents: `plan-gate` dispatches `architect`, then `test-strategy`, then `test-builder`. The `infra-init` skill dispatches the three `infra-init-*` agents in sequence and in parallel. Skills run in main context and own all coordination decisions; agents run isolated and return results.
 
@@ -270,7 +270,7 @@ All three exits — the coverage gate, the evidence floor, and the success path 
 
 - **Description field is the sole startup signal.** Claude reads only the `name` and `description` frontmatter fields at session start; the body of SKILL.md does not load until invocation. A poorly written description causes missed triggers. Write the description as if it is the only text Claude will ever read about the skill.
 
-- **`plugin-lifecycle` suppression is soft enforcement.** The `plugin-lifecycle` rule instructs Claude not to invoke Integrated plugin skills directly. This is model-judgment-dependent, not a technical block. If direct invocation of an Integrated skill persists, the escalation path is narrowing the skill's trigger description — which requires forking the plugin.
+- **Rule-based suppression of a plugin is soft enforcement, and it drifts.** A rule instructing Claude not to invoke a plugin's skills is model-judgment-dependent, not a technical block, and `skillOverrides` cannot substitute — the platform states plugin skills are unaffected by it. The only hard levers are `claude plugin disable` and uninstall. This repo tried the rule form (`rules/plugin-lifecycle.md`) and retired it 2026-08-06: the rule and `plugins/registry.md` asserted opposite lifecycle states for the same plugin for weeks with nothing detecting it. The durable fix was owning the reference material locally and uninstalling the plugin, enforced by `docs/reference/skill-surface-policy.json` under `npm test`.
 
 - **`feedback` skill does not write to `docs/workflow-feedback.md`.** An earlier version of the skill wrote to that path. The file has been archived. Current behavior: the skill appends observations to the session memory store at `.claude/projects/<project>/memory/` and optionally files a GitHub issue. Do not reference `docs/workflow-feedback.md` in any new skill or rule.
 

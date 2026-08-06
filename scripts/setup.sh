@@ -423,12 +423,11 @@ PLUGINS=(
   "context7@claude-plugins-official"
   "explanatory-output-style@claude-plugins-official"
   "playwright@claude-plugins-official"
-  "plugin-dev@claude-plugins-official"
   "pyright-lsp@claude-plugins-official"
   "security-guidance@claude-plugins-official"
-  "skill-creator@claude-plugins-official"
 )
 # Removed from this list 2026-06-18: commit-commands, feature-dev, claude-code-setup.
+# Removed 2026-08-06: superpowers, feature-dev (again), skill-creator, plugin-dev.
 # They are marked Removed in plugins/registry.md and the enforcement pass below
 # uninstalls them; they no longer belong in the install list.
 

@@ -230,13 +230,6 @@
     },
     {
       "type": "rule",
-      "name": "plugin-lifecycle",
-      "description": "When a plugin is **Integrated**, always route through `creating-tools`. Do not invoke Integrated plugin skills directly.",
-      "title": "Plugin Lifecycle — Conflict Suppression and Routing",
-      "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\rules\\plugin-lifecycle.md"
-    },
-    {
-      "type": "rule",
       "name": "secrets-handling",
       "description": "Never ask the user to paste a secret, token, or password into the chat. A pasted secret enters the transcript and context window — treat it as compromised and rotate it immediately.",
       "title": "Secrets Handling — Credentials in Workflow",
@@ -487,7 +480,7 @@
     {
       "type": "skill",
       "name": "writing-agents",
-      "description": "Use when creating a new agent, editing an existing agent's system prompt, or determining agent frontmatter conventions and testing approach.",
+      "description": "Applies TDD to agent system prompts — baseline invocation first, then a prompt targeting the observed failures. Use when creating a new agent, editing an existing agent's system prompt, or determining agent frontmatter conventions and testing approach. Route through creating-tools, not directly.",
       "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-agents\\SKILL.md"
     },
     {
@@ -499,7 +492,7 @@
     {
       "type": "skill",
       "name": "writing-rules",
-      "description": "Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped.",
+      "description": "Authors rules files and decides their scope. Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped. Route through creating-tools, not directly.",
       "file": "C:\\Users\\jason\\repos\\claude-workflow-improvements\\skills\\writing-rules\\SKILL.md"
     },
     {
@@ -545,6 +538,10 @@
     {
       "from": "brainstorming",
       "to": "writing-plans"
+    },
+    {
+      "from": "creating-tools",
+      "to": "test-driven-development"
     },
     {
       "from": "creating-tools",
@@ -933,14 +930,6 @@
     {
       "from": "planning",
       "to": "test-strategy"
-    },
-    {
-      "from": "plugin-lifecycle",
-      "to": "creating-tools"
-    },
-    {
-      "from": "plugin-lifecycle",
-      "to": "using-superpowers"
     },
     {
       "from": "project-setup",

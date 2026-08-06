@@ -68,10 +68,16 @@ Installed separately via `claude plugin install` (tracked outside the component 
 | `aws-serverless` | AWS Lambda, API Gateway, SAM/CDK deployment |
 | `claude-md-management` | CLAUDE.md auditing and improvement |
 | `context7` | Fetches current library/framework documentation |
-| `plugin-dev` | Plugin and skill authoring (Integrated — routed via `creating-tools`) |
+| `explanatory-output-style` | Educational output style |
 | `playwright` | Browser automation |
 | `pyright-lsp` | Python type checking and symbol resolution |
-| `skill-creator` | Skill creation and improvement tooling |
+| `security-guidance` | Edit-time secure-coding review hook |
+
+Every plugin costs skill-listing budget in **every** session, so the installed set is a declared,
+enforced surface rather than an accumulation. `docs/reference/skill-surface-policy.json` states
+the expected set and `npm test` fails on drift in either direction — including a removed plugin
+coming back. Removals to date: `superpowers`, `feature-dev`, `commit-commands`,
+`claude-code-setup`, `skill-creator`, `plugin-dev`.
 
 ### MCP Servers
 

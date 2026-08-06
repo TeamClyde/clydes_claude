@@ -154,5 +154,5 @@ These agents are available in addition to superpowers skills:
 ## Gotchas
 
 1. Skills listed in this orientation may not be symlinked yet on a fresh install — run setup.sh first.
-2. Plugin skills (like `plugin-dev:*`) that are in Integrated state must be invoked via `creating-tools`, not directly — see `rules/plugin-lifecycle.md`.
+2. Component authoring (skill, agent, rule, hook, command) routes through `creating-tools`, which owns its structural references locally — see `skills/creating-tools/routing-table.md`. No route delegates to a plugin.
 3. If a skill doesn't trigger when expected, check the description trigger pattern — it must match the user's phrasing.
