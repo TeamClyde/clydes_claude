@@ -998,7 +998,8 @@ function renderDossierEntry(run) {
         // `unlabelled` rather than blank: an empty Support cell reads as "no concern found",
         // which is the opposite of "this claim was never judged".
         f.support ?? 'unlabelled',
-        [f.thinSource ? 'thin source' : '', f.reframe?.improved ? 'reframed' : ''].filter(Boolean).join(', '),
+        [f.thinSource ? 'thin source' : '',
+          f.reframe ? (f.reframe.improved ? 'reframed' : 'reframed, no better evidence') : ''].filter(Boolean).join(', '),
       ])), ``);
   }
 
@@ -1081,6 +1082,159 @@ function mergeFindingsDoc(prior, run) {
       ...priorIntegrity,
     ],
   };
+}
+
+// ── Reframe (slice 4 — EXPERIMENTAL) ────────────────────────────────────────
+// "Thin source" is not one condition. An adversarial challenge decomposed it into FIVE, which four
+// of the moves below address (`evidence-type` covers two of them); a vocabulary swap addresses
+// exactly one — so a single unconditional transformation is the wrong shape. `inversion` and
+// `discipline` are two further moves that apply regardless of which condition was diagnosed. Every
+// move carries a `diagnosis` line because the agent's move table is assembled from this array, so
+// the SIX strings below are NOT the five conditions — counting them will not recover that number.
+// The agent's first job is to DIAGNOSE why the evidence is thin; only then does it select a move.
+//
+// Prior art covers 2 of the 6 KEYS — which is 3 of the paper's operations, because `abstraction`
+// here merges two of them. Huang & Efthimiadis (CIKM 2009) classify QUERY-STRING operations
+// (add/remove/substitute/reorder) and ground `vocabulary` (substitution) and both directions of
+// `abstraction` (specialization/generalization) as named, studied strategies.
+//
+// The other four are ungrounded for TWO DIFFERENT reasons, and the distinction matters because the
+// Task 20 ADR asserts it — and an ADR is immutable once Accepted:
+//   - `entity-anchored` and `evidence-type` change the RETRIEVAL TARGET rather than the query
+//     string (follow a citation to a reachable artifact; stop seeking papers at all). That is a
+//     different axis, entirely outside the cited taxonomy.
+//   - `inversion` and `discipline` ARE expressible as query-string substitutions, so the axis
+//     argument does not apply to them. They are ungrounded for the other reason: the paper does not
+//     name or study them as strategies. Classifiable as substitution is not the same as validated.
+// All four ship UNVALIDATED, by decision. Marking any of them `priorArt: true` would attribute to
+// that paper a claim it does not make.
+
+const REFRAME_MOVES = [
+  {
+    key: 'vocabulary',
+    priorArt: true,
+    diagnosis: 'The query was phrased weakly; the literature exists but we did not reach it.',
+    instruction: 'Mine the thin sources for canonical terminology, tool and library names, authors, and labs the original query lacked. Substitute them in. Example: "vector database costs" -> "HNSW index memory footprint".',
+  },
+  {
+    key: 'abstraction',
+    priorArt: true,
+    diagnosis: 'The sub-question is badly formed — vague, compound, or at the wrong altitude.',
+    instruction: 'Move up ("how do PG-based vector stores scale"), move down ("what is HNSW memory complexity"), or split a question carrying two unknowns into one query each.',
+  },
+  {
+    key: 'entity-anchored',
+    priorArt: false,
+    diagnosis: 'Authoritative sources exist but are paywalled or unfetchable.',
+    instruction: 'Follow the citation to something reachable: the preprint, the author’s talk, the lab page, the repository.',
+  },
+  {
+    key: 'evidence-type',
+    priorArt: false,
+    diagnosis: 'No authoritative literature exists yet (emerging tool, recent release), OR the claim is inherently non-academic (pricing, API behaviour, adoption).',
+    instruction: 'Stop seeking papers. Query for GitHub issues, RFCs, changelogs, release notes, conference talks, and source code. If the claim is inherently non-academic, accept that and report it — there is no paper about a vendor’s 2026 pricing.',
+  },
+  {
+    key: 'inversion',
+    priorArt: false,
+    diagnosis: 'Success literature on this topic is thin or promotional.',
+    instruction: 'Ask the opposite. "Why does X work?" -> "when does X fail?" Failure literature is frequently richer and better sourced.',
+  },
+  {
+    key: 'discipline',
+    priorArt: false,
+    diagnosis: 'The question is answered in another field’s vocabulary.',
+    instruction: 'Re-ask it in an adjacent discipline’s terms. "Agent context drift" has answers in RL, in HCI, and in distributed-systems work on state divergence.',
+  },
+];
+
+const KNOWN_SHIFTS = new Set(REFRAME_MOVES.map((m) => m.key));
+
+/**
+ * Which sub-questions have no grounded finding at all.
+ *
+ * Per sub-question, never per finding: one `supported && !thinSource` finding among five thin ones
+ * means the thread IS grounded, and reframing there is wasted spend.
+ *
+ * A sub-question with ZERO findings does NOT qualify — that is a coverage failure, already owned by
+ * the coverage gate and `coverage.missing`. Conflating "found weak evidence" with "found none"
+ * merges two different failures with two different fixes.
+ *
+ * A sub-question whose findings already carry a `reframe` stamp is excluded: exactly one round.
+ * Reformulation quality degrades as the count rises (Venktesh et al., arXiv:2605.00560), which is
+ * the evidence for the cap.
+ *
+ * A sub-question whose findings were never JUDGED does not qualify either. `tieredVerify` stamps
+ * `support`/`thinSource` unconditionally when Tier-1 triage returns a verdict (its triage-stamping
+ * branch, `verify.mjs:299-300`), but a finding triage skipped is stamped `support: 'unjudged'` with
+ * `thinSource` deliberately left absent (`tieredVerify`'s no-verdict branch,
+ * `verify.mjs:274-277`). Absent reads as falsy, so without this guard an unjudged finding
+ * satisfies "not (supported && !thin)" and its sub-question looks thin — firing the most expensive
+ * stage in the pipeline on the ABSENCE of a signal rather than on one. Task 18 guards the whole-run
+ * case with `verifyDegraded`, but that boundary is drawn at the RUN level; this one is per finding
+ * and escapes it on a run verify reports healthy.
+ */
+function thinSubQuestions(subQuestions, findings) {
+  const bySub = new Map();
+  for (const f of findings ?? []) {
+    if (!f?.subQuestion) continue;
+    if (!bySub.has(f.subQuestion)) bySub.set(f.subQuestion, []);
+    bySub.get(f.subQuestion).push(f);
+  }
+  return (Array.isArray(subQuestions) ? subQuestions : []).filter((q) => {
+    const fs = bySub.get(q);
+    if (!fs || fs.length === 0) return false;              // coverage problem, not a thinness one
+    if (fs.some((f) => f.reframe)) return false;           // already reframed — one round only
+    // Verify must actually have judged this thread before we can call it thin.
+    const judged = fs.filter((f) => f.support && f.support !== 'unjudged');
+    if (judged.length === 0) return false;                 // absence of a signal, not a thin signal
+    return !judged.some((f) => f.support === 'supported' && !f.thinSource);
+  });
+}
+
+/**
+ * Merge re-researched candidates into a sub-question's thin findings.
+ *
+ * Two mechanical drift suppressors, not prompt instructions. ReformIR suppresses drift by anchoring
+ * to the original query with ranker FEEDBACK; telling an agent to stay on topic is the weaker form.
+ *
+ *  1. A candidate must answer the ORIGINAL sub-question. One that answers the reformulated query
+ *     but not the original one IS drift and is refused here, regardless of how good it looks.
+ *  2. Candidates are CANDIDATES, not replacements. They merge only if they clear a bar the thin
+ *     findings did not — `supported && !thinSource`. Material that is merely DIFFERENT does not
+ *     enter the dossier, and failing to improve is a valid, recorded outcome.
+ *
+ * Thin findings are never dropped, even when better sources are found. They were the stepping
+ * stone, and a future session may want the path.
+ *
+ * @param {Array} thin        - this sub-question's surviving thin findings
+ * @param {Array} candidates  - RE-VERIFIED reframe output (never raw — see Task 19)
+ * @param {{subQuestion:string, diagnosis:string, shift:string}} ctx
+ * @returns {Array}
+ */
+function mergeReframed(thin, candidates, ctx) {
+  const better = (candidates ?? []).filter(
+    (f) => f?.subQuestion === ctx.subQuestion && f?.support === 'supported' && !f.thinSource,
+  );
+  const improved = better.length > 0;
+  // `shift` is stamped from a CLOSED set the code owns, never from what the agent typed. Task 18's
+  // schema declares the enum, but a schema is the agent boundary — this is the invariant at
+  // `:155`: an agent never types a flag. An unrecognized value becomes 'unrecognized' rather than
+  // being dropped, so the run still counts toward the distribution that Slice 4's accepted
+  // measurability risk names as its only mitigation. `diagnosis` is deliberately NOT constrained —
+  // it is prose the agent is asked to write. Note it is a DIFFERENT thing from
+  // `REFRAME_MOVES[].diagnosis`, which is a fixed condition sentence used to build the move table.
+  const stamp = {
+    diagnosis: ctx.diagnosis,
+    shift: KNOWN_SHIFTS.has(ctx.shift) ? ctx.shift : 'unrecognized',
+    improved,
+  };
+  return [
+    // The thin findings stand, stamped with what was tried. `improved: false` on them is the record
+    // that the stage fired and did not help — which is the data that makes this stage improvable.
+    ...(thin ?? []).map((f) => ({ ...f, reframe: stamp })),
+    ...better.map((f) => ({ ...f, reframe: stamp })),
+  ];
 }
 
 // <LIBRARIAN-CORE:end>

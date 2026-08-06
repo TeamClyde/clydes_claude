@@ -275,6 +275,29 @@ test('dossier entry: a finding with no support label renders `unlabelled`, never
   assert.match(renderDossierEntry(bare), /\| https:\/\/x\/1 \| c \| unlabelled \|  \|/);
 });
 
+test('dossier entry: the Flags cell separates reframed-and-improved from reframed-with-no-better-evidence', () => {
+  // A `reframe` stamp with `improved: false` is the RECORD that the stage fired and did not help —
+  // `mergeReframed` stamps it on every surviving thin finding precisely so that outcome is visible.
+  // Rendering it as a blank cell reads as "never reframed", erasing the one result that makes the
+  // stage improvable, and leaving the dossier disagreeing with findings.json about the same finding.
+  const reframed = { ...RUN, sections: [{
+    subQuestion: 'q', markdown: 'p',
+    findings: [
+      { source: 'https://x/1', claim: 'better', support: 'supported', thinSource: false, reframe: { diagnosis: 'd', shift: 'vocabulary', improved: true } },
+      { source: 'https://x/2', claim: 'stepping-stone', support: 'supported', thinSource: true, reframe: { diagnosis: 'd', shift: 'vocabulary', improved: true } },
+      { source: 'https://x/3', claim: 'tried-nothing-better', support: 'uncertain', thinSource: false, reframe: { diagnosis: 'd', shift: 'evidence-type', improved: false } },
+      { source: 'https://x/4', claim: 'thin-and-no-better', support: 'supported', thinSource: true, reframe: { diagnosis: 'd', shift: 'evidence-type', improved: false } },
+      { source: 'https://x/5', claim: 'never-reframed', support: 'supported', thinSource: false },
+    ],
+  }] };
+  const md = renderDossierEntry(reframed);
+  assert.match(md, /\| https:\/\/x\/1 \| better \| supported \| reframed \|/);
+  assert.match(md, /\| https:\/\/x\/2 \| stepping-stone \| supported \| thin source, reframed \|/);
+  assert.match(md, /\| https:\/\/x\/3 \| tried-nothing-better \| uncertain \| reframed, no better evidence \|/);
+  assert.match(md, /\| https:\/\/x\/4 \| thin-and-no-better \| supported \| thin source, reframed, no better evidence \|/);
+  assert.match(md, /\| https:\/\/x\/5 \| never-reframed \| supported \|  \|/, 'no reframe key leaves the cell untouched');
+});
+
 test('dossier header carries the immutable first-researched date and no mutable counter (D4)', () => {
   const h = renderDossierHeader('vector DB selection', '2026-08-05');
   assert.match(h, /^# Research: vector DB selection$/m);
@@ -366,4 +389,120 @@ test('dossier entry: a section whose prose could not be written is NAMED, never 
   assert.match(md, /- q2: what does it cost\?/);
   // Absent when nothing was lost — no empty scaffolding on the clean path.
   assert.doesNotMatch(renderDossierEntry(RUN), /### Sections not written/);
+});
+
+import { thinSubQuestions, REFRAME_MOVES, mergeReframed } from './librarian-core.mjs';
+
+const g = (subQuestion, support, thinSource, claim = 'c', source = 'https://x/1') =>
+  ({ subQuestion, support, thinSource, claim, source });
+
+test('trigger: a sub-question with ONE supported non-thin finding is grounded — no reframe', () => {
+  const findings = [
+    g('q1', 'supported', false),
+    g('q1', 'supported', true), g('q1', 'uncertain', true), g('q1', 'supported', true),
+  ];
+  assert.deepEqual(thinSubQuestions(['q1'], findings), []);
+});
+
+test('trigger: a sub-question with only thin or unsupported findings qualifies', () => {
+  const findings = [g('q1', 'supported', true), g('q1', 'uncertain', false)];
+  assert.deepEqual(thinSubQuestions(['q1'], findings), ['q1']);
+});
+
+test('trigger: a sub-question with NO findings does not qualify — that is a coverage problem', () => {
+  // The coverage gate and coverage.missing already own this case. Reframing a question that
+  // returned nothing at all conflates "found weak evidence" with "found none", which are different
+  // failures with different fixes.
+  assert.deepEqual(thinSubQuestions(['q1', 'q2'], [g('q1', 'supported', true)]), ['q1']);
+});
+
+test('trigger: operates per sub-question, never per finding', () => {
+  const findings = [g('q1', 'supported', false), g('q2', 'supported', true)];
+  assert.deepEqual(thinSubQuestions(['q1', 'q2'], findings), ['q2']);
+});
+
+test('the move set is exactly the six shipped moves, each naming its prior-art status', () => {
+  assert.equal(REFRAME_MOVES.length, 6);
+  const keys = REFRAME_MOVES.map((m) => m.key).sort();
+  assert.deepEqual(keys, ['abstraction', 'discipline', 'entity-anchored', 'evidence-type', 'inversion', 'vocabulary']);
+  // 2 of the 6 KEYS are grounded in Huang & Efthimiadis (CIKM 2009) — 3 of that paper's operations,
+  // since `abstraction` merges specialization and generalization. The other four are ungrounded for
+  // TWO different reasons (see librarian-core.mjs above REFRAME_MOVES): `entity-anchored` and
+  // `evidence-type` change the retrieval target rather than the query string, so the taxonomy does
+  // not reach them; `inversion` and `discipline` ARE query-string substitutions, but the paper does
+  // not name or study them as strategies. Classifiable is not the same as validated.
+  assert.equal(REFRAME_MOVES.filter((m) => m.priorArt).length, 2);
+  assert.deepEqual(REFRAME_MOVES.filter((m) => m.priorArt).map((m) => m.key).sort(), ['abstraction', 'vocabulary'],
+    'entity-anchored changes the retrieval target, not the query string — the cited paper does not ground it');
+  for (const m of REFRAME_MOVES) {
+    assert.ok(m.diagnosis && m.instruction, `${m.key} needs a diagnosis and an instruction`);
+  }
+});
+
+test('merge: a reframed finding that clears the bar is added and flagged improved', () => {
+  const thin = [g('q1', 'supported', true, 'weak')];
+  const candidates = [g('q1', 'supported', false, 'strong')];
+  const out = mergeReframed(thin, candidates, { subQuestion: 'q1', diagnosis: 'weak-query', shift: 'vocabulary' });
+  assert.equal(out.length, 2, 'thin findings are NEVER dropped — they were the stepping stone');
+  const added = out.find((f) => f.claim === 'strong');
+  assert.deepEqual(added.reframe, { diagnosis: 'weak-query', shift: 'vocabulary', improved: true });
+});
+
+test('merge: a candidate that is merely DIFFERENT, not better, does not enter the dossier', () => {
+  const thin = [g('q1', 'supported', true, 'weak')];
+  const candidates = [g('q1', 'supported', true, 'also weak'), g('q1', 'uncertain', false, 'shaky')];
+  const out = mergeReframed(thin, candidates, { subQuestion: 'q1', diagnosis: 'no-literature', shift: 'evidence-type' });
+  assert.equal(out.length, 1, 'only the original thin finding stands');
+  assert.equal(out[0].claim, 'weak');
+});
+
+test('merge: failing to improve is RECORDED on the thin findings, not silently forgotten', () => {
+  const thin = [g('q1', 'supported', true, 'weak')];
+  const out = mergeReframed(thin, [], { subQuestion: 'q1', diagnosis: 'no-literature', shift: 'evidence-type' });
+  assert.deepEqual(out[0].reframe, { diagnosis: 'no-literature', shift: 'evidence-type', improved: false });
+});
+
+test('merge: a candidate answering a DIFFERENT sub-question is drift and is refused', () => {
+  const thin = [g('q1', 'supported', true, 'weak')];
+  const candidates = [g('q-other', 'supported', false, 'excellent but off-target')];
+  const out = mergeReframed(thin, candidates, { subQuestion: 'q1', diagnosis: 'weak-query', shift: 'vocabulary' });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].reframe.improved, false);
+});
+
+test('merge: a reframed finding is never itself re-reframed — exactly one round', () => {
+  const already = [{ ...g('q1', 'supported', true, 'weak'), reframe: { diagnosis: 'd', shift: 's', improved: false } }];
+  assert.deepEqual(thinSubQuestions(['q1'], already), [], 'a sub-question already reframed is excluded');
+});
+
+test('trigger: findings verify never JUDGED do not qualify — that is an absent signal, not a thin one', () => {
+  // `tieredVerify` stamps `support: 'unjudged'` and deliberately leaves `thinSource` absent when
+  // triage returns no verdict for a finding (verify.mjs:274-277). Absent reads as falsy, so without
+  // the judged-guard these would satisfy "not (supported && !thin)" and fire the reframe on a
+  // sub-question verify never assessed. Task 18's `verifyDegraded` guard is run-level and does not
+  // cover this — a run can report healthy while individual findings come back unjudged.
+  const unjudged = [
+    { subQuestion: 'q1', support: 'unjudged', claim: 'c', source: 'https://x/1' },
+    { subQuestion: 'q1', support: 'unjudged', claim: 'c2', source: 'https://x/2' },
+  ];
+  assert.deepEqual(thinSubQuestions(['q1'], unjudged), []);
+
+  // One judged-and-thin finding alongside unjudged ones IS a real signal, and still qualifies.
+  assert.deepEqual(thinSubQuestions(['q1'], [...unjudged, g('q1', 'supported', true)]), ['q1']);
+
+  // A finding with no `support` key at all (raw, never through verify) is likewise not a signal.
+  assert.deepEqual(thinSubQuestions(['q1'], [{ subQuestion: 'q1', claim: 'c', source: 'https://x/1' }]), []);
+});
+
+test('merge: `shift` is stamped from the closed move-key set, never from what the agent typed', () => {
+  // An agent never types a flag — a free-text `shift` column cannot be aggregated, and the
+  // distribution of diagnosed conditions across real runs is the only mitigation this slice has for
+  // its accepted measurability risk. Unrecognized values are recorded, not dropped, so the run
+  // still counts.
+  const thin = [g('q1', 'supported', true, 'weak')];
+  const ctx = { subQuestion: 'q1', diagnosis: 'weak-query' };
+  const bogus = mergeReframed(thin, [], { ...ctx, shift: 'reword-it-a-bit' });
+  assert.equal(bogus[0].reframe.shift, 'unrecognized');
+  const valid = mergeReframed(thin, [], { ...ctx, shift: 'entity-anchored' });
+  assert.equal(valid[0].reframe.shift, 'entity-anchored', 'a real move key passes through unchanged');
 });
