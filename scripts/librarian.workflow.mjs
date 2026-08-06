@@ -986,20 +986,54 @@ const sectionMap = vetted.reduce((acc, f) => {
 const sections = [...sectionMap.entries()].map(([subQuestion, findings]) => ({ subQuestion, findings }));
 
 const sectionPrompt = (section) =>
-  `Write the report section for sub-question "${section.subQuestion}" using ONLY these vetted findings — ` +
-  `do NOT add topics, claims, or source URLs not present here, and do NOT perform any new research or web search. ` +
-  `For each finding: what was found, the source URLs, and a confidence read (lean on the "support" labels — flag any "unsupported"/"uncertain"). ` +
-  `Surface contradictions between sources; date every time-sensitive fact. ` +
+  `Write the DETAILED report section for sub-question "${section.subQuestion}" using ONLY these ` +
+  `vetted findings — do NOT add topics or claims not present here, and do NOT perform any new ` +
+  `research or web search.\n` +
+  // Compression is the failure mode, not length. The dossier is SUPPOSED to be long: it is a map
+  // of where the answers live, and a digest of a map is not a smaller map, it is a worse one.
+  `Explain what was found in depth: the mechanism, the caveats, contradictions between sources, ` +
+  `and a date on every time-sensitive fact. Length is NOT a problem — do NOT summarize, compress, ` +
+  `abbreviate, or produce a digest.\n` +
+  // Provenance is rendered by CODE from the findings themselves (see the Evidence table), so the
+  // prose must not carry any. An agent that types a URL can type one that is not in its slice, and
+  // a confidence word it invents cannot be reconciled against the verify labels. (#80)
+  `Do NOT write source URLs, citation markers, footnotes, or confidence labels of any kind — ` +
+  `provenance is rendered separately, directly from the findings. Refer to sources by what they ` +
+  `are ("the vendor's changelog", "the 2026 preprint"), never by URL.\n` +
   `Do NOT state a numeric count of sub-questions.\n` +
+  // #152 item 3: a section writer published an Artifact and returned only a digest of it, so the
+  // work it was paid for never reached the caller. This constraint previously existed only on the
+  // stitch prompt — one stage too late.
+  `Return the section as MARKDOWN in your final message. Do NOT publish it, do NOT create or ` +
+  `update an Artifact, do NOT design a web page, and do NOT return a URL in place of the text.\n` +
   (verifyDegraded ? `NOTE: adversarial verification did not complete — present every claim as UNVERIFIED and say so explicitly.\n` : '') +
   `FINDINGS: ${JSON.stringify(section.findings)}`;
 
+// Single source of truth for the section validation budget. Both the `maxValidationRetries` policy
+// below and (from Task 8) the `lastAttempt` check inside `validate` read this one value.
+const SECTION_VALIDATION_RETRIES = 2;
+
 const sectionUnits = sections.map((section) => ({
-  // work returns { subQuestion, markdown } so the stitcher can reconstruct by KEY, not by
-  // position — parallelFanout's `confirmed` is a COMPACT array (abandoned sections are absent),
-  // so a positional sections[i] map would mislabel neighbours after any abandon.
-  validate: (v) => (v && typeof v.markdown === 'string' && v.markdown.length > 0)
-    ? { ok: true } : { ok: false, reason: 'empty section' },
+  // work returns { subQuestion, markdown } so assembly can reconstruct by KEY, not by position —
+  // parallelFanout's `confirmed` is a COMPACT array (abandoned sections are absent), so a
+  // positional sections[i] map would mislabel neighbours after any abandon.
+  validate: (v) => {
+    if (!v || typeof v.markdown !== 'string' || v.markdown.length === 0) {
+      return { ok: false, reason: 'empty section' };
+    }
+    // Validation layer 1 — deterministic and free: every URL in the prose must belong to THIS
+    // section's own findings. Set membership, no agent. This is the check that makes "prose cannot
+    // claim more provenance than the evidence supports" structural rather than instructed.
+    const unknown = unknownUrls(v.markdown, section.findings);
+    if (unknown.length) {
+      return {
+        ok: false,
+        reason: `the prose cites URL(s) that are not in this section's findings: ${unknown.slice(0, 3).join(', ')}. `
+          + `Remove every source URL from the text — provenance is rendered separately from the findings.`,
+      };
+    }
+    return { ok: true };
+  },
   work: async (repair) => ({
     subQuestion: section.subQuestion,
     markdown: await agent(
@@ -1007,7 +1041,19 @@ const sectionUnits = sections.map((section) => ({
       { label: `synth:${section.subQuestion.slice(0, 48)}`, phase: 'Synthesize', model: 'claude-sonnet-4-6' }),
   }),
 }));
-const sectionReview = await parallelFanout(sectionUnits, { perUnitTimeoutMs: 240_000, maxInFlight: Math.min(sections.length, 8), modelTier: 'sonnet' });
+// 600s (was 240s): measured section writers produce 14-24k chars. At 240s two units were abandoned
+// and — because the watchdog is NON-PREEMPTIVE — were still paid for in full, while their retries
+// returned ~1.6k-char stubs. A budget below the measured workload buys nothing and loses the work.
+//
+// maxValidationRetries: 2 (engine default is 1). The URL check and the semantic audit (Task 8) are
+// INDEPENDENT failure modes sharing one budget; at 1, a section that trips the URL check, repairs,
+// and then fails the audit has no attempt left. Only failing sections retry, so cost stays bounded.
+//
+// In THIS slice, exhausting the budget still abandons the section — it then appears in
+// `missingSections` and the closing synthesis is told to say so, which is the pre-existing
+// reported-not-silent behavior. Task 8 upgrades exhaustion to keep-and-flag once there is an
+// `integrity` channel for the flags to land in.
+const sectionReview = await parallelFanout(sectionUnits, { perUnitTimeoutMs: 600_000, maxInFlight: Math.min(sections.length, MAX_CONCURRENT), modelTier: 'sonnet', maxValidationRetries: SECTION_VALIDATION_RETRIES });
 // Key by sub-question and render in sections[] order — robust to abandoned/out-of-order results.
 const sectionByQ = new Map(sectionReview.confirmed.map((s) => [s.subQuestion, s.markdown]));
 const orderedSections = sections.filter((sec) => sectionByQ.has(sec.subQuestion));

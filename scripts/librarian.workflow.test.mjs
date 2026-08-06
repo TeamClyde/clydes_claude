@@ -54,9 +54,12 @@ test('the evidence floor runs after verify and before the synthesis phase', () =
 });
 
 test('every exit path reports evidenceState — trust signals are never omitted on the sad path', () => {
-  // `^\s*return \{` not `^return \{`: the two gate returns sit inside `if` blocks and are indented,
-  // so a column-zero anchor would see only the final top-level return and pass vacuously at 1.
-  const returns = BODY.match(/^\s*return \{/gm) ?? [];
+  // `^ {0,2}return \{` not `^\s*return \{`: the two gate returns sit inside `if` blocks (2-space
+  // indent) and the success return sits at column zero, so anchoring at 0-2 leading spaces catches
+  // exactly those three. A bare `\s*` anchor also catches the `return {` control-flow statements
+  // inside sectionUnits' nested `validate` (Task 4, indented 4-6 spaces) — those are parallelFanout
+  // validation signals, not workflow exit paths, and were never meant to carry evidenceState.
+  const returns = BODY.match(/^ {0,2}return \{/gm) ?? [];
   const states = BODY.match(/evidenceState/g) ?? [];
   assert.ok(returns.length >= 3, 'expect the two gate returns plus the success return');
   assert.ok(states.length >= returns.length, 'each return must carry an evidenceState');
@@ -73,4 +76,38 @@ test('args.now is the only time source — Date.now() throws in the Workflow san
   assert.doesNotMatch(CODE, /new Date\(\s*\)/);
   assert.doesNotMatch(CODE, /Math\.random\(\)/);
   assert.match(BODY, /runDate: now \?\? null/);
+});
+
+test('section watchdog is 600s — 240s abandoned units that were still paid for (#152.1)', () => {
+  assert.match(BODY, /perUnitTimeoutMs: 600_000, maxInFlight: Math\.min\(sections\.length, MAX_CONCURRENT\)/);
+  assert.doesNotMatch(BODY, /perUnitTimeoutMs: 240_000/);
+});
+
+test('the section validation budget is 2, read from one named constant', () => {
+  // The plan asserted /maxValidationRetries: 2/, which cannot match: Step 3 introduces a named
+  // constant precisely so Task 8's lastAttempt check cannot drift from the policy value, so the
+  // call site reads the identifier and the literal 2 lives only in the declaration. Assert both
+  // halves — the value AND the wiring — or the constant could be right while nothing reads it.
+  assert.match(BODY, /const SECTION_VALIDATION_RETRIES = 2;/);
+  assert.match(BODY, /maxValidationRetries: SECTION_VALIDATION_RETRIES/);
+});
+
+test('the no-publish constraint is on the SECTION prompt, not only the assembly stage (#152.3)', () => {
+  const sectionPromptBlock = BODY.slice(BODY.indexOf('const sectionPrompt'), BODY.indexOf('const SECTION_VALIDATION_RETRIES'));
+  // Matched within a single template literal. The plan asserted the full sentence
+  // "Do NOT publish it, do NOT create or update an Artifact", which spans a concatenation
+  // boundary (`…do NOT create or ` + `update an Artifact…`) and therefore never appears
+  // contiguously in the source text.
+  assert.match(sectionPromptBlock, /Do NOT publish it, do NOT create or/);
+  assert.match(sectionPromptBlock, /update an Artifact, do NOT design a web page/);
+  assert.match(sectionPromptBlock, /Do NOT write source URLs/);
+  // Same concatenation-boundary trap as the publish constraint above: the source reads
+  // `…do NOT summarize, compress, ` +\n  `abbreviate, or produce a digest…`, so the full sentence
+  // never appears contiguously either. Split within each literal, same as the publish assertion.
+  assert.match(sectionPromptBlock, /do NOT summarize, compress,/);
+  assert.match(sectionPromptBlock, /abbreviate, or produce a digest/);
+});
+
+test('section validation calls the deterministic URL-membership check', () => {
+  assert.match(BODY, /unknownUrls\(v\.markdown, section\.findings\)/);
 });
