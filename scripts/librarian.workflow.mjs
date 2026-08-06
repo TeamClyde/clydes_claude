@@ -1073,16 +1073,17 @@ if (!coverage.ok) {
   // #96's own complaint was that recoverable work was thrown away, so a stopped run must still
   // hand over everything it bought.
   return {
-    report: null,
-    stoppedAt: 'coverage-gate',
+    dossierEntry: null,
+    findingsDoc: null,
+    findings: [],
     rawFindings: allFindings,
+    supersedes: [],
     coverage,
     evidenceState: deriveEvidenceState({ findings: [], rawFindings: allFindings, verifyDegraded: false, coverage }),
     runDate: now ?? null,
-    subQuestionCount: subQuestions.length,
-    findingCount: 0,
-    sources: [...new Set(allFindings.map((f) => f.source).filter(Boolean))],
-    degraded: review.degraded,
+    stoppedAt: 'coverage-gate',
+    verify: null,
+    integrity: [],
   };
 }
 
@@ -1105,17 +1106,17 @@ const vetted = verifyDegraded ? allFindings : verified.findings;
 // it faithfully renders an empty list. Nothing prevented synthesis from running over zero findings.
 if (vetted.length === 0) {
   return {
-    report: null,
-    stoppedAt: 'evidence-floor',
+    dossierEntry: null,
+    findingsDoc: null,
+    findings: [],
     rawFindings: allFindings,
+    supersedes: [],
     coverage,
     evidenceState: deriveEvidenceState({ findings: [], rawFindings: allFindings, verifyDegraded, coverage }),
     runDate: now ?? null,
-    subQuestionCount: subQuestions.length,
-    findingCount: 0,
-    sources: [...new Set(allFindings.map((f) => f.source).filter(Boolean))],
-    degraded: review.degraded,
-    verifyDegraded,
+    stoppedAt: 'evidence-floor',
+    verify: { degraded: verifyDegraded, partial: verified.partial === true, degradedAtTier: verified.degradedAtTier ?? null, triageCoverage: verified.counts?.triageCoverage ?? null, recheckCoverage: null, consensusCoverage: null },
+    integrity: [],
   };
 }
 // < 1 means triage passed over some findings without judging them. Surfaced, never swallowed.
@@ -1377,10 +1378,6 @@ if (priorFindings.length) {
 // a structural property instead of a hoped-for one. This is the lever on #96 and #152: not "add a
 // guard" but "reduce the number of places a non-deterministic component can silently lose content"
 // — from three (section writer, stitcher, closing synthesis) to one.
-const body = orderedSections
-  .map((sec) => `### Q: ${sec.subQuestion}\n\n${sectionByQ.get(sec.subQuestion)}`)
-  .join('\n\n');
-
 // The ONE remaining agent in the assembly path, and its input is BOUNDED — not by section count but
 // by CLAIM SIZE. digest holds one short `claim` per vetted finding (never the `detail` field and
 // never the prose), so this stage's input is O(findings) with a small constant, against sections
@@ -1415,23 +1412,70 @@ const closing = await agent(
 // call does not, so its one structural risk is closed in code rather than left to the prompt.
 const closingBody = String(closing ?? '').replace(/^\s*#{1,6}\s*what this means[^\n]*\n+/i, '');
 
-// Built in CODE and prepended, not asked of an agent. The old stitcher prompt told the model to
-// "open the report with" this notice; the new layout guarantees the closing agent's text lands
-// LAST, so that instruction did not merely weaken — it became unsatisfiable. The most
-// safety-critical signal in the document must not depend on a model's placement choice. Slice 2
-// replaces this with the dossier entry's code-rendered coverage line, which is the same idea
-// applied to the whole entry.
-const gaps = [];
-if (missingSubQuestions.length) {
-  gaps.push(`**${missingSubQuestions.length} of ${subQuestions.length} sub-questions are UNANSWERED** — this report does not cover: ${missingSubQuestions.join('; ')}`);
-}
-if (missingSections.length) {
-  gaps.push(`**${missingSections.length} section(s) could not be written** and are absent: ${missingSections.join('; ')}`);
-}
-const banner = gaps.length ? `${gaps.map((g) => `> ${g}`).join('\n>\n')}\n\n` : '';
-
-const report = `${banner}${body}\n\n### What this means\n\n${closingBody}`;
-
-const sources = [...new Set(vetted.map((f) => f.source).filter(Boolean))];
 const evidenceState = deriveEvidenceState({ findings: vetted, rawFindings: allFindings, verifyDegraded, coverage });
-return { report, runDate: now ?? null, coverage, evidenceState, subQuestionCount: subQuestions.length, findingCount: vetted.length, sources, degraded: review.degraded, verifyDegraded, verifyPartial, missingSubQuestions, triageCoverage, recheckCoverage, consensusCoverage };
+
+// The entry is rendered by CODE from the section prose plus the findings. The prose is copied
+// verbatim; every URL, support label, and flag in the Evidence tables is a projection of the
+// findings array. That is what makes dossier.md and findings.json unable to disagree.
+//
+// The slice-1 gap banner is SUPERSEDED here, not carried forward: the coverage line is the entry's
+// second line and the gaps become named blocks. Both gap classes it reported must still arrive —
+// `coverage.missing` (no findings) via coverage, and `missingSections` (findings written up but the
+// section writer was abandoned) explicitly. They are NOT the same set, and passing only the first
+// drops a paid-for sub-question from the entry while the coverage line still claims it (#96).
+//
+// `closing: closingBody`, never the raw `closing`. renderDossierEntry writes the
+// "### What this means" heading itself, so the un-stripped value doubles it — the heading moved
+// from this assembly into the renderer, and the strip step above is what keeps that move honest.
+const dossierEntry = renderDossierEntry({
+  runDate: now,
+  title: brief ?? 'research run',
+  coverage,
+  evidenceState,
+  supersedes,
+  sections: orderedSections.map((sec) => ({
+    subQuestion: sec.subQuestion,
+    markdown: sectionByQ.get(sec.subQuestion),
+    findings: sectionMap.get(sec.subQuestion) ?? [],
+  })),
+  missingSections,
+  closing: closingBody,
+  integrity,
+});
+
+// The complete findings.json payload, merged here rather than in main context — the workflow is
+// the only place holding BOTH args.priorFindings and this run's output. Main context stringifies
+// it to disk; the workflow still writes no files. (Plan decision D3.)
+// `topic` is derived from the brief, not passed separately — SKILL.md's args carry no `topic`
+// field. mergeFindingsDoc preserves `base.topic` from the FIRST run on every later merge, so the
+// topic stays stable across follow-ups even though each run's brief differs.
+const findingsDoc = mergeFindingsDoc(input.priorFindings, {
+  topic: brief ?? 'research',
+  runDate: now, brief, coverage, evidenceState,
+  findings: vetted, supersedes, integrity,
+});
+
+return {
+  dossierEntry,        // assembled markdown for THIS run's dated entry — append to dossier.md
+  // Non-null ONLY on a first run (no priorFindings). Rendered here rather than described in
+  // SKILL.md prose for the same reason as findingsDoc: main context writes bytes, it does not
+  // reconstruct format. A header a model retypes each time is a header that drifts.
+  dossierHeader: input.priorFindings ? null : renderDossierHeader(brief ?? 'research', now),
+  findingsDoc,         // complete findings.json payload — write wholesale
+  findings: vetted,    // this run's records, for callers that want them without re-parsing
+  supersedes,          // [] on a first run
+  coverage,            // { answered, total, missing[] }
+  evidenceState,       // verified | unverified | no-results | web-unavailable | research-incomplete
+  runDate: now ?? null,
+  // Sub-questions absent from this entry for a reason `coverage` cannot express: their research
+  // succeeded and the write-up did not. Carried so a caller sees the same gap the dossier names.
+  missingSections,
+  // `coverage` is authoritative for "did we answer the brief", but the fan-out's OWN quorum signal
+  // is a different fact — a fan-out can fall below quorum while coverage still clears, because
+  // coverage counts sub-questions ANSWERED and quorum counts units that RETURNED. Carried rather
+  // than dropped: this plan opens by diagnosing a signal that was computed and never read, and
+  // deleting one here would repeat that.
+  fanoutDegraded: review.degraded,
+  verify: { degraded: verifyDegraded, partial: verifyPartial, degradedAtTier: verified.degradedAtTier ?? null, triageCoverage, recheckCoverage, consensusCoverage },
+  integrity,           // [] when every claim was traceable
+};

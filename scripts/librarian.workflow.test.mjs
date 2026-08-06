@@ -53,7 +53,7 @@ test('the evidence floor runs after verify and before the synthesis phase', () =
   assert.ok(floorIdx < synthIdx, 'nothing may reach synthesis over an empty vetted set');
 });
 
-test('every exit path reports evidenceState — trust signals are never omitted on the sad path', () => {
+test('all three exits share ONE contract — a caller never branches on which gate stopped the run', () => {
   // Excise the sectionUnits block first: its `validate` returns are validation CONTROL FLOW, not
   // exit paths, and counting them compares unrelated things. Marker-slicing rather than an
   // indent-depth regex — indentation is a layout accident, so extracting `validate` to a top-level
@@ -64,18 +64,24 @@ test('every exit path reports evidenceState — trust signals are never omitted 
   assert.ok(unitsStart !== -1 && unitsEnd > unitsStart, 'sectionUnits block markers must resolve');
   const EXIT_SCOPE = BODY.slice(0, unitsStart) + BODY.slice(unitsEnd);
 
-  const exits = EXIT_SCOPE.split(/^\s*return \{/m).slice(1);
+  // The count is asserted so the loop below can never pass vacuously: if the split stopped matching,
+  // an empty `exits` would satisfy every per-item check without testing anything.
+  const exits = EXIT_SCOPE.split(/^\s*return \{/m).slice(1)
+    // Bound each return at BOTH ends — the closing `};` line — so a key found in the code BETWEEN
+    // two returns cannot satisfy the return above it. `\s*` keeps this indent-independent.
+    .map((chunk) => chunk.split(/^\s*\};$/m)[0]);
   assert.equal(exits.length, 3, 'two gate returns plus the success return');
 
-  // Per-return, NOT a bulk count. The previous `states.length >= returns.length` form had slack —
-  // the success path mentions evidenceState twice (the const, then the shorthand) — so a fourth
-  // exit path carrying NO evidenceState still passed. That was proven by construction in review,
-  // and it is the exact hole this assertion exists to close: #96 is a sad path that failed to
-  // report why. The 300-char window is ~3x the measured worst case (evidenceState lands at offset
-  // 41-100 in all three returns, since it is an early field) and is bounded deliberately, so a
-  // mention far downstream cannot satisfy a return that omits it.
+  // Per-return AND per-key. Every exit carries the same keys, so a caller reads one shape rather
+  // than branching on `stoppedAt` — the sad paths are the ones #96 was about, and they are exactly
+  // the ones most likely to quietly lose a field.
   for (const [i, chunk] of exits.entries()) {
-    assert.match(chunk.slice(0, 300), /evidenceState/, `exit path ${i + 1} omits evidenceState`);
+    for (const key of ['dossierEntry', 'findingsDoc', 'findings', 'supersedes', 'coverage', 'evidenceState', 'runDate', 'verify', 'integrity']) {
+      // Anchored at the start of a property line and accepting BOTH forms — `coverage,` (shorthand)
+      // and `findings: vetted,` — because the returns mix them. A plain `includes(key)` would let
+      // `rawFindings` satisfy `findings`; the line anchor is what rules that out.
+      assert.match(chunk, new RegExp(`^\\s*${key}\\s*[,:]`, 'm'), `exit path ${i + 1} omits ${key}`);
+    }
   }
 });
 
@@ -126,18 +132,19 @@ test('section validation calls the deterministic URL-membership check', () => {
   assert.match(BODY, /unknownUrls\(v\.markdown, section\.findings\)/);
 });
 
-test('the stitcher agent is gone — assembly is concatenation (#152.2)', () => {
+test('the stitcher agent is gone — the entry is rendered by code (#152.2)', () => {
   assert.doesNotMatch(BODY, /label: 'synth:stitch'/);
   assert.doesNotMatch(BODY, /Stitch the sections below together/);
-  assert.match(BODY, /const body = orderedSections\s*\n?\s*\.map/);
-  assert.match(BODY, /const report = `\$\{banner\}\$\{body\}/);
+  // Slice 2: `const body = ...` concatenation is superseded by renderDossierEntry, which is still
+  // code — the property under test is "no agent assembles the document", not the mechanism.
+  assert.match(BODY, /const dossierEntry = renderDossierEntry\(\{/);
 });
 
 test('exactly ONE agent remains in the assembly path, fed the digest not the prose', () => {
   // Bounded at BOTH ends. Open-ended to EOF would make this assert "no agent call anywhere below",
   // so an unrelated later addition would fail it with a bare count mismatch and no clue why.
-  const start = BODY.indexOf('const body = orderedSections');
-  const end = BODY.indexOf('const report = `');
+  const start = BODY.indexOf('const digest = orderedSections');
+  const end = BODY.indexOf('const dossierEntry = renderDossierEntry({');
   assert.ok(start !== -1 && end > start, 'assembly block boundaries must resolve');
   const assembly = BODY.slice(start, end);
   assert.equal((assembly.match(/await agent\(/g) ?? []).length, 1);
@@ -145,14 +152,24 @@ test('exactly ONE agent remains in the assembly path, fed the digest not the pro
   assert.doesNotMatch(assembly, /JSON\.stringify\(orderedSections\)/);
 });
 
-test('the unanswered-brief notice is built in code and leads the report (#96)', () => {
-  // Prepended by code rather than requested of the closing agent, whose text is guaranteed to land
-  // last — so "open the report with this" was unsatisfiable as an instruction.
-  assert.match(BODY, /const banner = gaps\.length/);
-  assert.match(BODY, /const report = `\$\{banner\}\$\{body\}/);
-  const bannerBlock = BODY.slice(BODY.indexOf('const gaps = []'), BODY.indexOf('const report = `'));
-  assert.match(bannerBlock, /missingSubQuestions\.length/);
-  assert.match(bannerBlock, /missingSections\.length/);
+test('BOTH gap classes reach the dossier entry — coverage.missing is not enough (#96)', () => {
+  // The slice-1 banner reported missingSubQuestions AND missingSections. renderDossierEntry derives
+  // "### Unanswered" from coverage.missing, which is computed from FINDINGS — so a sub-question
+  // whose research succeeded but whose section writer was abandoned is absent from it. Passing only
+  // coverage would drop that sub-question from the entry while the coverage line still claims it.
+  const call = BODY.slice(BODY.indexOf('const dossierEntry = renderDossierEntry({'), BODY.indexOf('const findingsDoc ='));
+  assert.ok(call.length > 0, 'the renderDossierEntry call must resolve');
+  assert.match(call, /^\s*coverage,$/m, 'coverage carries the no-findings gaps');
+  assert.match(call, /^\s*missingSections,$/m, 'missingSections carries the failed-write-up gaps');
+});
+
+test('the closing synthesis is passed HEADING-STRIPPED — the renderer writes the heading', () => {
+  // renderDossierEntry emits "### What this means" itself. Passing the raw `closing` shorthand
+  // instead of `closingBody` doubles the heading whenever the agent writes one of its own, which
+  // is exactly what the strip below exists to absorb.
+  assert.match(BODY, /const closingBody = String\(closing \?\? ''\)\.replace\(/);
+  assert.match(BODY, /^\s*closing: closingBody,$/m);
+  assert.doesNotMatch(BODY, /^\s*closing,$/m, 'the raw agent output must never be passed through');
 });
 
 // ── Task 8 — L2 section audit ───────────────────────────────────────────────
@@ -223,4 +240,23 @@ test('supersession compares claims to claims, so its input does not grow with do
 
 test('an already-superseded claim cannot be superseded twice', () => {
   assert.match(BODY, /\.filter\(\(f\) => !f\.supersededBy\)/);
+});
+
+// ── Task 10 — return contract ───────────────────────────────────────────────
+
+test('the report string is gone — the artifact is a dossier entry plus a findings doc', () => {
+  // No `$` anchor: these are shorthand properties carrying trailing `//` comments, so the line does
+  // not end at the comma. Anchoring the end would assert the comment away, not the property.
+  assert.doesNotMatch(BODY, /^\s*report,/m);
+  assert.doesNotMatch(BODY, /^\s*report: null,/m);
+  assert.match(BODY, /^\s*dossierEntry,/m);
+  assert.match(BODY, /^\s*findingsDoc,/m);
+});
+
+test('findingsDoc is merged in the workflow, not handed to main context to reconstruct (D3)', () => {
+  assert.match(BODY, /mergeFindingsDoc\(input\.priorFindings, \{/);
+});
+
+test('the dossier header is rendered on a FIRST run only, and by code', () => {
+  assert.match(BODY, /dossierHeader: input\.priorFindings \? null : renderDossierHeader\(/);
 });
