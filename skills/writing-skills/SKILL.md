@@ -82,20 +82,22 @@ skills/
 
 ## SKILL.md Structure
 
-**Frontmatter (YAML):**
-- Two required fields: `name` and `description` (see [agentskills.io/specification](https://agentskills.io/specification) for all supported fields)
-- Max 1024 characters total
-- `name`: Use letters, numbers, and hyphens only (no parentheses, special chars)
-- `description`: Third-person, describes ONLY when to use (NOT what it does)
-  - Start with "Use when..." to focus on triggering conditions
+**Frontmatter (YAML):** full field inventory in `creating-tools/frontmatter-reference.md`.
+
+- **All fields are optional.** Only `description` is recommended, so Claude knows when to use
+  the skill. `name` defaults to the directory name.
+- `description`: Third-person. **What the skill does and when to use it** — both.
   - Include specific symptoms, situations, and contexts
-  - **NEVER summarize the skill's process or workflow** (see CSO section for why)
-  - Keep under 500 characters if possible
+  - **NEVER summarize the skill's internal steps or workflow** (see CSO section for why)
+  - Put the key use case first: combined `description` + `when_to_use` is truncated at 1,536
+    characters in the skill listing
+- If the skill must run in a cloud session or routine, restrict frontmatter to the six
+  packaging-spec fields — anything else is a hard upload error. See the reference.
 
 ```markdown
 ---
-name: Skill-Name-With-Hyphens
-description: Use when [specific triggering conditions and symptoms]
+name: skill-name-with-hyphens
+description: [what the skill does]. Use when [specific triggering conditions and symptoms].
 ---
 
 # Skill Name
@@ -135,30 +137,44 @@ Concrete results
 
 **Purpose:** Claude reads description to decide which skills to load for a given task. Make it answer: "Should I read this skill right now?"
 
-**Format:** Start with "Use when..." to focus on triggering conditions
+**Format:** State the capability, then the trigger — official guidance is *"what the skill does
+and when to use it."* A description with no trigger context is the most common cause of a skill
+never auto-activating.
 
-**CRITICAL: Description = When to Use, NOT What the Skill Does**
+**CRITICAL: Capability belongs in the description. Procedure does not.**
 
-The description should ONLY describe triggering conditions. Do NOT summarize the skill's process or workflow in the description.
+The line to hold is not *what it does* vs *when to use it* — you need both. It is **capability**
+vs **internal steps**.
 
-**Why this matters:** Testing revealed that when a description summarizes the skill's workflow, Claude may follow the description instead of reading the full skill content. A description saying "code review between tasks" caused Claude to do ONE review, even though the skill's flowchart clearly showed TWO reviews (spec compliance then code quality).
+**Why this matters:** Testing revealed that when a description summarizes the skill's *workflow*,
+Claude may follow the description instead of reading the full skill content. A description saying
+"code review between tasks" caused Claude to do ONE review, even though the skill's flowchart
+clearly showed TWO reviews (spec compliance then code quality).
 
-When the description was changed to just "Use when executing implementation plans with independent tasks" (no workflow summary), Claude correctly read the flowchart and followed the two-stage review process.
+**The trap:** a description that narrates *how* the skill works creates a shortcut Claude takes.
+The skill body becomes documentation Claude skips. A description that names *what the skill is
+for* does not — it makes the skill findable, which is the field's entire job.
 
-**The trap:** Descriptions that summarize workflow create a shortcut Claude will take. The skill body becomes documentation Claude skips.
+| Content | Example | Verdict |
+|---|---|---|
+| **Capability** — what it is for | "Executes an implementation plan task-by-task in isolated contexts" | Keep |
+| **Procedure** — the steps it runs | "dispatches subagent per task with code review between tasks" | Remove |
 
 ```yaml
-# ❌ BAD: Summarizes workflow - Claude may follow this instead of reading skill
+# ❌ BAD: Narrates internal steps - Claude follows this instead of reading the skill
 description: Use when executing plans - dispatches subagent per task with code review between tasks
 
-# ❌ BAD: Too much process detail
+# ❌ BAD: Enumerates the process
 description: Use for TDD - write test first, watch it fail, write minimal code, refactor
 
-# ✅ GOOD: Just triggering conditions, no workflow summary
+# ❌ BAD: Trigger only, no capability - harder to match, tells Claude nothing about fit
 description: Use when executing implementation plans with independent tasks in the current session
 
-# ✅ GOOD: Triggering conditions only
-description: Use when implementing any feature or bugfix, before writing implementation code
+# ✅ GOOD: Capability + trigger, no procedure
+description: Executes an implementation plan in isolated per-task contexts. Use when you have a written plan with independent tasks.
+
+# ✅ GOOD: Capability + trigger
+description: Requires a failing test before implementation code. Use when implementing any feature or bugfix.
 ```
 
 **Content:**
@@ -167,7 +183,7 @@ description: Use when implementing any feature or bugfix, before writing impleme
 - Keep triggers technology-agnostic unless the skill itself is technology-specific
 - If skill is technology-specific, make that explicit in the trigger
 - Write in third person (injected into system prompt)
-- **NEVER summarize the skill's process or workflow**
+- State the capability alongside the trigger — **never the internal steps**
 
 ```yaml
 # ❌ BAD: Too abstract, vague, doesn't include when to use

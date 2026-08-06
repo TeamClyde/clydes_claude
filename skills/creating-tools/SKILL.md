@@ -30,7 +30,7 @@ Do not pick a route unilaterally under time pressure or convenience. The gate ho
 | Artifact type | Route to | Notes |
 |---|---|---|
 | skill | `writing-skills` | Full TDD cycle + Pulser eval — see routing-table.md |
-| agent | `writing-agents` | Process in writing-agents; structure via `plugin-dev:agent-development` internally |
+| agent | `writing-agents` | TDD process + frontmatter conventions, both owned locally |
 | rule | `writing-rules` | Global or path-scoped |
 | hook | `plugin-dev:hook-development` | Direct delegation |
 | command | `plugin-dev:command-development` | Direct delegation |

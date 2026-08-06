@@ -37,10 +37,10 @@ A bare invocation without a system prompt typically fails in these ways:
 
 | Failure | Symptom | What it tells you to add |
 |---|---|---|
-| No model selection | Agent uses default | `model:` field in frontmatter |
-| Vague description | Written as "Use when X" | Rewrite description as inputs + outputs |
+| No model selection | Agent inherits the parent's model | `model:` field in frontmatter (repo policy) |
+| Vague description | Says neither what the agent is for nor when to delegate to it | Rewrite as capability + when Claude should delegate |
 | No output format | Unstructured response | Output format section in system prompt |
-| Unnecessary tools | Lists Read/Grep by default | Clarify `tools:` is only for file writers |
+| Under-provisioned tools | Declares `tools:` but omits `Read`/`Grep`/`Glob` and cannot read | List every needed tool — the allowlist is strict — or omit `tools:` to inherit all |
 | Scope creep | Takes on adjacent tasks | Constraints section needed |
 | No Role statement | Dives into work without context | Role section needed |
 
