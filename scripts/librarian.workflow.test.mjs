@@ -125,3 +125,17 @@ test('the no-publish constraint is on the SECTION prompt, not only the assembly 
 test('section validation calls the deterministic URL-membership check', () => {
   assert.match(BODY, /unknownUrls\(v\.markdown, section\.findings\)/);
 });
+
+test('the stitcher agent is gone — assembly is concatenation (#152.2)', () => {
+  assert.doesNotMatch(BODY, /label: 'synth:stitch'/);
+  assert.doesNotMatch(BODY, /Stitch the sections below together/);
+  assert.match(BODY, /const body = orderedSections\s*\n?\s*\.map/);
+  assert.match(BODY, /const report = `\$\{body\}/);
+});
+
+test('exactly ONE agent remains in the assembly path, fed the digest not the prose', () => {
+  const assembly = BODY.slice(BODY.indexOf('const body = orderedSections'));
+  assert.equal((assembly.match(/await agent\(/g) ?? []).length, 1);
+  assert.match(assembly, /FINDINGS DIGEST: \$\{JSON\.stringify\(digest\)\}/);
+  assert.doesNotMatch(assembly, /JSON\.stringify\(orderedSections\)/);
+});

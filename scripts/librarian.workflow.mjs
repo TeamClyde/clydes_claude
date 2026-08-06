@@ -1065,23 +1065,38 @@ const missingSections = sections.filter((sec) => !sectionByQ.has(sec.subQuestion
 // told which parts of their brief the report does not answer.
 const missingSubQuestions = subQuestions.filter((q) => !sectionByQ.has(q));
 
-const report = await agent(
-  `You are assembling a cited research report from pre-written sections. ` +
-  `Stitch the sections below together in the order given — do NOT rewrite, paraphrase, or add any new research, claims, or source URLs. ` +
-  `After the last section, append a "What this means for the build" section drawn STRICTLY from the findings already in the sections — no new information. ` +
-  `Do NOT state a numeric count of sub-questions anywhere.\n` +
-  // The stitcher is a text assembler. Left unconstrained it has published a themed web page instead
-  // of returning the report — publishing is outward-facing and stays a main-context decision.
-  `Return the assembled report as MARKDOWN in your final message. Do NOT publish it, do NOT create or ` +
-  `update an Artifact, do NOT design a web page, and do NOT return a URL in place of the report text.\n` +
-  (brief ? `RESEARCH GOAL (context only — do NOT expand scope beyond the sections): ${brief}\n` : '') +
-  (verifyDegraded ? `NOTE: adversarial verification did not complete — present every claim as UNVERIFIED and say so explicitly.\n` : '') +
-  (triageCoverage != null && triageCoverage < 1 ? `NOTE: verification triage judged only ${Math.round(triageCoverage * 100)}% of collected findings; the remainder were carried through on the adversarial tiers alone. Say so explicitly.\n` : '') +
-  (missingSubQuestions.length ? `NOTE: the report does NOT answer these sub-questions — no section survived for them. Open the report with an explicit, prominent statement that they are MISSING and unanswered: ${JSON.stringify(missingSubQuestions)}.\n` : '') +
-  (missingSections.length ? `NOTE: ${missingSections.length} section(s) could not be written and are absent — state explicitly that these sub-questions are MISSING from the report: ${JSON.stringify(missingSections)}.\n` : '') +
-  `--- SECTIONS (stitch in this order) ---\n` +
-  orderedSections.map((sec) => `### Section: ${sec.subQuestion}\n${sectionByQ.get(sec.subQuestion)}`).join('\n\n'),
-  { label: 'synth:stitch', phase: 'Synthesize', model: 'claude-sonnet-4-6' });
+// ── Code assembly (#152.2) — the stitcher is DELETED ────────────────────────
+// Concatenation cannot truncate, cannot start mid-sentence, and cannot compress. Wholeness becomes
+// a structural property instead of a hoped-for one. This is the lever on #96 and #152: not "add a
+// guard" but "reduce the number of places a non-deterministic component can silently lose content"
+// — from three (section writer, stitcher, closing synthesis) to one.
+const body = orderedSections
+  .map((sec) => `### Q: ${sec.subQuestion}\n\n${sectionByQ.get(sec.subQuestion)}`)
+  .join('\n\n');
+
+// The ONE remaining agent in the assembly path, and its input is BOUNDED: the findings digest
+// (claims grouped by sub-question), never the section prose. Input size no longer tracks dossier
+// size, so a 40-section dossier costs this stage no more than a 4-section one.
+const digest = orderedSections.map((sec) => ({
+  subQuestion: sec.subQuestion,
+  claims: (sectionMap.get(sec.subQuestion) ?? []).map((f) => f.claim).filter(Boolean),
+}));
+
+const closing = await agent(
+  `Write a "What this means" closing synthesis for a research dossier, drawn STRICTLY from the ` +
+  `findings digest below. No new information, no new sources, no web search.\n` +
+  `Do NOT write source URLs. Do NOT state a numeric count of sub-questions.\n` +
+  `Return MARKDOWN in your final message. Do NOT publish it, do NOT create or update an Artifact, ` +
+  `and do NOT return a URL in place of the text.\n` +
+  (brief ? `RESEARCH GOAL (context only — do NOT expand scope beyond the digest): ${brief}\n` : '') +
+  (verifyDegraded ? `NOTE: adversarial verification did not complete — treat every claim as UNVERIFIED and say so explicitly.\n` : '') +
+  (triageCoverage != null && triageCoverage < 1 ? `NOTE: verification triage judged only ${Math.round(triageCoverage * 100)}% of collected findings; the remainder were carried on the adversarial tiers alone. Say so explicitly.\n` : '') +
+  (missingSubQuestions.length ? `NOTE: these sub-questions are UNANSWERED — state prominently that they are missing: ${JSON.stringify(missingSubQuestions)}.\n` : '') +
+  (missingSections.length ? `NOTE: ${missingSections.length} section(s) could not be written and are absent — say so explicitly: ${JSON.stringify(missingSections)}.\n` : '') +
+  `FINDINGS DIGEST: ${JSON.stringify(digest)}`,
+  { label: 'synth:closing', phase: 'Synthesize', model: 'claude-sonnet-4-6' });
+
+const report = `${body}\n\n### What this means\n\n${closing}`;
 
 const sources = [...new Set(vetted.map((f) => f.source).filter(Boolean))];
 const evidenceState = deriveEvidenceState({ findings: vetted, rawFindings: allFindings, verifyDegraded, coverage });
