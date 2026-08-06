@@ -5,7 +5,7 @@
 **Owner:** solo
 **Last updated:** 2026-06-25
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
-**Related ADRs:** ADR-0005 (orchestration-regulation-standard), ADR-0006 (tiered-adversarial-verify-standard)
+**Related ADRs:** ADR-0005 (orchestration-regulation-standard), ADR-0006 (tiered-adversarial-verify-standard), ADR-0011 (librarian-durable-research-artifact-contract)
 **Key files:**
   - `docs/reference/component-inventory.md` — generated roster of all skills + agents
   - `rules/new-repo-setup.md` — agent/skill registry + invocation conventions
@@ -256,6 +256,7 @@ All three exits — the coverage gate, the evidence floor, and the success path 
 
 - [ADR-0005](../adr/0005-orchestration-regulation-standard.md) — Repo-wide orchestration-regulation standard (Accepted)
 - [ADR-0006](../adr/0006-tiered-adversarial-verify-standard.md) — Tiered-adversarial verify standard (Accepted)
+- [ADR-0011](../adr/0011-librarian-durable-research-artifact-contract.md) — The librarian's output is a durable research artifact, not a returned report (Accepted)
 
 ---
 
