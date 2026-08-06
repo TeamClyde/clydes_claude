@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildBundle } from './build-engine-bundle.mjs';
-import { buildExtras, EXTRAS } from './build-engine-bundle.mjs';
+import { buildExtras, EXTRAS, extrasMarkers } from './build-engine-bundle.mjs';
 
 test('bundle has no import/export and exposes a working parallelFanout', async () => {
   const block = await buildBundle();            // returns the inlinable source string
@@ -56,4 +56,16 @@ test('every EXTRAS target carries its marker pair (a missing pair would silently
     assert.ok(src.includes(`// <${spec.name}:start>`), `${target} missing <${spec.name}:start>`);
     assert.ok(src.includes(`// <${spec.name}:end>`), `${target} missing <${spec.name}:end>`);
   }
+});
+
+test('an EXTRAS name with a regex metacharacter is rejected loudly, not silently mismatched', () => {
+  // The name is interpolated into `new RegExp` in inject(); a metacharacter would change matching
+  // semantics rather than fail, and `engine:check` cannot catch a skipped injection because it
+  // produces no git diff. So the guard must throw.
+  assert.throws(() => extrasMarkers('BAD.NAME'), /must match/);
+  assert.throws(() => extrasMarkers('BAD+NAME'), /must match/);
+  assert.deepEqual(extrasMarkers('LIBRARIAN-CORE'), {
+    start: '// <LIBRARIAN-CORE:start>',
+    end: '// <LIBRARIAN-CORE:end>',
+  });
 });
