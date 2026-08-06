@@ -355,3 +355,15 @@ test('mergeFindingsDoc: a malformed or partial prior doc degrades to empty array
     assert.ok(Array.isArray(doc.findings) && Array.isArray(doc.runs) && Array.isArray(doc.integrity));
   }
 });
+
+test('dossier entry: a section whose prose could not be written is NAMED, never silently absent', () => {
+  // coverage.missing is computed from FINDINGS; a sub-question can have findings and still lose its
+  // section when the writer is abandoned. That case is invisible to coverage.missing, so without
+  // this block the entry drops a paid-for sub-question while claiming full coverage (#96).
+  const lost = { ...RUN, missingSections: ['q2: what does it cost?'] };
+  const md = renderDossierEntry(lost);
+  assert.match(md, /### Sections not written/);
+  assert.match(md, /- q2: what does it cost\?/);
+  // Absent when nothing was lost — no empty scaffolding on the clean path.
+  assert.doesNotMatch(renderDossierEntry(RUN), /### Sections not written/);
+});

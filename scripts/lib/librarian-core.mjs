@@ -231,6 +231,18 @@ export function renderDossierEntry(run) {
     out.push(run.coverage.missing.map((q) => `- ${q}`).join('\n'), ``);
   }
 
+  // A DIFFERENT gap from the one above, and it must not be folded into it. `coverage.missing` is
+  // derived from FINDINGS, so a sub-question that produced findings but whose section writer was
+  // abandoned is absent from it — yet its prose is missing from this entry too. Reported separately
+  // because the cause and the remedy differ: `### Unanswered` means the research found nothing,
+  // this means the research succeeded and the write-up did not. Without this block such a
+  // sub-question disappears from the dossier while the coverage line above still claims it was
+  // answered — silently discarding paid-for work, which is the #96 failure this plan exists to fix.
+  if (run.missingSections?.length) {
+    out.push(`### Sections not written`, ``);
+    out.push(run.missingSections.map((q) => `- ${q}`).join('\n'), ``);
+  }
+
   out.push(`### What this means`, ``, run.closing, ``);
 
   // Present ONLY when claims failed the audit after repair — and then never silently omitted.
