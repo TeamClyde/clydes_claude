@@ -541,8 +541,11 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
       const thinEscalates     = thin && escalateOn.has('thin-source');
 
       // Carry BOTH judgements onto the finding so they survive into the caller's evidence table.
-      // Verify is the only stage that RE-READ the sources, so neither can be reconstructed
-      // downstream. `label` was previously read into a local and thrown away, which left every
+      // Verify is the only stage that JUDGES SOURCE AUTHORITY — a downstream consumer holds the
+      // URL but not the judgement, so neither can be reconstructed there. Note it does not judge by
+      // re-reading: `thinSource` is set by the Tier-1 triage prompt above, which says
+      // `Do NOT re-research`. Independence from the research leaf is the property relied on here,
+      // not fresh retrieval. `label` was previously read into a local and thrown away, which left every
       // surviving finding with no `support` field at all — the consumer's Support column would
       // render `unlabelled` for every row, voiding the trust contract the column exists to carry.
       //
