@@ -536,8 +536,11 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
       const thinEscalates     = thin && escalateOn.has('thin-source');
 
       // Carry BOTH judgements onto the finding so they survive into the caller's evidence table.
-      // Verify is the only stage that RE-READ the sources, so neither can be reconstructed
-      // downstream. `label` was previously read into a local and thrown away, which left every
+      // Verify is the only stage that JUDGES SOURCE AUTHORITY — a downstream consumer holds the
+      // URL but not the judgement, so neither can be reconstructed there. Note it does not judge by
+      // re-reading: `thinSource` is set by the Tier-1 triage prompt above, which says
+      // `Do NOT re-research`. Independence from the research leaf is the property relied on here,
+      // not fresh retrieval. `label` was previously read into a local and thrown away, which left every
       // surviving finding with no `support` field at all — the consumer's Support column would
       // render `unlabelled` for every row, voiding the trust contract the column exists to carry.
       //
@@ -998,7 +1001,8 @@ function renderDossierEntry(run) {
         // `unlabelled` rather than blank: an empty Support cell reads as "no concern found",
         // which is the opposite of "this claim was never judged".
         f.support ?? 'unlabelled',
-        [f.thinSource ? 'thin source' : '', f.reframe?.improved ? 'reframed' : ''].filter(Boolean).join(', '),
+        [f.thinSource ? 'thin source' : '',
+          f.reframe ? (f.reframe.improved ? 'reframed' : 'reframed, no better evidence') : ''].filter(Boolean).join(', '),
       ])), ``);
   }
 
@@ -1081,6 +1085,159 @@ function mergeFindingsDoc(prior, run) {
       ...priorIntegrity,
     ],
   };
+}
+
+// ── Reframe (slice 4 — EXPERIMENTAL) ────────────────────────────────────────
+// "Thin source" is not one condition. An adversarial challenge decomposed it into FIVE, which four
+// of the moves below address (`evidence-type` covers two of them); a vocabulary swap addresses
+// exactly one — so a single unconditional transformation is the wrong shape. `inversion` and
+// `discipline` are two further moves that apply regardless of which condition was diagnosed. Every
+// move carries a `diagnosis` line because the agent's move table is assembled from this array, so
+// the SIX strings below are NOT the five conditions — counting them will not recover that number.
+// The agent's first job is to DIAGNOSE why the evidence is thin; only then does it select a move.
+//
+// Prior art covers 2 of the 6 KEYS — which is 3 of the paper's operations, because `abstraction`
+// here merges two of them. Huang & Efthimiadis (CIKM 2009) classify QUERY-STRING operations
+// (add/remove/substitute/reorder) and ground `vocabulary` (substitution) and both directions of
+// `abstraction` (specialization/generalization) as named, studied strategies.
+//
+// The other four are ungrounded for TWO DIFFERENT reasons, and the distinction matters because the
+// Task 20 ADR asserts it — and an ADR is immutable once Accepted:
+//   - `entity-anchored` and `evidence-type` change the RETRIEVAL TARGET rather than the query
+//     string (follow a citation to a reachable artifact; stop seeking papers at all). That is a
+//     different axis, entirely outside the cited taxonomy.
+//   - `inversion` and `discipline` ARE expressible as query-string substitutions, so the axis
+//     argument does not apply to them. They are ungrounded for the other reason: the paper does not
+//     name or study them as strategies. Classifiable as substitution is not the same as validated.
+// All four ship UNVALIDATED, by decision. Marking any of them `priorArt: true` would attribute to
+// that paper a claim it does not make.
+
+const REFRAME_MOVES = [
+  {
+    key: 'vocabulary',
+    priorArt: true,
+    diagnosis: 'The query was phrased weakly; the literature exists but we did not reach it.',
+    instruction: 'Mine the thin sources for canonical terminology, tool and library names, authors, and labs the original query lacked. Substitute them in. Example: "vector database costs" -> "HNSW index memory footprint".',
+  },
+  {
+    key: 'abstraction',
+    priorArt: true,
+    diagnosis: 'The sub-question is badly formed — vague, compound, or at the wrong altitude.',
+    instruction: 'Move up ("how do PG-based vector stores scale"), move down ("what is HNSW memory complexity"), or split a question carrying two unknowns into one query each.',
+  },
+  {
+    key: 'entity-anchored',
+    priorArt: false,
+    diagnosis: 'Authoritative sources exist but are paywalled or unfetchable.',
+    instruction: 'Follow the citation to something reachable: the preprint, the author’s talk, the lab page, the repository.',
+  },
+  {
+    key: 'evidence-type',
+    priorArt: false,
+    diagnosis: 'No authoritative literature exists yet (emerging tool, recent release), OR the claim is inherently non-academic (pricing, API behaviour, adoption).',
+    instruction: 'Stop seeking papers. Query for GitHub issues, RFCs, changelogs, release notes, conference talks, and source code. If the claim is inherently non-academic, accept that and report it — there is no paper about a vendor’s 2026 pricing.',
+  },
+  {
+    key: 'inversion',
+    priorArt: false,
+    diagnosis: 'Success literature on this topic is thin or promotional.',
+    instruction: 'Ask the opposite. "Why does X work?" -> "when does X fail?" Failure literature is frequently richer and better sourced.',
+  },
+  {
+    key: 'discipline',
+    priorArt: false,
+    diagnosis: 'The question is answered in another field’s vocabulary.',
+    instruction: 'Re-ask it in an adjacent discipline’s terms. "Agent context drift" has answers in RL, in HCI, and in distributed-systems work on state divergence.',
+  },
+];
+
+const KNOWN_SHIFTS = new Set(REFRAME_MOVES.map((m) => m.key));
+
+/**
+ * Which sub-questions have no grounded finding at all.
+ *
+ * Per sub-question, never per finding: one `supported && !thinSource` finding among five thin ones
+ * means the thread IS grounded, and reframing there is wasted spend.
+ *
+ * A sub-question with ZERO findings does NOT qualify — that is a coverage failure, already owned by
+ * the coverage gate and `coverage.missing`. Conflating "found weak evidence" with "found none"
+ * merges two different failures with two different fixes.
+ *
+ * A sub-question whose findings already carry a `reframe` stamp is excluded: exactly one round.
+ * Reformulation quality degrades as the count rises (Venktesh et al., arXiv:2605.00560), which is
+ * the evidence for the cap.
+ *
+ * A sub-question whose findings were never JUDGED does not qualify either. `tieredVerify` stamps
+ * `support`/`thinSource` unconditionally when Tier-1 triage returns a verdict (its triage-stamping
+ * branch, `verify.mjs:299-300`), but a finding triage skipped is stamped `support: 'unjudged'` with
+ * `thinSource` deliberately left absent (`tieredVerify`'s no-verdict branch,
+ * `verify.mjs:274-277`). Absent reads as falsy, so without this guard an unjudged finding
+ * satisfies "not (supported && !thin)" and its sub-question looks thin — firing the most expensive
+ * stage in the pipeline on the ABSENCE of a signal rather than on one. Task 18 guards the whole-run
+ * case with `verifyDegraded`, but that boundary is drawn at the RUN level; this one is per finding
+ * and escapes it on a run verify reports healthy.
+ */
+function thinSubQuestions(subQuestions, findings) {
+  const bySub = new Map();
+  for (const f of findings ?? []) {
+    if (!f?.subQuestion) continue;
+    if (!bySub.has(f.subQuestion)) bySub.set(f.subQuestion, []);
+    bySub.get(f.subQuestion).push(f);
+  }
+  return (Array.isArray(subQuestions) ? subQuestions : []).filter((q) => {
+    const fs = bySub.get(q);
+    if (!fs || fs.length === 0) return false;              // coverage problem, not a thinness one
+    if (fs.some((f) => f.reframe)) return false;           // already reframed — one round only
+    // Verify must actually have judged this thread before we can call it thin.
+    const judged = fs.filter((f) => f.support && f.support !== 'unjudged');
+    if (judged.length === 0) return false;                 // absence of a signal, not a thin signal
+    return !judged.some((f) => f.support === 'supported' && !f.thinSource);
+  });
+}
+
+/**
+ * Merge re-researched candidates into a sub-question's thin findings.
+ *
+ * Two mechanical drift suppressors, not prompt instructions. ReformIR suppresses drift by anchoring
+ * to the original query with ranker FEEDBACK; telling an agent to stay on topic is the weaker form.
+ *
+ *  1. A candidate must answer the ORIGINAL sub-question. One that answers the reformulated query
+ *     but not the original one IS drift and is refused here, regardless of how good it looks.
+ *  2. Candidates are CANDIDATES, not replacements. They merge only if they clear a bar the thin
+ *     findings did not — `supported && !thinSource`. Material that is merely DIFFERENT does not
+ *     enter the dossier, and failing to improve is a valid, recorded outcome.
+ *
+ * Thin findings are never dropped, even when better sources are found. They were the stepping
+ * stone, and a future session may want the path.
+ *
+ * @param {Array} thin        - this sub-question's surviving thin findings
+ * @param {Array} candidates  - RE-VERIFIED reframe output (never raw — see Task 19)
+ * @param {{subQuestion:string, diagnosis:string, shift:string}} ctx
+ * @returns {Array}
+ */
+function mergeReframed(thin, candidates, ctx) {
+  const better = (candidates ?? []).filter(
+    (f) => f?.subQuestion === ctx.subQuestion && f?.support === 'supported' && !f.thinSource,
+  );
+  const improved = better.length > 0;
+  // `shift` is stamped from a CLOSED set the code owns, never from what the agent typed. Task 18's
+  // schema declares the enum, but a schema is the agent boundary — this is the invariant at
+  // `:155`: an agent never types a flag. An unrecognized value becomes 'unrecognized' rather than
+  // being dropped, so the run still counts toward the distribution that Slice 4's accepted
+  // measurability risk names as its only mitigation. `diagnosis` is deliberately NOT constrained —
+  // it is prose the agent is asked to write. Note it is a DIFFERENT thing from
+  // `REFRAME_MOVES[].diagnosis`, which is a fixed condition sentence used to build the move table.
+  const stamp = {
+    diagnosis: ctx.diagnosis,
+    shift: KNOWN_SHIFTS.has(ctx.shift) ? ctx.shift : 'unrecognized',
+    improved,
+  };
+  return [
+    // The thin findings stand, stamped with what was tried. `improved: false` on them is the record
+    // that the stage fired and did not help — which is the data that makes this stage improvable.
+    ...(thin ?? []).map((f) => ({ ...f, reframe: stamp })),
+    ...better.map((f) => ({ ...f, reframe: stamp })),
+  ];
 }
 
 // <LIBRARIAN-CORE:end>
@@ -1186,7 +1343,180 @@ phase('Verify');
 // is non-preemptive the abandoned clusters were still paid for in full.
 const verified = await tieredVerify(allFindings, { profile: 'web-research', agent, perTierTimeoutMs: 900_000 });
 const verifyDegraded = verified.degraded;
-const vetted = verifyDegraded ? allFindings : verified.findings;
+let vetted = verifyDegraded ? allFindings : verified.findings;
+
+// ── Diagnose-then-shift reframe (#118 extension — EXPERIMENTAL) ─────────────
+// Fires only for sub-questions with NO supported non-thin finding. Exactly one round. The trigger
+// comes from verify — an independent adversarial pass — not from a leaf assessing its own work.
+// Independence is the property relied on here, NOT source re-reading: `thinSource` is a Tier-1
+// triage judgement and that prompt says `Do NOT re-research` (lib/verify.mjs:135-137).
+//
+// ACCEPTED RISK (by decision, not oversight): success is not measurable with any instrument this
+// repo has. `thinSource` is an LLM judgment, so the trigger and the success metric come from the
+// same mechanism, and a shift returning different-but-equally-thin sources is indistinguishable
+// from one that failed. The recorded diagnosis below is the partial substitute: the DISTRIBUTION of
+// diagnosed conditions across real runs is observable, and tells us whether the stage fires on
+// conditions it can help.
+const REFRAME_SCHEMA = {
+  type: 'object', required: ['diagnosis', 'shift', 'queries'],
+  properties: {
+    diagnosis: { type: 'string' },
+    shift: { enum: ['vocabulary', 'abstraction', 'entity-anchored', 'evidence-type', 'inversion', 'discipline'] },
+    queries: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+// Skipped entirely when verify degraded. A degraded verify falls back to the RAW findings, which
+// carry no `support` or `thinSource` stamp at all, and reframing on the ABSENCE of a signal is a
+// different thing from reframing on one: verify never judged these sources, so we do not know that
+// they are thin. The trigger requires a verify that actually ran.
+//
+// BELT-AND-BRACES, not the only line of defence. `thinSubQuestions` already refuses to classify an
+// unjudged thread as thin — it filters to findings carrying a real `support` stamp and returns
+// false when none survive — so unstamped findings could not reach the reframe even without this
+// guard. Skipping the stage outright when verify degraded makes that intent explicit at the call
+// site rather than leaving it implicit in a helper's filtering. It saves no meaningful work —
+// `thinSubQuestions` is a synchronous filter over an in-memory array, not an agent call — so the
+// value here is clarity, not spend.
+const thinQs = verifyDegraded ? [] : thinSubQuestions(subQuestions, vetted);
+let reframed = [];
+if (thinQs.length) {
+  phase('Reframe');
+  const moveTable = REFRAME_MOVES.map((m) => `- ${m.key}: WHEN ${m.diagnosis} HOW ${m.instruction}`).join('\n');
+
+  const reframeUnits = thinQs.map((q) => {
+    const thinFindings = vetted.filter((f) => f.subQuestion === q);
+    return {
+      // `diagnosis` is checked, not just named in the reason string. The schema requires it, but the
+      // recorded diagnosis is the ONE mitigation the accepted-measurability-risk note above names as
+      // this stage's own — a plan that arrives without one reaches the merge as `undefined` and the
+      // mitigation silently evaporates. A rejection reason must not claim more than its predicate.
+      // The enum is deliberately NOT re-checked here: `mergeReframed` already normalizes `shift`
+      // against the closed set it owns, so duplicating that check would give it two homes.
+      validate: (v) => (v?.diagnosis && v?.shift && Array.isArray(v?.queries) && v.queries.length > 0 && v.queries.length <= 3)
+        ? { ok: true }
+        : { ok: false, reason: 'need a diagnosis, one shift from the enum, and 1-3 reformulated queries' },
+      // `work` stamps the sub-question onto its OWN result. parallelFanout's `confirmed` is a
+      // COMPACT array — abandoned units are absent, not null — so a positional thinQs[i] lookup
+      // would silently mislabel every plan after the first abandon. Reconstruct by KEY, never by
+      // position; this is the same rule the section fan-out already follows.
+      //
+      // The stamp comes LAST, after the spread — the code-owned key must win. REFRAME_SCHEMA does
+      // not set `additionalProperties: false` and the prompt prints the sub-question verbatim, so
+      // an agent that echoes back a paraphrased `subQuestion` would clobber a stamp placed first.
+      // Downstream matches this key EXACTLY; a paraphrase matches nothing and the re-researched
+      // findings are dropped in silence. Same invariant as `mergeReframed`: an agent never types a
+      // flag the code owns.
+      work: async (repair) => ({ ...await agent(
+        `Research on this sub-question produced only THIN evidence: no well-supported, ` +
+        `non-low-authority source. Your job is to work out WHY, then pick the ONE move that ` +
+        `matches — not to reformulate reflexively.\n\n` +
+        `STEP 1 — DIAGNOSE. State in one sentence why the evidence is thin.\n` +
+        `STEP 2 — SELECT the single matching move:\n${moveTable}\n\n` +
+        `STEP 3 — Write 1-3 reformulated queries applying ONLY that move.\n\n` +
+        // The 240s budget below assumes this stage does no web work. Nothing in the steps above
+        // forbids it, and "mine these for terminology" invites it — so say it, the same way the
+        // section-writer prompt spells out its own no-new-research constraint.
+        `Do NOT search the web and do NOT fetch any page. You are PLANNING queries, not running ` +
+        `them: reason over the thin sources already provided below and return queries for someone ` +
+        `else to run.\n` +
+        // The anchor. The failure mode of reformulation is drifting to an adjacent, easier
+        // question — which the mechanical checks in Task 19 enforce, but state it here too.
+        `Every query must still serve the ORIGINAL sub-question verbatim below. A query that ` +
+        `answers something adjacent and easier is DRIFT and will be rejected downstream.\n` +
+        `ORIGINAL SUB-QUESTION: ${q}\n` +
+        `THIN SOURCES FOUND (mine these for terminology — they are weak, not useless): ` +
+        `${JSON.stringify(thinFindings.map((f) => ({ source: f.source, claim: f.claim })))}\n` +
+        (repair ? `PREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.\n` : ''),
+        { label: `reframe:${q.slice(0, 40)}`, phase: 'Reframe', schema: REFRAME_SCHEMA, model: 'claude-sonnet-4-6' }), subQuestion: q }),
+    };
+  });
+
+  // 240s: this stage plans queries, it does not run them. The re-research below carries the
+  // web-facing budget.
+  //
+  // quorum: 0 — this stage is OPTIONAL, so no number of successes is *required*. Note this does
+  // NOT suppress the returned `degraded` flag: dispatch.mjs:61-62 special-cases quorum 0 so that
+  // any abandon still sets degraded, and dispatch.test.mjs locks that in ("zero-quorum does not
+  // mask abandons"). We simply never READ `.degraded` from either reframe fan-out — the run's
+  // trust signals come from `coverage` and `evidenceState`, and a failed reframe must leave the
+  // run intact with its thin findings. Do not later wire these `.degraded` values into a caller
+  // signal expecting quorum 0 to mean "abandons are fine".
+  const reframePlans = await parallelFanout(reframeUnits, { perUnitTimeoutMs: 240_000, maxInFlight: Math.min(thinQs.length, MAX_CONCURRENT), modelTier: 'sonnet', quorum: 0 });
+  const plans = reframePlans.confirmed;   // each already carries its own subQuestion
+
+  // ── Narrow re-research: one leaf per plan, running ONLY that plan's queries ──
+  const researchUnits = plans.map((plan) => ({
+    validate: (v) => (v && Array.isArray(v.findings)) ? { ok: true } : { ok: false, reason: 'need { findings: [...] } (an empty array is a valid answer)' },
+    // Same compact-array rule: carry the plan on the result rather than re-deriving it by position.
+    work: async (repair) => ({ plan, findings: (await agent(
+      // The anti-memory contract, carried over from the primary research leaf verbatim in intent.
+      // This stage exists to obtain BETTER SOURCES; a memory-answered finding arrives with a
+      // plausible-looking URL, survives the re-verify, and can be stamped `supported` — defeating
+      // the whole stage while looking like success. The search budget is honoured here too, in the
+      // same conditional form as the primary leaf: this is the other web-facing fan-out, so a
+      // caller's cap that binds one and not the other is not a cap.
+      `You are a research analyst running a NARROW follow-up. Investigate by SEARCHING THE WEB — ` +
+      `do NOT answer from memory. Run ONLY these queries and report ` +
+      `what you find:\n${plan.queries.map((s) => `- ${s}`).join('\n')}\n\n` +
+      (maxSearchesPerLeaf != null ? `Search budget: perform at most ${maxSearchesPerLeaf} WebSearch calls, then synthesize from what you have found.\n` : '') +
+      `Set "subQuestion" on EVERY finding to exactly: ${plan.subQuestion}\n` +
+      `Set "source" to the URL the claim came from. Prefer primary and authoritative sources. ` +
+      `If these queries surface nothing better than what we already had, return an EMPTY findings ` +
+      `array — that is a valid and useful answer, not a failure.\n` +
+      (repair ? `PREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.\n` : ''),
+      { label: `reresearch:${plan.subQuestion.slice(0, 40)}`, phase: 'Reframe', schema: FINDINGS, model: LEAF_MODEL }))?.findings ?? [] }),
+  }));
+
+  const reResearch = await parallelFanout(researchUnits, { perUnitTimeoutMs: 900_000, maxInFlight: Math.min(researchUnits.length, MAX_CONCURRENT), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet', quorum: 0 });
+  reframed = reResearch.confirmed.flatMap((r) => r.findings.map((f) => ({ ...f, _plan: r.plan })));
+
+  // Re-verified BEFORE merging, and — critically — against the ORIGINAL sub-question, never the
+  // reformulated query. A finding that answers the reformulation but not the original one IS
+  // drift; triage labels it accordingly rather than admitting it. This is the mechanical form of
+  // the anchor. ReformIR suppresses drift with ranker FEEDBACK anchored to the original query;
+  // telling the reframe agent to stay on topic is the weaker, prompt-only form.
+  //
+  // Only the VERIFY call is gated on `reframed.length` — an empty re-research has nothing to
+  // verify, so the pass would be pure waste.
+  let candidates = [];
+  if (reframed.length) {
+    const reVerified = await tieredVerify(
+      reframed.map(({ _plan, ...f }) => ({ ...f, subQuestion: _plan.subQuestion })),
+      { profile: 'web-research', agent, perTierTimeoutMs: 900_000 },
+    );
+    // A degraded re-verify yields NO candidates. The merge bar is `supported && !thinSource`, and
+    // unverified findings have neither label — admitting them would let the reframe bypass exactly
+    // the scrutiny it was triggered by.
+    candidates = reVerified.degraded ? [] : reVerified.findings;
+  }
+
+  // The MERGE is gated on `plans`, NOT on `reframed.length` — and the `plans.length` guard is a
+  // pure optimization: with `plans` empty the loop body never runs and the reassignment below
+  // would be an identity copy.
+  //
+  // `plans` and `reframed` come from two independent fan-outs: a plan can exist while its
+  // re-research validly returns zero findings — Task 18's own prompt invites exactly that ("return
+  // an EMPTY findings array — that is a valid and useful answer, not a failure"), and with three of
+  // six moves unvalidated it is likely the COMMON outcome. Gating this loop on `reframed.length`
+  // would skip `mergeReframed` in precisely that case, losing the `improved: false` stamp — which
+  // is the recorded-diagnosis signal that Slice 4's accepted measurability risk names as its own
+  // partial mitigation. A stage whose failures go unrecorded cannot be improved.
+  if (plans.length) {
+    const merged = [];
+    for (const plan of plans) {
+      const thinForQ = vetted.filter((f) => f.subQuestion === plan.subQuestion);
+      merged.push(...mergeReframed(
+        thinForQ,
+        candidates.filter((f) => f.subQuestion === plan.subQuestion),
+        { subQuestion: plan.subQuestion, diagnosis: plan.diagnosis, shift: plan.shift },
+      ));
+    }
+    // Replace only the reframed sub-questions' findings; everything else is untouched.
+    const touched = new Set(plans.map((p) => p.subQuestion));
+    vetted = [...vetted.filter((f) => !touched.has(f.subQuestion)), ...merged];
+  }
+}
 
 // ── Evidence floor (#96, #80) — backstop ────────────────────────────────────
 // Never enter the synthesis path over an empty vetted set. This should be unreachable when the
@@ -1229,7 +1559,21 @@ const sectionMap = vetted.reduce((acc, f) => {
   acc.get(key).push(f);
   return acc;
 }, new Map());
-const sections = [...sectionMap.entries()].map(([subQuestion, findings]) => ({ subQuestion, findings }));
+// `sections` exists to feed two AGENT PROMPTS — the section writer and the L2 traceability auditor
+// — and nothing else: the Evidence table and findings.json both read `sectionMap`/`vetted`, which
+// keep the full reframe stamp. So the stamp is projected down HERE, at the single seam, to the one
+// code-owned boolean.
+//
+// `reframe.diagnosis` is deliberately unconstrained free text the reframe agent wrote about the
+// PIPELINE. The section writer is instructed to work from ONLY these findings, which puts that
+// pipeline-meta prose inside its permitted material — "no authoritative literature exists yet on
+// this topic" can be written into the report as a statement about the SUBJECT. The traceability
+// auditor would then pass it, because it genuinely is in the findings JSON: the guard against
+// fabrication would certify pipeline metadata as sourced research.
+const sections = [...sectionMap.entries()].map(([subQuestion, findings]) => ({
+  subQuestion,
+  findings: findings.map((f) => (f.reframe ? { ...f, reframe: { improved: f.reframe.improved } } : f)),
+}));
 
 const sectionPrompt = (section) =>
   `Write the DETAILED report section for sub-question "${section.subQuestion}" using ONLY these ` +

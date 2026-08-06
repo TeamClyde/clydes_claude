@@ -59,10 +59,16 @@ test('all three exits share ONE contract — a caller never branches on which ga
   // indent-depth regex — indentation is a layout accident, so extracting `validate` to a top-level
   // function, or nesting a real exit path one level deeper, would silently reclassify returns with
   // no test signal. This file already uses the marker-slice technique for sectionPromptBlock.
+  // Task 18 added a SECOND unit-construction block (reframeUnits), whose `return {` is the same
+  // validation control flow, not an exit path. Excised on the same grounds and by the same
+  // technique — any future unit block must be added here too, or it inflates the count.
+  const reframeStart = BODY.indexOf('const reframeUnits = thinQs.map(');
+  const reframeEnd = BODY.indexOf('const reframePlans =');
   const unitsStart = BODY.indexOf('const sectionUnits = sections.map(');
   const unitsEnd = BODY.indexOf('const sectionReview =');
+  assert.ok(reframeStart !== -1 && reframeEnd > reframeStart, 'reframeUnits block markers must resolve');
   assert.ok(unitsStart !== -1 && unitsEnd > unitsStart, 'sectionUnits block markers must resolve');
-  const EXIT_SCOPE = BODY.slice(0, unitsStart) + BODY.slice(unitsEnd);
+  const EXIT_SCOPE = BODY.slice(0, reframeStart) + BODY.slice(reframeEnd, unitsStart) + BODY.slice(unitsEnd);
 
   // The count is asserted so the loop below can never pass vacuously: if the split stopped matching,
   // an empty `exits` would satisfy every per-item check without testing anything.
@@ -100,7 +106,11 @@ test('args.now is the only time source — Date.now() throws in the Workflow san
 
 test('section watchdog is 600s — 240s abandoned units that were still paid for (#152.1)', () => {
   assert.match(BODY, /perUnitTimeoutMs: 600_000, maxInFlight: Math\.min\(sections\.length, MAX_CONCURRENT\)/);
-  assert.doesNotMatch(BODY, /perUnitTimeoutMs: 240_000/);
+  // Scoped to the SECTION fan-out. A bare /perUnitTimeoutMs: 240_000/ ban was equivalent only while
+  // that literal appeared nowhere else; Task 18's reframe PLANNING stage legitimately uses 240s
+  // (it plans queries, it does not run them), so the global form now bans an unrelated budget.
+  // #152.1 is about this fan-out reverting, and that is what this guard asserts.
+  assert.doesNotMatch(BODY, /perUnitTimeoutMs: 240_000, maxInFlight: Math\.min\(sections\.length/);
 });
 
 test('the section validation budget is 2, read from one named constant', () => {
@@ -175,7 +185,17 @@ test('the closing synthesis is passed HEADING-STRIPPED — the renderer writes t
 // ── Task 8 — L2 section audit ───────────────────────────────────────────────
 
 test('section validation runs L1 before L2 — the free check gates the paid one', () => {
-  const validateBlock = BODY.slice(BODY.indexOf('validate: async (v) => {'), BODY.indexOf('work: async (repair)'));
+  // The end marker is searched FROM the start marker, not from 0. Task 18's reframe units also use
+  // `work: async (repair)` and sit earlier in the file, so an unanchored indexOf resolves the end
+  // BEFORE the start and `slice` silently yields '' — every assertion below would then fail with a
+  // bare -1 and no clue why. Any unit block added above the section fan-out has the same effect.
+  const validateStart = BODY.indexOf('validate: async (v) => {');
+  const validateEnd = BODY.indexOf('work: async (repair)', validateStart);
+  // Both ends asserted before the slice. An unfound end marker is -1, and `slice(start, -1)` does
+  // not mean "not found" — it means "to the second-to-last character", so the block would silently
+  // run to EOF and the ordering check below would still pass while bounding nothing.
+  assert.ok(validateStart !== -1 && validateEnd > validateStart, 'the validate block markers must resolve');
+  const validateBlock = BODY.slice(validateStart, validateEnd);
   const l1 = validateBlock.indexOf('unknownUrls(');
   // The L2 marker is `withWatchdog(`, NOT `await agent(` — the audit call is a thunk passed to the
   // watchdog (`() => agent(`), so no `await agent(` exists here. Asserting on the un-wrapped shape
@@ -187,7 +207,12 @@ test('section validation runs L1 before L2 — the free check gates the paid one
 
 test('repair exhaustion KEEPS the section and records integrity — never drops it (#96)', () => {
   assert.match(BODY, /integrity\.push\(\{ subQuestion: section\.subQuestion/);
-  const validateBlock = BODY.slice(BODY.indexOf('validate: async (v) => {'), BODY.indexOf('work: async (repair)'));
+  // End marker searched from the start marker, and both ends asserted before the slice — see the
+  // note in the L1-before-L2 test above for why an unguarded end marker bounds nothing.
+  const validateStart = BODY.indexOf('validate: async (v) => {');
+  const validateEnd = BODY.indexOf('work: async (repair)', validateStart);
+  assert.ok(validateStart !== -1 && validateEnd > validateStart, 'the validate block markers must resolve');
+  const validateBlock = BODY.slice(validateStart, validateEnd);
   // BOTH validation layers preserve on exhaustion — L1 (stray URL) and L2 (untraceable claim).
   assert.equal((validateBlock.match(/if \(lastAttempt\) \{/g) ?? []).length, 2);
 });
@@ -259,4 +284,289 @@ test('findingsDoc is merged in the workflow, not handed to main context to recon
 
 test('the dossier header is rendered on a FIRST run only, and by code', () => {
   assert.match(BODY, /dossierHeader: input\.priorFindings \? null : renderDossierHeader\(/);
+});
+
+// ── Task 18 — reframe stage ─────────────────────────────────────────────────
+
+test('the reframe stage is skipped when nothing is thin OR when verify degraded', () => {
+  // A degraded verify returns unstamped findings, and reframing on the ABSENCE of a signal is a
+  // different thing from reframing on one. Belt-and-braces: thinSubQuestions already refuses to
+  // classify an unjudged thread as thin, so this guard makes the intent explicit at the call site
+  // rather than leaving it implicit in a helper's filtering. It saves no meaningful work —
+  // thinSubQuestions is a synchronous filter over an in-memory array, not an agent call — so the
+  // value here is clarity, not spend.
+  assert.match(BODY, /const thinQs = verifyDegraded \? \[\] : thinSubQuestions\(subQuestions, vetted\);/);
+  assert.match(BODY, /if \(thinQs\.length\) \{/);
+});
+
+test('reframe stages use quorum: 0 — an optional stage must never degrade the run', () => {
+  // Comment-stripped before counting, for the same reason as the time-source test above: the
+  // stage's own rationale comment spells `quorum: 0` out in prose, so an unstripped count reads 3
+  // and the assertion fails against the only correct implementation. The property under test is
+  // the two CALL SITES, and the rationale comment is load-bearing — the test bends, not the code.
+  const start = BODY.indexOf('const thinQs');
+  const end = BODY.indexOf('reframed = reResearch');
+  // Both ends asserted before the slice. An unfound end marker is -1 and `slice(start, -1)` runs to
+  // EOF−1, which for a COUNT assertion is the worst case: the count happens to be right today, so
+  // the test would keep passing while bounding nothing at all.
+  assert.ok(start !== -1 && end > start, 'the reframe stage markers must resolve');
+  const block = BODY.slice(start, end)
+    .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  assert.equal((block.match(/quorum: 0/g) ?? []).length, 2, 'both the plan and re-research fan-outs');
+});
+
+test('reframe results are reconstructed by KEY, never by position in the compact confirmed array', () => {
+  // PRE-FLIGHTED 2026-08-06. The end marker was originally `'if (reframed.length)'` — which is
+  // TASK 19's code, not Task 18's. Verified: it has ZERO occurrences in the file at Task 18's own
+  // commit point. `indexOf` returns -1, and `slice(start, -1)` does not mean "not found" — it means
+  // "to the second-to-last character", so the block silently expands to the whole rest of the file
+  // and the two `doesNotMatch` guards below stop bounding anything. Failure shape 6: a slice bounded
+  // at one end silently changes meaning. Re-anchored to Task 18's own last line, which also spans
+  // both fan-outs — the two shapes this test asserts.
+  // Comment-stripped: the block's own rule comment cites `thinQs[i]` as the shape to AVOID, which
+  // the guard below then reads as the violation itself. Same trap, same fix as the quorum count.
+  const start = BODY.indexOf('const reframeUnits');
+  const end = BODY.indexOf('reframed = reResearch');
+  // Both ends asserted before the slice, closing the -1 hole the note above describes rather than
+  // only documenting it.
+  assert.ok(start !== -1 && end > start, 'the reframe unit block markers must resolve');
+  const block = BODY.slice(start, end)
+    .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  // parallelFanout's `confirmed` omits abandoned units, so any thinQs[i] / plans[i] lookup
+  // mislabels every neighbour after the first abandon.
+  assert.doesNotMatch(block, /thinQs\[i\]/);
+  assert.doesNotMatch(block, /plans\[i\]/);
+  // The plan unit still carries its OWN key — but the stamp must come AFTER the spread, or it is
+  // not code-owned at all. REFRAME_SCHEMA sets no `additionalProperties: false` and the prompt
+  // prints the sub-question verbatim, so an agent that echoes back a paraphrased `subQuestion`
+  // silently overwrites a stamp placed first; every downstream exact-match on this key then finds
+  // nothing and the re-researched findings are dropped without a signal. Asserted in three parts —
+  // the literal opens with the spread, the code-owned key closes it, and the clobberable order is
+  // banned outright so a revert cannot pass.
+  assert.match(block, /work: async \(repair\) => \(\{ \.\.\.await agent\(/, 'the agent result is spread FIRST');
+  assert.match(block, /\}\), subQuestion: q \}\),/, 'the code-owned key is stamped LAST, so it wins');
+  assert.doesNotMatch(block, /=> \(\{ subQuestion: q,/, 'a stamp before the spread is clobberable by the agent');
+  assert.match(block, /work: async \(repair\) => \(\{ plan,/, 'the re-research carries its own plan');
+});
+
+test('both reframe fan-outs keep their budget AND their caller-controlled maxInFlight', () => {
+  // Same guard shape as the #152.1 section-watchdog test: the timeout and the maxInFlight are
+  // asserted TOGETHER in one pattern. Dropping maxInFlight is the silent failure — parallelFanout
+  // defaults it to 8, so args.cap stops being read and the batch barrier moves back to the 9th
+  // unit with nothing failing. The two budgets are also asymmetric on purpose (planning does no web
+  // work, re-research does), so an edit that flattens them to one number must fail here.
+  assert.match(BODY, /perUnitTimeoutMs: 240_000, maxInFlight: Math\.min\(thinQs\.length, MAX_CONCURRENT\)/,
+    'the planning fan-out: 240s and a cap-derived maxInFlight');
+  assert.match(BODY, /perUnitTimeoutMs: 900_000, maxInFlight: Math\.min\(researchUnits\.length, MAX_CONCURRENT\)/,
+    'the re-research fan-out: 900s, matching the primary web-facing leaves');
+});
+
+test('the reframe agent must diagnose before it selects a move', () => {
+  assert.match(BODY, /STEP 1 — DIAGNOSE/);
+  assert.match(BODY, /STEP 2 — SELECT the single matching move/);
+});
+
+test('the plan validator ENFORCES the diagnosis, it does not only name it in the reason', () => {
+  // Scoped to the reframe unit block: the re-research units below carry a `validate` of their own,
+  // so a whole-BODY assertion could keep passing on the wrong predicate.
+  // REFRAME_SCHEMA lists `diagnosis` under `required`, so this predicate is the SECOND line of
+  // defence — which is precisely why deleting `v?.diagnosis &&` leaves every other test green. It
+  // is kept because the recorded diagnosis is the one observability mitigation the stage's
+  // accepted-risk note names as its own, and because the rejection reason below claims to demand a
+  // diagnosis: a reason must not claim more than its predicate checks.
+  const start = BODY.indexOf('const reframeUnits = thinQs.map(');
+  const end = BODY.indexOf('const reframePlans =');
+  assert.ok(start !== -1 && end > start, 'the reframe unit block markers must resolve');
+  const block = BODY.slice(start, end);
+  assert.match(block, /validate: \(v\) => \(v\?\.diagnosis && v\?\.shift &&/);
+});
+
+test('the PLANNING prompt forbids web work — its 240s budget assumes the stage does none', () => {
+  // Split at the concatenation seams, same as the #152.3 no-publish assertions: the paragraph spans
+  // three template literals (`…not running ` + `them: reason over…` + `else to run.`), so no
+  // contiguous regex can cover it. Bounded to the reframe unit block at both ends so the assertion
+  // stays about THIS prompt.
+  // The planning fan-out is budgeted at 240s because it only plans; the surrounding prompt also
+  // tells the agent to "mine these for terminology", which invites the searching that budget does
+  // not cover. Nothing else in the prompt forbids it, so deleting this paragraph is silent.
+  const start = BODY.indexOf('const reframeUnits = thinQs.map(');
+  const end = BODY.indexOf('const reframePlans =');
+  assert.ok(start !== -1 && end > start, 'the reframe unit block markers must resolve');
+  const block = BODY.slice(start, end);
+  assert.match(block, /Do NOT search the web and do NOT fetch any page\./);
+  assert.match(block, /You are PLANNING queries, not running/);
+  assert.match(block, /them: reason over the thin sources already provided below/);
+});
+
+test('the re-research leaf keeps the anti-memory contract AND the caller-set search budget', () => {
+  // Scope is the whole point here: BOTH strings appear TWICE in BODY, because the primary research
+  // leaf carries them too. A whole-BODY assertion passes on the primary copy regardless of what the
+  // re-research prompt says, so it would lock nothing.
+  // Anti-memory: this stage exists to obtain BETTER SOURCES, and a memory-answered finding arrives
+  // with a plausible-looking URL that can survive the re-verify — success-shaped, but no new source.
+  // Budget: this is the other web-facing fan-out, so a cap that binds the primary leaf and not this
+  // one is not a cap. The conditional is asserted whole, not just the identifier, because the
+  // identifier alone also appears in the destructure and in prose above.
+  const start = BODY.indexOf('const researchUnits = plans.map(');
+  const end = BODY.indexOf('const reResearch = await parallelFanout(');
+  assert.ok(start !== -1 && end > start, 'the re-research unit block markers must resolve');
+  const block = BODY.slice(start, end);
+  assert.match(block, /do NOT answer from memory\. Run ONLY these queries/);
+  assert.match(block, /\(maxSearchesPerLeaf != null \? `Search budget: perform at most \$\{maxSearchesPerLeaf\} WebSearch calls/);
+});
+
+test('the reframe stage runs before the evidence floor, so a rescue is counted', () => {
+  // PRE-FLIGHTED 2026-08-06. Both indices are asserted present BEFORE they are compared. The plan's
+  // form was the bare ordering comparison, which passes vacuously: `indexOf` returns -1 when the
+  // marker is absent, and -1 < anything is true — so it held against the pre-change file, which has
+  // no reframe stage at all. That is the state this test exists to rule out. Same -1 family as the
+  // slice bug pre-flighted in the by-KEY test above; the coverage-gate test guards it the same way.
+  const reframeIdx = BODY.indexOf('const thinQs =');
+  const floorIdx = BODY.indexOf("stoppedAt: 'evidence-floor'");
+  assert.ok(reframeIdx !== -1, 'the reframe stage must exist');
+  assert.ok(floorIdx !== -1, 'the evidence floor must exist');
+  assert.ok(reframeIdx < floorIdx, 'a reframe that rescues a sub-question must be counted by the floor');
+});
+
+// ── Task 19 — re-verify, merge bar, recorded diagnosis ──────────────────────
+
+test('reframed findings are re-verified BEFORE merging — no unverified claim enters the dossier', () => {
+  // PRE-FLIGHTED 2026-08-06 — the `-1` family, FOURTH instance in this slice. Both markers fed an
+  // UNGUARDED `indexOf` into `slice`: a missing end marker yields `slice(start, -1)`, which means
+  // "to the second-to-last character", not "not found", so the block silently expands to EOF and
+  // the ordering check below bounds nothing. Guard before slicing, using the idiom this file
+  // already established.
+  const blockStart = BODY.indexOf('let candidates = [];');
+  const blockEnd = BODY.indexOf('vetted = [...vetted.filter');
+  assert.ok(blockStart !== -1 && blockEnd > blockStart, 're-verify block markers must resolve');
+  // Comment-stripped before the indices are taken, same as the quorum count and the by-KEY test.
+  // Defensive, not load-bearing today: the assertions below search for the CALL forms
+  // (`tieredVerify(`, `mergeReframed(`) while this block's rationale comments write the bare names,
+  // so the strip changes no outcome as the source stands. It exists because those comments already
+  // name both symbols in prose — a future comment that writes one of them with its paren attached
+  // would move an unstripped index onto the EXPLANATION rather than the call.
+  const block = BODY.slice(blockStart, blockEnd)
+    .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const verifyIdx = block.indexOf('await tieredVerify(');
+  const mergeIdx = block.indexOf('mergeReframed(');
+  assert.ok(verifyIdx !== -1 && mergeIdx !== -1);
+  assert.ok(verifyIdx < mergeIdx, 're-verify must precede the merge');
+});
+
+test('the merge/record loop is gated on plans, NOT on reframed — a no-improvement round still records', () => {
+  // `plans` and `reframed` come from independent fan-outs. Re-research validly returning zero
+  // findings is the documented common case, and gating the merge on `reframed.length` would drop
+  // the `improved: false` diagnosis stamp exactly then — the signal slice 4's accepted
+  // measurability risk names as its own mitigation.
+  //
+  // PRE-FLIGHTED 2026-08-06. The original second assertion here was
+  //   assert.doesNotMatch(BODY, /if \(reframed\.length\) \{[\s\S]{0,4000}?mergeReframed\(/);
+  // and it FAILS against this task's own specified code, for two independent reasons:
+  //   1. `if (reframed.length) {` sits 1472 chars above `mergeReframed(` — inside the 4000 window.
+  //      Proximity is not containment; the regex cannot tell "gated by" from "appears before".
+  //   2. The explanatory comment above the merge loop itself contains both `reframed.length` and
+  //      `mergeReframed`, so the task's own comment trips its own test.
+  // Replaced with both-ends-bounded marker slicing, which tests containment directly.
+  const gA = BODY.indexOf('if (reframed.length) {');
+  const gB = BODY.indexOf('if (plans.length) {');
+  assert.ok(gA !== -1 && gB !== -1 && gA < gB, 'the re-verify guard opens before the merge guard');
+
+  // Both regions are comment-stripped. Defensive, not load-bearing today: the negative assertion
+  // forbids the CALL form `mergeReframed(`, and the prose between the two guards writes the bare
+  // name, so the strip changes no outcome as the source stands. It exists because that prose names
+  // the symbol at all — a future comment that writes `mergeReframed(` with its paren would fail an
+  // unstripped check on a wording change rather than a code change.
+  const stripComments = (s) => s.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const verifyOnly = stripComments(BODY.slice(gA, gB));
+  assert.ok(verifyOnly.includes('tieredVerify('), '`reframed.length` gates the re-verify');
+  assert.ok(!verifyOnly.includes('mergeReframed('), 'and never reaches the merge');
+
+  // Containment, not proximity: the reframed guard must CLOSE before the merge guard opens. This is
+  // the mutation the ordering assertions above cannot see — a merge block physically NESTED inside
+  // `if (reframed.length)` while still spelling `if (plans.length)` has identical runtime behaviour
+  // to swapping the guard, and loses the `improved: false` stamp in exactly the case the outcome §
+  // Slice 4 — Accepted Risks names as this stage's only mitigation.
+  //
+  // NOT brace-depth counting: this asserts the PRESENCE of one closing brace in a comment-stripped
+  // two-statement window, never a depth tally, and reads no indentation. Its honest limit is that it
+  // false-PASSES (never false-fails) if a future edit inserts an unrelated braced block in that
+  // window — a strictly better failure profile than depth counting, which false-fails.
+  const candIdx = BODY.indexOf('candidates = reVerified.degraded');
+  assert.ok(candIdx !== -1 && candIdx < gB, 'the candidates assignment must precede the merge guard');
+  assert.ok(stripComments(BODY.slice(candIdx, gB)).includes('}'),
+    'the `reframed.length` guard must close before `if (plans.length)` opens');
+
+  // Same `-1` guard as above — an unguarded end marker would expand this block to EOF and make the
+  // containment check below meaningless.
+  const mergeEnd = BODY.indexOf('vetted = [...vetted.filter');
+  assert.ok(mergeEnd > gB, 'the merge-block end marker must resolve after the guard');
+  const mergeBlock = stripComments(BODY.slice(gB, mergeEnd));
+  assert.ok(mergeBlock.includes('mergeReframed('), 'the merge loop lives inside the plans.length guard');
+});
+
+test('re-verification uses the ORIGINAL sub-question, not the reformulated query (drift check)', () => {
+  assert.match(BODY, /\{ \.\.\.f, subQuestion: _plan\.subQuestion \}/);
+});
+
+test('a degraded re-verify contributes NO candidates — the reframe cannot bypass scrutiny', () => {
+  assert.match(BODY, /reVerified\.degraded \? \[\] : reVerified\.findings/);
+});
+
+test('the diagnosis and the shift are recorded, which is what makes the stage improvable', () => {
+  assert.match(BODY, /diagnosis: plan\.diagnosis, shift: plan\.shift/);
+});
+
+test('vetted is `let` — the reframe merge is the one place it is reassigned', () => {
+  assert.match(BODY, /^let vetted = verifyDegraded \? allFindings : verified\.findings;$/m);
+  assert.equal((BODY.match(/^\s*vetted = /gm) ?? []).length, 1);
+});
+
+test('`_plan` is stripped before the re-verify — the internal carrier never reaches vetted', () => {
+  // `_plan` is a workflow-internal carrier bolted onto each re-researched finding so the plan can be
+  // recovered by KEY rather than by array position. It must not survive the strip: what comes back
+  // becomes `candidates`, then merged `vetted` — which is the verify payload, the Evidence table,
+  // and findings.json on disk. This is exactly the wiring-regression class this file exists to catch.
+  const start = BODY.indexOf('const reVerified = await tieredVerify(');
+  const end = BODY.indexOf('candidates = reVerified.degraded');
+  assert.ok(start !== -1 && end > start, 're-verify call markers must resolve');
+  const stripComments = (s) => s.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const call = stripComments(BODY.slice(start, end));
+  // The rest-destructure is what removes the carrier; `_plan` may then appear ONLY as that binding
+  // and as the source of the original sub-question — never in the object literal being built.
+  assert.match(call, /\(\{ _plan, \.\.\.f \}\)/, 'the rest-destructure is what drops the carrier');
+  assert.equal((call.match(/_plan/g) ?? []).length, 2,
+    '`_plan` appears only as the binding and as `_plan.subQuestion`');
+  // And nothing downstream re-introduces it into the merged set.
+  assert.ok(!stripComments(BODY.slice(end)).includes('_plan'),
+    'no code after the strip may re-introduce the internal carrier');
+});
+
+test('the section prompt payload cannot carry the agent-written `diagnosis` prose', () => {
+  // `sections` is the ONLY value the section-writer and L2 traceability-audit prompts stringify, and
+  // post-merge every finding may carry `reframe: { diagnosis, shift, improved }` — where `diagnosis`
+  // is deliberately unconstrained free text the reframe agent wrote about the PIPELINE. The section
+  // writer is told to use ONLY these findings, so that pipeline-meta prose is permitted material it
+  // can state as a fact about the SUBJECT — and the traceability auditor passes it, because it
+  // genuinely IS in the findings JSON. The projection at this one seam is what prevents that.
+  const start = BODY.indexOf('const sections = [...sectionMap.entries()]');
+  const end = BODY.indexOf('const sectionPrompt =');
+  assert.ok(start !== -1 && end > start, 'the sections construction must resolve');
+  const ctor = BODY.slice(start, end).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  assert.match(ctor, /reframe: \{ improved: f\.reframe\.improved \}/,
+    'the reframe stamp must be projected down to the one code-owned boolean');
+  assert.doesNotMatch(ctor, /\bdiagnosis\b|\bshift\b/,
+    'neither free-text field may be reconstructed onto the prompt payload');
+  // The projection only bounds the prompts if the prompts read the projected value. Both do.
+  assert.ok(BODY.includes('FINDINGS: ${JSON.stringify(section.findings)}'),
+    'the section-writer prompt reads section.findings');
+  assert.ok(BODY.includes('PROSE:\\n${v.markdown}\\n\\nFINDINGS: ${JSON.stringify(section.findings)}'),
+    'the traceability auditor reads section.findings');
+});
+
+test('findings.json and the Evidence table keep the FULL reframe stamp — the projection is prompt-only', () => {
+  // The projection above must not leak into the durable record: `diagnosis` and `shift` are the
+  // recorded-diagnosis signal that makes this stage improvable, and they are written to disk.
+  assert.match(BODY, /findings: vetted, supersedes, integrity/, 'findings.json is built from `vetted`');
+  assert.match(BODY, /findings: sectionMap\.get\(sec\.subQuestion\) \?\? \[\]/,
+    'the Evidence table renders from `sectionMap`, not from the projected `sections`');
 });

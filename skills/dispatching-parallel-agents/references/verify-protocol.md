@@ -46,8 +46,9 @@ Output set after Tier 1 (profile-aware): `supported` findings pass through direc
 `thinSource` is judged on the **source**, not the claim, and independently of `support`. A finding
 can be `supported: true, thinSource: true` — well-argued from a single low-authority page — and
 that combination is precisely the one Tier 1 must not wave through. The flag is carried onto the
-finding so it survives into the consumer's own output; verify is the only stage that re-read the
-sources, so this judgement cannot be reconstructed downstream.
+finding so it survives into the consumer's own output; verify is the only stage that *judges source
+authority*, and a downstream consumer holds the URL but not that judgement, so it cannot be
+reconstructed there.
 
 ---
 
@@ -154,10 +155,20 @@ other reason, and Tiers 2 and 3 can still drop it — Tier 2 on a `keep: false` 
 majority refutation. When that happens the drop is a verdict on the *claim* — Tier 2 by re-reading
 the source, Tier 3 by adversarial reasoning over the recorded finding — not a penalty for thinness.
 
-> **Not implemented.** Routing a thin finding toward *better* evidence — re-researching it against
-> new sources — is a separate stage that does not exist in this engine. Tier 2 re-reads the
-> cluster's **existing** source and never seeks a new one. Here `thin-source` is a scrutiny signal,
-> not a remediation path.
+> **Not in this engine — but a consumer may build it downstream.** Routing a thin finding toward
+> *better* evidence — re-researching it against new sources — is a separate stage that does not
+> exist in this engine. Tier 2 re-reads the cluster's **existing** source and never seeks a new one,
+> so *within verify* `thin-source` remains a scrutiny signal, not a remediation path. Nothing below
+> changes what any tier does.
+>
+> The `librarian` consumer now runs that stage **downstream of verify**. For a sub-question left
+> with no `supported && !thinSource` finding, it diagnoses *why* the evidence is thin, applies the
+> one query shift that matches, re-researches narrowly, and re-verifies the results **against the
+> original sub-question** before merging them — as candidates that must clear
+> `supported && !thinSource`, never as replacements. The thin findings that triggered it are never
+> dropped. Exactly one round, and the stage is skipped entirely when verify degraded (an unstamped
+> finding is the absence of a signal, not a thin one). See
+> [ADR-0012](../../../docs/explanation/adr/0012-remediative-escalation-for-thin-source.md).
 
 ---
 

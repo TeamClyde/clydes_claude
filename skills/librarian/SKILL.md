@@ -80,6 +80,7 @@ Use when the user asks for:
 | `verify.partial` | Verify ran and was used, but some clusters or voter frames were lost. Do not read a thinned verify as a clean one. |
 | `verify.degradedAtTier` | Which tier fell back, when one did. |
 | `fanoutDegraded` | The research fan-out fell below quorum. Distinct from `coverage` — it counts units that RETURNED, not sub-questions ANSWERED. |
+| `findings[].reframe` | The sub-question had no grounded finding, so a diagnose-then-shift reframe ran. `improved: false` means the reframe fired and did **not** find better evidence — report that plainly; it is a real result, not a gap. |
 
 ### `evidenceState`
 
