@@ -502,3 +502,88 @@ test('#118: a re-verified finding reports THIS pass\'s thinSource, not a stale o
   const out = await tieredVerify(stale, { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
   assert.equal(out.findings[0].thinSource, false, 'this pass judged it not-thin — the stale flag must not survive');
 });
+
+// ── Regression: #119 a lost tier unwound every tier that had already succeeded ──────────────────
+// One outer try/catch wrapped the whole of tieredVerify, so any tier failure discarded the completed
+// work of the tiers before it and returned the raw unverified input. Fallback is now scoped to the
+// failing tier and falls back to THAT TIER'S INPUT SET, stamped with `degradedAtTier`.
+
+test('#119: a Tier-1 total failure degrades AT TIER 1 and falls back to the caller input', async () => {
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') throw new Error('boom');
+    return {};
+  };
+  const out = await tieredVerify(F, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.degraded, true);
+  assert.equal(out.degradedAtTier, 'triage');
+  assert.equal(out.findings.length, F.length, 'falls back to THIS tier\'s input, never an empty set');
+});
+
+test('#119: a Tier-3 total failure keeps Tier-1 and Tier-2 work instead of discarding it', async () => {
+  // c escalates as uncertain, survives recheck, then every voter frame fails. Before this change
+  // the tier3-no-frames throw unwound to the outer catch and returned the RAW input — throwing away
+  // the completed triage that had already dropped `b` as unsupported.
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: F.map((f, i) => ({ index: i, support: f._seed })) };
+    if (opts.label?.startsWith('verify:recheck')) return { keep: [{ index: 2, keep: true }] };
+    if (opts.label?.startsWith('verify:consensus')) throw new Error('frame down');
+  };
+  const out = await tieredVerify(F, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.degradedAtTier, 'consensus');
+  const ids = out.findings.map((f) => f.id);
+  assert.ok(ids.includes('a'), 'Tier-1 supported survives');
+  assert.ok(ids.includes('c'), 'the contested tail falls back to its own input set');
+  assert.ok(!ids.includes('b'), 'the Tier-1 unsupported DROP is respected — completed work is kept');
+});
+
+test('#119: a Tier-2 total failure keeps Tier-1 labels and passes the escalation set forward', async () => {
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: F.map((f, i) => ({ index: i, support: f._seed })) };
+    if (opts.label?.startsWith('verify:recheck')) throw new Error('all clusters down');
+    if (opts.label?.startsWith('verify:consensus')) return { votes: F.map((_, i) => ({ index: i, refuted: false })) };
+  };
+  const out = await tieredVerify(F, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  const ids = out.findings.map((f) => f.id);
+  assert.ok(ids.includes('a') && ids.includes('c'));
+  assert.ok(!ids.includes('b'), 'the Tier-1 drop still stands');
+  // Tier 2 losing every cluster is per-cluster containment, already fixed in PR #166 — it reports
+  // partial, not degraded, because Tier 3 still ran over the fallen-back set.
+  assert.equal(out.partial, true);
+  assert.equal(out.recheckCoverage ?? out.counts.recheckCoverage, 0);
+});
+
+test('#119: degradedAtTier is null on a clean run — it is a cause, not a status', async () => {
+  const out = await tieredVerify(F, { profile: 'audit', agent: mkAgent(), perTierTimeoutMs: 1000 });
+  assert.equal(out.degraded, false);
+  assert.equal(out.degradedAtTier, null);
+});
+
+test('#119: the anyJudged empty-triage guard reports its tier too', async () => {
+  const agent = async (prompt, opts) => (opts.label === 'verify:triage' ? { verdicts: [] } : {});
+  const out = await tieredVerify(F, { profile: 'audit', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.degraded, true);
+  assert.equal(out.degradedAtTier, 'triage');
+  assert.equal(out.verifyEmptied, true);
+});
+
+test('#119: a throw in Tier-2 CLUSTERING degrades gracefully — the tier try must cover processing, not just dispatch', async () => {
+  // `clusterBy` is caller-supplied and runs OUTSIDE any allSettled. A restructure that wraps only
+  // the tier's dispatch would let this escape tieredVerify entirely, and NEITHER consumer wraps the
+  // call — an escape crashes the whole workflow run. Containment here is scoped to Tier 2: it falls
+  // back to the tier's own input (the escalation set) and Tier 3 still runs over it, so the run is
+  // `partial`, not `degraded`, and the completed Tier-1 drop of `b` is kept.
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: F.map((f, i) => ({ index: i, support: f._seed })) };
+    return {};
+  };
+  const clusterBy = () => { throw new Error('cluster key exploded'); };
+  const out = await tieredVerify(F, { profile: 'audit', agent, clusterBy, perTierTimeoutMs: 1000 });
+  assert.ok(Array.isArray(out.findings), 'tieredVerify must resolve, never let a clusterBy throw escape');
+  assert.ok(out.findings.length > 0, 'falls back to a real set, never empty');
+  const ids = out.findings.map((f) => f.id);
+  assert.ok(ids.includes('a') && ids.includes('c'), 'Tier-1 supported + the escalation set Tier 2 fell back to');
+  assert.ok(!ids.includes('b'), 'a Tier-2 collapse does not resurrect what Tier 1 already dropped');
+  assert.equal(out.degraded, false, 'Tier 3 still ran over the fallen-back set — partial, not degraded');
+  assert.equal(out.partial, true);
+  assert.equal(out.counts.recheckCoverage, 0, 'no cluster returned a re-check');
+});

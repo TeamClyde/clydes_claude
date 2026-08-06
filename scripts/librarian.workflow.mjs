@@ -423,19 +423,42 @@ function batchRefutePrompt(findings, voter) {
  * @param {Function} opts.agent       - Workflow agent(prompt, opts) => Promise<result>.
  * @param {number}   [opts.perTierTimeoutMs=120_000]
  * @param {Function} [opts.clusterBy] - Custom cluster key fn (f) => string.
- * @returns {Promise<{findings, contested, counts, degraded, partial?, verifyEmptied?}>}
+ * @returns {Promise<{findings, contested, counts, degraded, degradedAtTier, partial?, verifyEmptied?}>}
  *   `degraded` — the verify did not run; treat `findings` as unverified.
+ *   `degradedAtTier` — which tier fell back: 'triage' | 'consensus' | null. A CAUSE, not a status.
  *   `partial`  — the verify ran and its output is usable, but some tier agents were lost, so it
  *                was less adversarial than the protocol promises. Never conflate the two.
  */
 async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_000, clusterBy }) {
+  const prof = VERIFY_PROTOCOL.profiles[profile] ?? VERIFY_PROTOCOL.profiles.audit;
+  const escalateOn = new Set(prof.escalateOn);
+
+  // Stamp global index; all tier logic uses `work`, NOT the caller's `findings`.
+  const work = findings.map((f, i) => ({ ...f, _idx: i }));
+
+  // Fallback rule: on tier failure, fall back to THAT TIER'S INPUT SET — never to an empty set,
+  // and never to the whole run's input. A whole-tier collapse is reserved for a whole-tier failure;
+  // per-unit losses inside a tier are contained by the allSettled handling within each tier.
+  const degradedResult = (tier, set) => ({
+    findings: stripIdx(set),
+    contested: [],
+    counts: { degraded: true },
+    degraded: true,
+    degradedAtTier: tier,
+  });
+
+  // Bindings a later tier or a return reads must outlive the tier that writes them — a single outer
+  // try/catch is exactly what this replaces, so nothing a tier completed may die with that tier.
+  let triageCoverage = 1;
+  const supported   = [];  // Pass-through without re-check
+  const escalation  = [];  // Routed to Tier 2
+  // `unsupported` (when the profile does not escalate it) is the only silent drop.
+
+  // Each tier's try spans its PROCESSING, not just its dispatch. `Promise.allSettled` never rejects,
+  // so a try around a dispatch alone covers almost nothing; the real exposure is the synchronous
+  // work between dispatches (verdict mapping, the escalation loop, the caller-supplied `clusterBy`).
+  // Neither embedded consumer wraps this call, so anything that escapes here crashes the whole run.
   try {
-    const prof = VERIFY_PROTOCOL.profiles[profile] ?? VERIFY_PROTOCOL.profiles.audit;
-    const escalateOn = new Set(prof.escalateOn);
-
-    // Stamp global index; all tier logic uses `work`, NOT the caller's `findings`.
-    const work = findings.map((f, i) => ({ ...f, _idx: i }));
-
     // ── Tier 1: Chunked Triage ───────────────────────────────────────────────
     // One agent per chunk, in parallel. allSettled (not all): chunking multiplies the failure surface,
     // and a failed chunk is survivable — its findings simply arrive unjudged, which now escalates
@@ -460,7 +483,7 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
 
     // What fraction of the input triage actually judged. < 1 means some findings passed through
     // unjudged (a truncating or failed chunk) — the caller must be able to see that.
-    const triageCoverage = work.length ? work.filter((f) => verdictMap.has(f._idx)).length / work.length : 1;
+    triageCoverage = work.length ? work.filter((f) => verdictMap.has(f._idx)).length / work.length : 1;
 
     // Fail loud, never silent. If triage judged NONE of a non-empty input (no verdicts, or verdicts
     // whose indices match no finding), the verify never actually ran — a broken contract (e.g.
@@ -476,14 +499,11 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
         findings:      findings,
         contested:     [],
         counts:        { supported: 0, dropped: work.length, contested: 0, triageCoverage: 0 },
-        degraded:      true,
-        verifyEmptied: true,
+        degraded:       true,
+        degradedAtTier: 'triage',
+        verifyEmptied:  true,
       };
     }
-
-    const supported   = [];  // Pass-through without re-check
-    const escalation  = [];  // Routed to Tier 2
-    // `unsupported` (when the profile does not escalate it) is the only silent drop.
 
     for (const f of work) {
       const v = verdictMap.get(f._idx);
@@ -528,7 +548,18 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
       }
       // unsupported (and not in escalateOn) → dropped.
     }
+  } catch {
+    // Tier 1's input set IS the whole run's input, so this is the one tier whose collapse degrades
+    // everything — not because the fallback is global, but because nothing had completed yet.
+    return degradedResult('triage', work);
+  }
 
+  let contestedTail = []; // Survivors from Tier 2 → routed to Tier 3
+  // Fraction of clusters that actually returned a re-check.
+  let recheckCoverage = 1;
+  let clustersSucceeded = 0;
+
+  try {
     // ── Tier 2: Clustered Adversarial Re-Check ───────────────────────────────
     const keyFn = clusterBy ?? defaultClusterKey;
 
@@ -539,8 +570,6 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
       if (!clusters.has(key)) clusters.set(key, []);
       clusters.get(key).push(f);
     }
-
-    const contestedTail = []; // Survivors from Tier 2 → routed to Tier 3
 
     // Clusters run concurrently — they are independent, and one agent call per cluster is already
     // well inside the runtime concurrency ceiling. (Was a sequential await per cluster: pure wall-clock loss.)
@@ -562,7 +591,6 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
       }),
     );
 
-    let clustersSucceeded = 0;
     for (const [i, settled] of clusterResults.entries()) {
       const members = clusterEntries[i][1];
 
@@ -589,21 +617,34 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
       }
     }
 
-    // Fraction of clusters that actually returned a re-check.
-    const recheckCoverage = clusterEntries.length ? clustersSucceeded / clusterEntries.length : 1;
+    recheckCoverage = clusterEntries.length ? clustersSucceeded / clusterEntries.length : 1;
+  } catch {
+    // A whole-Tier-2 collapse — the caller-supplied `clusterBy` throwing is the realistic case, and
+    // it runs outside any allSettled. Fall back to THIS tier's input set: every escalated finding
+    // goes on to face Tier 3 unre-checked. Not `degraded` — Tier 1's completed labels stand and
+    // Tier 3 still runs; `recheckCoverage: 0` is what tells the caller the re-check never happened.
+    contestedTail     = [...escalation];
+    clustersSucceeded = 0;
+    recheckCoverage   = 0;
+  }
 
-    // ── Tier 3: Minority-Veto 3-Voter Consensus (BATCHED) ────────────────────
-    // One agent per voter frame per chunk — NOT one agent per finding. Frames run concurrently within
-    // a chunk, chunks run in sequence, so at most `voters` (3) agents are in flight here. Cost is
-    // O(3 × chunks) instead of O(3 × findings). The decision rule below is unchanged.
-    const finalSurvivors = [];
-    const contested      = [];
-    const contestedChunks = chunkArr(contestedTail, TRIAGE_CHUNK);
-    const VOTERS  = VERIFY_PROTOCOL.consensus.voters;
-    const SURVIVE = VERIFY_PROTOCOL.consensus.surviveAtLeast;
-    let framesSucceeded = 0;
-    let framesExpected  = 0;
+  // ── Tier 3: Minority-Veto 3-Voter Consensus (BATCHED) ────────────────────
+  // One agent per voter frame per chunk — NOT one agent per finding. Frames run concurrently within
+  // a chunk, chunks run in sequence, so at most `voters` (3) agents are in flight here. Cost is
+  // O(3 × chunks) instead of O(3 × findings). The decision rule below is unchanged.
+  const finalSurvivors = [];
+  const contested      = [];
+  const contestedChunks = chunkArr(contestedTail, TRIAGE_CHUNK);
+  const VOTERS  = VERIFY_PROTOCOL.consensus.voters;
+  const SURVIVE = VERIFY_PROTOCOL.consensus.surviveAtLeast;
+  let framesSucceeded = 0;
+  let framesExpected  = 0;
+  // Every voter frame failing while findings were waiting on them means Tier 3 never ran. Silence
+  // defaults to keeper, so continuing would pass the whole contested set through labelled as
+  // verified. Degrade instead — scoped to this tier, keeping what Tiers 1 and 2 completed.
+  let tier3Failed = false;
 
+  try {
     for (const [chunkIdx, members] of contestedChunks.entries()) {
       const frames = await Promise.allSettled(
         [0, 1, 2].map((v) =>
@@ -669,48 +710,60 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
       }
     }
 
-    // Every voter frame failing while findings were waiting on them means Tier 3 never ran. Silence
-    // defaults to keeper, so continuing would pass the whole contested set through labelled as
-    // verified. Degrade instead.
-    if (contestedChunks.length > 0 && framesSucceeded === 0) throw new Error('tier3-no-frames');
+    if (contestedChunks.length > 0 && framesSucceeded === 0) tier3Failed = true;
+  } catch {
+    tier3Failed = true;
+  }
 
-    // Combine: Tier-1 supported + Tier-3 survivors
-    const survivors = [...supported, ...finalSurvivors];
-
-    // Fraction of Tier-3 voter frames that returned.
-    const consensusCoverage = framesExpected ? framesSucceeded / framesExpected : 1;
-
-    // `partial` is DISTINCT from `degraded` and the difference is load-bearing. `degraded` means the
-    // verify did not run and its findings must be treated as unverified — callers respond by
-    // discarding the verify output wholesale. `partial` means the verify DID run and its output is
-    // usable, but some tier agents were lost, so it was less adversarial than the protocol promises.
-    // Folding this into `degraded` would make one timed-out voter frame throw away an entire
-    // otherwise-good verify pass — a worse outcome than the fail-open it replaces.
-    const partial = recheckCoverage < 1 || consensusCoverage < 1;
-
+  if (tier3Failed) {
+    // Tier 3's input set is the contested tail. Tier-1 `supported` and the Tier-2 keeps are
+    // COMPLETED WORK and are kept — that is the whole of #119: a lost tier must not unwind the
+    // tiers that already succeeded.
     return {
-      findings:  stripIdx(survivors),
-      contested: stripIdx(contested),
+      findings:  stripIdx([...supported, ...contestedTail]),
+      contested: stripIdx(contestedTail),
       counts: {
-        supported:  survivors.length,
-        dropped:    work.length - survivors.length,
-        contested:  contested.length,
+        supported:  supported.length + contestedTail.length,
+        dropped:    work.length - supported.length - contestedTail.length,
+        contested:  contestedTail.length,
         triageCoverage,
         recheckCoverage,
-        consensusCoverage,
+        consensusCoverage: 0,
       },
-      degraded: false,
-      partial,
-    };
-  } catch {
-    // Degraded path: return the caller's ORIGINAL findings (never the _idx-stamped copies).
-    return {
-      findings:  findings,
-      contested: [],
-      counts:    { degraded: true },
-      degraded:  true,
+      degraded:       true,
+      degradedAtTier: 'consensus',
     };
   }
+
+  // Combine: Tier-1 supported + Tier-3 survivors
+  const survivors = [...supported, ...finalSurvivors];
+
+  // Fraction of Tier-3 voter frames that returned.
+  const consensusCoverage = framesExpected ? framesSucceeded / framesExpected : 1;
+
+  // `partial` is DISTINCT from `degraded` and the difference is load-bearing. `degraded` means the
+  // verify did not run and its findings must be treated as unverified — callers respond by
+  // discarding the verify output wholesale. `partial` means the verify DID run and its output is
+  // usable, but some tier agents were lost, so it was less adversarial than the protocol promises.
+  // Folding this into `degraded` would make one timed-out voter frame throw away an entire
+  // otherwise-good verify pass — a worse outcome than the fail-open it replaces.
+  const partial = recheckCoverage < 1 || consensusCoverage < 1;
+
+  return {
+    findings:  stripIdx(survivors),
+    contested: stripIdx(contested),
+    counts: {
+      supported:  survivors.length,
+      dropped:    work.length - survivors.length,
+      contested:  contested.length,
+      triageCoverage,
+      recheckCoverage,
+      consensusCoverage,
+    },
+    degraded: false,
+    degradedAtTier: null,   // a CAUSE, not a status — null means no tier fell back
+    partial,
+  };
 }
 
 // <ENGINE-BUNDLE:end>
