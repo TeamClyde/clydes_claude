@@ -1342,6 +1342,133 @@ const verified = await tieredVerify(allFindings, { profile: 'web-research', agen
 const verifyDegraded = verified.degraded;
 const vetted = verifyDegraded ? allFindings : verified.findings;
 
+// ── Diagnose-then-shift reframe (#118 extension — EXPERIMENTAL) ─────────────
+// Fires only for sub-questions with NO supported non-thin finding. Exactly one round. The trigger
+// comes from verify — an independent adversarial pass — not from a leaf assessing its own work.
+// Independence is the property relied on here, NOT source re-reading: `thinSource` is a Tier-1
+// triage judgement and that prompt says `Do NOT re-research` (lib/verify.mjs:135-137).
+//
+// ACCEPTED RISK (by decision, not oversight): success is not measurable with any instrument this
+// repo has. `thinSource` is an LLM judgment, so the trigger and the success metric come from the
+// same mechanism, and a shift returning different-but-equally-thin sources is indistinguishable
+// from one that failed. The recorded diagnosis below is the partial substitute: the DISTRIBUTION of
+// diagnosed conditions across real runs is observable, and tells us whether the stage fires on
+// conditions it can help.
+const REFRAME_SCHEMA = {
+  type: 'object', required: ['diagnosis', 'shift', 'queries'],
+  properties: {
+    diagnosis: { type: 'string' },
+    shift: { enum: ['vocabulary', 'abstraction', 'entity-anchored', 'evidence-type', 'inversion', 'discipline'] },
+    queries: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+// Skipped entirely when verify degraded. A degraded verify falls back to the RAW findings, which
+// carry no `support` or `thinSource` stamp at all, and reframing on the ABSENCE of a signal is a
+// different thing from reframing on one: verify never judged these sources, so we do not know that
+// they are thin. The trigger requires a verify that actually ran.
+//
+// BELT-AND-BRACES, not the only line of defence. `thinSubQuestions` already refuses to classify an
+// unjudged thread as thin — it filters to findings carrying a real `support` stamp and returns
+// false when none survive — so unstamped findings could not reach the reframe even without this
+// guard. Skipping the stage outright when verify degraded makes that intent explicit at the call
+// site rather than leaving it implicit in a helper's filtering. It saves no meaningful work —
+// `thinSubQuestions` is a synchronous filter over an in-memory array, not an agent call — so the
+// value here is clarity, not spend.
+const thinQs = verifyDegraded ? [] : thinSubQuestions(subQuestions, vetted);
+let reframed = [];
+if (thinQs.length) {
+  phase('Reframe');
+  const moveTable = REFRAME_MOVES.map((m) => `- ${m.key}: WHEN ${m.diagnosis} HOW ${m.instruction}`).join('\n');
+
+  const reframeUnits = thinQs.map((q) => {
+    const thinFindings = vetted.filter((f) => f.subQuestion === q);
+    return {
+      // `diagnosis` is checked, not just named in the reason string. The schema requires it, but the
+      // recorded diagnosis is the ONE mitigation the accepted-measurability-risk note above names as
+      // this stage's own — a plan that arrives without one reaches the merge as `undefined` and the
+      // mitigation silently evaporates. A rejection reason must not claim more than its predicate.
+      // The enum is deliberately NOT re-checked here: `mergeReframed` already normalizes `shift`
+      // against the closed set it owns, so duplicating that check would give it two homes.
+      validate: (v) => (v?.diagnosis && v?.shift && Array.isArray(v?.queries) && v.queries.length > 0 && v.queries.length <= 3)
+        ? { ok: true }
+        : { ok: false, reason: 'need a diagnosis, one shift from the enum, and 1-3 reformulated queries' },
+      // `work` stamps the sub-question onto its OWN result. parallelFanout's `confirmed` is a
+      // COMPACT array — abandoned units are absent, not null — so a positional thinQs[i] lookup
+      // would silently mislabel every plan after the first abandon. Reconstruct by KEY, never by
+      // position; this is the same rule the section fan-out already follows.
+      //
+      // The stamp comes LAST, after the spread — the code-owned key must win. REFRAME_SCHEMA does
+      // not set `additionalProperties: false` and the prompt prints the sub-question verbatim, so
+      // an agent that echoes back a paraphrased `subQuestion` would clobber a stamp placed first.
+      // Downstream matches this key EXACTLY; a paraphrase matches nothing and the re-researched
+      // findings are dropped in silence. Same invariant as `mergeReframed`: an agent never types a
+      // flag the code owns.
+      work: async (repair) => ({ ...await agent(
+        `Research on this sub-question produced only THIN evidence: no well-supported, ` +
+        `non-low-authority source. Your job is to work out WHY, then pick the ONE move that ` +
+        `matches — not to reformulate reflexively.\n\n` +
+        `STEP 1 — DIAGNOSE. State in one sentence why the evidence is thin.\n` +
+        `STEP 2 — SELECT the single matching move:\n${moveTable}\n\n` +
+        `STEP 3 — Write 1-3 reformulated queries applying ONLY that move.\n\n` +
+        // The 240s budget below assumes this stage does no web work. Nothing in the steps above
+        // forbids it, and "mine these for terminology" invites it — so say it, the same way the
+        // section-writer prompt spells out its own no-new-research constraint.
+        `Do NOT search the web and do NOT fetch any page. You are PLANNING queries, not running ` +
+        `them: reason over the thin sources already provided below and return queries for someone ` +
+        `else to run.\n` +
+        // The anchor. The failure mode of reformulation is drifting to an adjacent, easier
+        // question — which the mechanical checks in Task 19 enforce, but state it here too.
+        `Every query must still serve the ORIGINAL sub-question verbatim below. A query that ` +
+        `answers something adjacent and easier is DRIFT and will be rejected downstream.\n` +
+        `ORIGINAL SUB-QUESTION: ${q}\n` +
+        `THIN SOURCES FOUND (mine these for terminology — they are weak, not useless): ` +
+        `${JSON.stringify(thinFindings.map((f) => ({ source: f.source, claim: f.claim })))}\n` +
+        (repair ? `PREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.\n` : ''),
+        { label: `reframe:${q.slice(0, 40)}`, phase: 'Reframe', schema: REFRAME_SCHEMA, model: 'claude-sonnet-4-6' }), subQuestion: q }),
+    };
+  });
+
+  // 240s: this stage plans queries, it does not run them. The re-research below carries the
+  // web-facing budget.
+  //
+  // quorum: 0 — this stage is OPTIONAL, so no number of successes is *required*. Note this does
+  // NOT suppress the returned `degraded` flag: dispatch.mjs:61-62 special-cases quorum 0 so that
+  // any abandon still sets degraded, and dispatch.test.mjs locks that in ("zero-quorum does not
+  // mask abandons"). We simply never READ `.degraded` from either reframe fan-out — the run's
+  // trust signals come from `coverage` and `evidenceState`, and a failed reframe must leave the
+  // run intact with its thin findings. Do not later wire these `.degraded` values into a caller
+  // signal expecting quorum 0 to mean "abandons are fine".
+  const reframePlans = await parallelFanout(reframeUnits, { perUnitTimeoutMs: 240_000, maxInFlight: Math.min(thinQs.length, MAX_CONCURRENT), modelTier: 'sonnet', quorum: 0 });
+  const plans = reframePlans.confirmed;   // each already carries its own subQuestion
+
+  // ── Narrow re-research: one leaf per plan, running ONLY that plan's queries ──
+  const researchUnits = plans.map((plan) => ({
+    validate: (v) => (v && Array.isArray(v.findings)) ? { ok: true } : { ok: false, reason: 'need { findings: [...] } (an empty array is a valid answer)' },
+    // Same compact-array rule: carry the plan on the result rather than re-deriving it by position.
+    work: async (repair) => ({ plan, findings: (await agent(
+      // The anti-memory contract, carried over from the primary research leaf verbatim in intent.
+      // This stage exists to obtain BETTER SOURCES; a memory-answered finding arrives with a
+      // plausible-looking URL, survives the re-verify, and can be stamped `supported` — defeating
+      // the whole stage while looking like success. The search budget is honoured here too, in the
+      // same conditional form as the primary leaf: this is the other web-facing fan-out, so a
+      // caller's cap that binds one and not the other is not a cap.
+      `You are a research analyst running a NARROW follow-up. Investigate by SEARCHING THE WEB — ` +
+      `do NOT answer from memory. Run ONLY these queries and report ` +
+      `what you find:\n${plan.queries.map((s) => `- ${s}`).join('\n')}\n\n` +
+      (maxSearchesPerLeaf != null ? `Search budget: perform at most ${maxSearchesPerLeaf} WebSearch calls, then synthesize from what you have found.\n` : '') +
+      `Set "subQuestion" on EVERY finding to exactly: ${plan.subQuestion}\n` +
+      `Set "source" to the URL the claim came from. Prefer primary and authoritative sources. ` +
+      `If these queries surface nothing better than what we already had, return an EMPTY findings ` +
+      `array — that is a valid and useful answer, not a failure.\n` +
+      (repair ? `PREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.\n` : ''),
+      { label: `reresearch:${plan.subQuestion.slice(0, 40)}`, phase: 'Reframe', schema: FINDINGS, model: LEAF_MODEL }))?.findings ?? [] }),
+  }));
+
+  const reResearch = await parallelFanout(researchUnits, { perUnitTimeoutMs: 900_000, maxInFlight: Math.min(researchUnits.length, MAX_CONCURRENT), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet', quorum: 0 });
+  reframed = reResearch.confirmed.flatMap((r) => r.findings.map((f) => ({ ...f, _plan: r.plan })));
+}
+
 // ── Evidence floor (#96, #80) — backstop ────────────────────────────────────
 // Never enter the synthesis path over an empty vetted set. This should be unreachable when the
 // coverage gate above works; it exists because it is free and because #96 proves the failure is
