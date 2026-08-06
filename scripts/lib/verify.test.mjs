@@ -490,3 +490,15 @@ test('a degraded verify returns the caller findings UNSTAMPED — no label is ho
   assert.equal(out.degraded, true);
   assert.equal(out.findings[0].support, undefined, 'verify did not run, so there IS no label');
 });
+
+test('#118: a re-verified finding reports THIS pass\'s thinSource, not a stale one', async () => {
+  // A finding arriving with thinSource:true from an earlier verify pass, judged not-thin now.
+  // The guarded form of this stamp preserved the stale `true`; the unconditional form does not.
+  const stale = [{ id: 'stale', source: 'https://arxiv.org/abs/2', claim: 'now well-sourced', thinSource: true }];
+  const agent = async (prompt, opts) => {
+    if (opts.label === 'verify:triage') return { verdicts: [{ index: 0, support: 'supported', thinSource: false }] };
+    return {};
+  };
+  const out = await tieredVerify(stale, { profile: 'web-research', agent, perTierTimeoutMs: 1000 });
+  assert.equal(out.findings[0].thinSource, false, 'this pass judged it not-thin — the stale flag must not survive');
+});

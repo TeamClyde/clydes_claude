@@ -244,6 +244,10 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
       // blank Support cell, which a reader parses as "no concern found" — the opposite of "this
       // claim was never judged". Only Tier 1 assigns labels, so a finding that survives Tiers 2/3
       // unjudged genuinely has no label, and saying so is the honest rendering.
+      //
+      // `thinSource` is deliberately NOT stamped here. Triage returned no verdict at all, so there
+      // is no thin-source judgement to record either — and claiming `false` would assert a
+      // judgement that was never made. An absent value renders identically to `false` downstream.
       if (!v) { f.support = 'unjudged'; escalation.push(f); continue; }
 
       const label   = v.support;       // 'supported' | 'uncertain' | 'unsupported'
@@ -262,9 +266,12 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
       // downstream. `label` was previously read into a local and thrown away, which left every
       // surviving finding with no `support` field at all — the consumer's Support column would
       // render `unlabelled` for every row, voiding the trust contract the column exists to carry.
-      f.support = label;
-      if (thin) f.thinSource = true;
-      else if (f.thinSource === undefined) f.thinSource = false;
+      //
+      // Both stamps are unconditional overwrites — this round's judgement, not a merge with
+      // whatever the finding arrived carrying. A finding re-verified in a later pass (slice 4's
+      // reframe re-verify) must report THIS pass's verdict, not a stale one.
+      f.support    = label;
+      f.thinSource = thin;
 
       if (labelEscalates || disagreeEscalates || thinEscalates) {
         escalation.push(f);
