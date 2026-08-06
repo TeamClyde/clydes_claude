@@ -54,15 +54,29 @@ test('the evidence floor runs after verify and before the synthesis phase', () =
 });
 
 test('every exit path reports evidenceState — trust signals are never omitted on the sad path', () => {
-  // `^ {0,2}return \{` not `^\s*return \{`: the two gate returns sit inside `if` blocks (2-space
-  // indent) and the success return sits at column zero, so anchoring at 0-2 leading spaces catches
-  // exactly those three. A bare `\s*` anchor also catches the `return {` control-flow statements
-  // inside sectionUnits' nested `validate` (Task 4, indented 4-6 spaces) — those are parallelFanout
-  // validation signals, not workflow exit paths, and were never meant to carry evidenceState.
-  const returns = BODY.match(/^ {0,2}return \{/gm) ?? [];
-  const states = BODY.match(/evidenceState/g) ?? [];
-  assert.ok(returns.length >= 3, 'expect the two gate returns plus the success return');
-  assert.ok(states.length >= returns.length, 'each return must carry an evidenceState');
+  // Excise the sectionUnits block first: its `validate` returns are validation CONTROL FLOW, not
+  // exit paths, and counting them compares unrelated things. Marker-slicing rather than an
+  // indent-depth regex — indentation is a layout accident, so extracting `validate` to a top-level
+  // function, or nesting a real exit path one level deeper, would silently reclassify returns with
+  // no test signal. This file already uses the marker-slice technique for sectionPromptBlock.
+  const unitsStart = BODY.indexOf('const sectionUnits = sections.map(');
+  const unitsEnd = BODY.indexOf('const sectionReview =');
+  assert.ok(unitsStart !== -1 && unitsEnd > unitsStart, 'sectionUnits block markers must resolve');
+  const EXIT_SCOPE = BODY.slice(0, unitsStart) + BODY.slice(unitsEnd);
+
+  const exits = EXIT_SCOPE.split(/^\s*return \{/m).slice(1);
+  assert.equal(exits.length, 3, 'two gate returns plus the success return');
+
+  // Per-return, NOT a bulk count. The previous `states.length >= returns.length` form had slack —
+  // the success path mentions evidenceState twice (the const, then the shorthand) — so a fourth
+  // exit path carrying NO evidenceState still passed. That was proven by construction in review,
+  // and it is the exact hole this assertion exists to close: #96 is a sad path that failed to
+  // report why. The 300-char window is ~3x the measured worst case (evidenceState lands at offset
+  // 41-100 in all three returns, since it is an early field) and is bounded deliberately, so a
+  // mention far downstream cannot satisfy a return that omits it.
+  for (const [i, chunk] of exits.entries()) {
+    assert.match(chunk.slice(0, 300), /evidenceState/, `exit path ${i + 1} omits evidenceState`);
+  }
 });
 
 test('args.now is the only time source — Date.now() throws in the Workflow sandbox', () => {
