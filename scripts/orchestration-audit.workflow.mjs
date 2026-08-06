@@ -948,4 +948,4 @@ const report = await agent(
   { label: 'synthesize', phase: 'Synthesize' },
 );
 
-return { report, confirmedCount: confirmedFindings.length, finderClassified: finderClass.length, verifyDegraded: verified.degraded, raw: { confirmedFindings, finderClass } };
+return { report, confirmedCount: confirmedFindings.length, finderClassified: finderClass.length, verifyDegraded: verified.degraded, verifyDegradedAtTier: verified.degradedAtTier ?? null, raw: { confirmedFindings, finderClass } };
