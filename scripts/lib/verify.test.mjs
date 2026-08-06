@@ -536,7 +536,11 @@ test('#119: a Tier-3 total failure keeps Tier-1 and Tier-2 work instead of disca
   assert.ok(!ids.includes('b'), 'the Tier-1 unsupported DROP is respected — completed work is kept');
 });
 
-test('#119: a Tier-2 total failure keeps Tier-1 labels and passes the escalation set forward', async () => {
+test('a Tier-2 total cluster loss reports partial, not degraded — PR #166 per-cluster containment guard', async () => {
+  // NOT a #119 test. Every cluster's agent call throwing is absorbed per-cluster by the pre-existing
+  // allSettled handling and never reaches Tier 2's catch. This guards PR #166's containment against
+  // being narrowed by a later restructure; `#119: a throw in Tier-2 CLUSTERING ...` is the test that
+  // actually exercises the per-tier catch.
   const agent = async (prompt, opts) => {
     if (opts.label === 'verify:triage') return { verdicts: F.map((f, i) => ({ index: i, support: f._seed })) };
     if (opts.label?.startsWith('verify:recheck')) throw new Error('all clusters down');
@@ -546,8 +550,7 @@ test('#119: a Tier-2 total failure keeps Tier-1 labels and passes the escalation
   const ids = out.findings.map((f) => f.id);
   assert.ok(ids.includes('a') && ids.includes('c'));
   assert.ok(!ids.includes('b'), 'the Tier-1 drop still stands');
-  // Tier 2 losing every cluster is per-cluster containment, already fixed in PR #166 — it reports
-  // partial, not degraded, because Tier 3 still ran over the fallen-back set.
+  // Partial, not degraded — Tier 3 still ran over the set each failed cluster fell back to.
   assert.equal(out.partial, true);
   assert.equal(out.recheckCoverage ?? out.counts.recheckCoverage, 0);
 });
@@ -586,4 +589,12 @@ test('#119: a throw in Tier-2 CLUSTERING degrades gracefully — the tier try mu
   assert.equal(out.degraded, false, 'Tier 3 still ran over the fallen-back set — partial, not degraded');
   assert.equal(out.partial, true);
   assert.equal(out.counts.recheckCoverage, 0, 'no cluster returned a re-check');
+});
+
+test('#119: a non-array input degrades instead of rejecting — nothing escapes tieredVerify', async () => {
+  // The prologue (`findings.map`) belongs to no tier, so per-tier scoping left it unguarded.
+  // Neither consumer wraps this call, so a rejection here crashes the whole workflow run.
+  const out = await tieredVerify(undefined, { profile: 'audit', agent: mkAgent(), perTierTimeoutMs: 1000 });
+  assert.ok(Array.isArray(out.findings), 'must resolve with a usable shape, never reject');
+  assert.equal(out.findings.length, 0);
 });

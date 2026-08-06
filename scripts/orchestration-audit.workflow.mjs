@@ -438,8 +438,14 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
   const prof = VERIFY_PROTOCOL.profiles[profile] ?? VERIFY_PROTOCOL.profiles.audit;
   const escalateOn = new Set(prof.escalateOn);
 
-  // Stamp global index; all tier logic uses `work`, NOT the caller's `findings`.
-  const work = findings.map((f, i) => ({ ...f, _idx: i }));
+  // `findings.map` used to sit inside the function-wide try. With per-tier scoping no tier OWNS the
+  // prologue, so guard it explicitly: a non-array input must not reject out of tieredVerify. Neither
+  // consumer wraps this call, so a rejection here crashes the whole run rather than degrading it.
+  // An empty input is not a degrade — nothing failed, so it honestly verifies to an empty set.
+  const input = Array.isArray(findings) ? findings : [];
+
+  // Stamp global index; all tier logic uses `work`, NOT the caller's `input`.
+  const work = input.map((f, i) => ({ ...f, _idx: i }));
 
   // Fallback rule: on tier failure, fall back to THAT TIER'S INPUT SET — never to an empty set,
   // and never to the whole run's input. A whole-tier collapse is reserved for a whole-tier failure;
@@ -501,7 +507,7 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
     const anyJudged = work.some((f) => verdictMap.has(f._idx));
     if (!anyJudged && work.length > 0) {
       return {
-        findings:      findings,
+        findings:      input,
         contested:     [],
         counts:        { supported: 0, dropped: work.length, contested: 0, triageCoverage: 0 },
         degraded:       true,
