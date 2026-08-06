@@ -1324,6 +1324,42 @@ const missingSections = sections.filter((sec) => !sectionByQ.has(sec.subQuestion
 // told which parts of their brief the report does not answer.
 const missingSubQuestions = subQuestions.filter((q) => !sectionByQ.has(q));
 
+// ── Supersession pass — runs ONLY when this is a follow-up on an existing topic ──
+// dossier.md is append-only, so a later run cannot edit a prior narrative entry. Supersession is
+// therefore recorded as DATA: this pass names which prior claims this run replaces and why, and
+// mergeFindingsDoc stamps them onto the prior records without deleting anything.
+const SUPERSEDE_SCHEMA = {
+  type: 'object', required: ['supersedes'],
+  properties: {
+    supersedes: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['priorRunDate', 'claim', 'reason'],
+        properties: { priorRunDate: { type: 'string' }, claim: { type: 'string' }, reason: { type: 'string' } },
+      },
+    },
+  },
+};
+
+let supersedes = [];
+const priorFindings = Array.isArray(input.priorFindings?.findings) ? input.priorFindings.findings : [];
+if (priorFindings.length) {
+  // Compare CLAIMS to CLAIMS, never prose to prose. Both sides are bounded lists, so this stage's
+  // input does not grow with dossier length.
+  const priorDigest = priorFindings
+    .filter((f) => !f.supersededBy)   // an already-superseded claim cannot be superseded again
+    .map((f) => ({ runDate: f.runDate, claim: f.claim }));
+  const nowDigest = vetted.map((f) => f.claim).filter(Boolean);
+  const sup = await agent(
+    `Prior research on this topic recorded the claims in PRIOR. New research just produced NEW. ` +
+    `Identify ONLY the prior claims that the new findings make OUT OF DATE OR WRONG — a claim the ` +
+    `new work supersedes, not one it merely restates or elaborates. Copy each prior claim and its ` +
+    `runDate EXACTLY as given. If nothing is superseded, return an empty array. Terse.\n\n` +
+    `PRIOR: ${JSON.stringify(priorDigest)}\n\nNEW: ${JSON.stringify(nowDigest)}`,
+    { label: 'synth:supersede', phase: 'Synthesize', schema: SUPERSEDE_SCHEMA, model: 'claude-sonnet-4-6' });
+  supersedes = sup?.supersedes ?? [];
+}
+
 // ── Code assembly (#152.2) — the stitcher is DELETED ────────────────────────
 // Concatenation cannot truncate, cannot start mid-sentence, and cannot compress. Wholeness becomes
 // a structural property instead of a hoped-for one. This is the lever on #96 and #152: not "add a

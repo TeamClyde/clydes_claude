@@ -207,3 +207,20 @@ test('the auditor judges traceability only — never truth, never new research',
   // bounded gap keeps the assertion about the instruction rather than about the line width.
   assert.match(BODY, /do NOT judge whether[\s\S]{0,40}a claim is TRUE in the world/);
 });
+
+// ── Task 9 — supersession pass ──────────────────────────────────────────────
+
+test('the supersession pass is skipped entirely on a new topic', () => {
+  assert.match(BODY, /if \(priorFindings\.length\) \{/);
+  assert.match(BODY, /let supersedes = \[\];/);
+});
+
+test('supersession compares claims to claims, so its input does not grow with dossier length', () => {
+  const block = BODY.slice(BODY.indexOf('const priorDigest'), BODY.indexOf("label: 'synth:supersede'"));
+  assert.match(block, /\.map\(\(f\) => \(\{ runDate: f\.runDate, claim: f\.claim \}\)\)/);
+  assert.doesNotMatch(block, /markdown/);
+});
+
+test('an already-superseded claim cannot be superseded twice', () => {
+  assert.match(BODY, /\.filter\(\(f\) => !f\.supersededBy\)/);
+});
