@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { buildBundle } from './build-engine-bundle.mjs';
+import { buildExtras, EXTRAS } from './build-engine-bundle.mjs';
 
 test('bundle has no import/export and exposes a working parallelFanout', async () => {
   const block = await buildBundle();            // returns the inlinable source string
@@ -31,4 +34,26 @@ test('bundle exposes a working tieredVerify with VERIFY_PROTOCOL', async () => {
   );
   assert.equal(out.findings.length, 1);
   assert.equal(out.degraded, false);
+});
+
+test('librarian extras block is import/export-free and exposes the core helpers', async () => {
+  const block = await buildExtras('./librarian.workflow.mjs');
+  assert.ok(block, 'librarian.workflow.mjs must have an extras block');
+  assert.ok(!/^\s*import\s/m.test(block), 'extras block must contain no import statement');
+  assert.ok(!/^\s*export\s/m.test(block), 'extras block must contain no export statement');
+  const fn = new Function(`${block}\n return { assessCoverage, deriveEvidenceState, unknownUrls };`);
+  const { assessCoverage } = fn();
+  assert.equal(assessCoverage(['a', 'b'], [{ subQuestion: 'a' }]).ok, false);
+});
+
+test('orchestration-audit has NO extras block — librarian helpers stay out of it', async () => {
+  assert.equal(await buildExtras('./orchestration-audit.workflow.mjs'), null);
+});
+
+test('every EXTRAS target carries its marker pair (a missing pair would silently skip injection)', () => {
+  for (const [target, spec] of Object.entries(EXTRAS)) {
+    const src = readFileSync(fileURLToPath(new URL(target, import.meta.url)), 'utf8');
+    assert.ok(src.includes(`// <${spec.name}:start>`), `${target} missing <${spec.name}:start>`);
+    assert.ok(src.includes(`// <${spec.name}:end>`), `${target} missing <${spec.name}:end>`);
+  }
 });
