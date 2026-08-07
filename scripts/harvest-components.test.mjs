@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, join, isAbsolute } from 'node:path'
-import { harvest, buildGateMap } from './harvest-components.mjs'
+import { execFileSync } from 'node:child_process'
+import { harvest, buildGateMap, committedCandidateCounts } from './harvest-components.mjs'
 import { resolvedNames } from './lib/component-refs.mjs'
 
 // Repo root resolved the portable way (matches existing .claude/hooks/*.mjs).
@@ -133,4 +134,32 @@ test('tokenizer reproduces the legacy edge set for every component (equivalence)
     for (const n of modern) if (!legacy.has(n)) divergences.push(`${c.type}:${c.name} -> ${n} (tokenizer only)`)
   }
   assert.deepEqual(divergences, [], `edge extraction diverged:\n${divergences.join('\n')}`)
+})
+
+test('every committed skill directory yields a component', async () => {
+  const inv = await harvest({ repoRoot: REPO_ROOT })
+  const found = new Set(inv.filter(c => c.type === 'skill').map(c => c.file.split('/')[1]))
+
+  // Committed state, not readdir: skills/git-manager-workspace/ is gitignored and
+  // does not exist in a CI checkout, so a working-tree scan would go red here and
+  // green in CI -- the inverse of what an enforced invariant is for.
+  const committed = new Set(
+    execFileSync('git', ['ls-files', '-z', 'skills/'], { cwd: REPO_ROOT, encoding: 'utf8' })
+      .split('\0').filter(Boolean)
+      .map(p => p.split('/')[1])
+      .filter(Boolean),
+  )
+
+  const dropped = [...committed].filter(d => !found.has(d)).sort()
+  assert.deepEqual(dropped, [], `committed skill director(ies) produced no component: ${dropped.join(', ')} — a missing SKILL.md drops a skill from the inventory silently, and every citation to it then reads as a dead reference`)
+})
+
+test('per-root candidate counts match harvested node counts', async () => {
+  const inv = await harvest({ repoRoot: REPO_ROOT })
+  const counts = await committedCandidateCounts(REPO_ROOT)
+  for (const type of ['skill', 'agent', 'rule', 'hook']) {
+    const nodes = inv.filter(c => c.type === type).length
+    assert.equal(nodes, counts[type],
+      `${type}: ${nodes} node(s) from ${counts[type]} committed candidate(s) — a mismatch means the scanner dropped a file`)
+  }
 })
