@@ -12,7 +12,7 @@ The methodological prefix is auto-prepended by `.claude/hooks/preToolUse/subagen
 
 ```
 Agent dispatch:
-  subagent_type: <code-reviewer agent>
+  subagent_type: general-purpose
   prompt: |
     [role: code-quality-reviewer]
 
@@ -32,7 +32,7 @@ Agent dispatch:
 - Report Format (Strengths / Issues / Assessment)
 
 **Variable suffix authoring rules:**
-- First non-empty line MUST be the marker `[role: code-quality-reviewer]`. Anything before the marker (including the legacy `Task tool (superpowers:code-reviewer):` directive, if used) blocks the hook from firing.
+- First non-empty line MUST be the marker `[role: code-quality-reviewer]`. Anything before the marker (including a legacy plugin-namespaced dispatch directive, if used) blocks the hook from firing.
 - The `Use template at requesting-code-review/code-reviewer.md` reference goes INSIDE the prompt (after the marker) as a directive to the subagent, not before the marker as a meta-comment.
 - Only the per-task SHA range and task identifier go in the suffix below the template reference.
 - The `ACTIVE_STACK_HATS:` line lists the repo's active hats (resolved by the orchestrator from `project.json` `stacks` + `~/.claude/stacks/<name>.md` `## Hat`). The reviewer flags any code that violates an active hat's best-practice as an Issue. Omit the line if no stacks are declared. See `rules/stack-hats.md`.

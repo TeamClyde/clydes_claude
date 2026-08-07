@@ -12,7 +12,7 @@ allowed-tools: Agent, Read
 
 Agents are dispatched as autonomous workers — not loaded as context. Testing means invoking the agent without a system prompt first, documenting what breaks, then writing the system prompt to address those specific failures.
 
-**REQUIRED BACKGROUND:** You MUST understand `superpowers:test-driven-development` before using this skill. This skill adapts TDD specifically to agent creation.
+**REQUIRED BACKGROUND:** You MUST understand `test-driven-development` before using this skill. This skill adapts TDD specifically to agent creation.
 
 **REQUIRED BACKGROUND:** Read `creating-tools/frontmatter-reference.md` for the verified field
 inventory covering both agents and skills. Agent and skill frontmatter use different key names

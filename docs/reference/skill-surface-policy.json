@@ -86,5 +86,49 @@
     ],
     "totalDescriptionChars": 13000,
     "perSkillMaxChars": 1536
+  },
+
+  "references": {
+    "$comment": [
+      "Resolution set and exemptions for scripts/reference-integrity.test.mjs.",
+      "",
+      "Every entry is keyed by the thing being exempted and valued by the REASON it is",
+      "exempt. A missing or empty reason fails the schema check in skill-surface.test.mjs.",
+      "That requirement is the whole mechanism preventing this block from becoming the new",
+      "place dead references hide.",
+      "",
+      "Resolution happens against COMMITTED STATE ONLY. CI runners are stock ubuntu/windows",
+      "images with no ~/.claude directory, so anything resolved by probing the local",
+      "filesystem is invisible to the gate that is supposed to enforce it. A machine-local",
+      "skill must be DECLARED here to be citable -- the same principle as plugins.expected."
+    ],
+    "localOnlySkills": {
+      "pulser": "Machine-local skill, not in this repo; cited by name in skills/adherence-audit/SKILL.md, which would otherwise fail its own audit.",
+      "write-article": "Machine-local skill belonging to the content-engine repo; cited here but never resolvable from this checkout."
+    },
+    "knownNamespaces": {
+      "$comment": [
+        "Namespaces that ARE component namespaces but are not covered by plugins.expected,",
+        "plugins.removed, or the local skill set. A `ns:name` pair counts as a CITATION only",
+        "if `ns` appears in the union of those four sets; anything else is prose that happens",
+        "to contain a colon (file:line, node:test, type:feat, justify-content:center).",
+        "",
+        "This list is POSITIVE by design. The inverse -- 'ns is not a known skill or plugin,",
+        "therefore dead' -- is not provable: measured over this corpus it yields 48 findings",
+        "of which 17 are real. A positive declaration is diffable and cannot silently widen."
+      ],
+      "elements-of-style": "Permanently declared dead. Never a local skill and never in plugins.expected or plugins.removed, so any `elements-of-style:` citation resolves to nothing. The one occurrence (skills/brainstorming/SKILL.md:295) is removed in the same slice that adds this entry; the entry STAYS afterwards as a recurrence guard, exactly as plugins.removed guards a deleted plugin. Do not delete it when the citation goes -- that would let the reference silently return."
+    },
+    "platformAgentTypes": {
+      "general-purpose": "Platform-provided agent type, not a repo component. The correct subagent_type for the code-quality review lens.",
+      "Explore": "Platform-provided read-only search agent type.",
+      "Plan": "Platform-provided planning agent type.",
+      "claude": "Platform-provided catch-all agent type.",
+      "statusline-setup": "Platform-provided agent type for status-line configuration."
+    },
+    "historicalLedgers": {
+      "plugins/registry.md": "Removal ledger -- its purpose is to name removed plugins, so its citations must stay dead. Outside the slice-1 corpus (skills/, agents/, rules/); declared now because slice 3's corpus-wide entry point brings it into scope.",
+      "plugins/history.md": "Append-only state-transition log; same reason as registry.md."
+    }
   }
 }

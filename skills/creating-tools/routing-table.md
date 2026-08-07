@@ -34,7 +34,7 @@ local reference first and the route second.
 Pulser eval phase (Phase 3). Structural conventions are owned locally in
 `creating-tools/frontmatter-reference.md`.
 
-**`writing-skills` is the full-cycle entry point for skills.** It includes the Pulser eval phase (Phase 3). Do not route to `plugin-dev:skill-development` — `rules/plugin-lifecycle.md` forbids invoking it, and `writing-skills` does not depend on it. Structural conventions are owned locally in `creating-tools/frontmatter-reference.md`.
+**`writing-skills` is the full-cycle entry point for skills.** It includes the Pulser eval phase (Phase 3). Structural conventions are owned locally in `creating-tools/frontmatter-reference.md`.
 
 **`writing-agents` is the full-cycle entry point for agents.** Structural guidance is owned locally in `creating-tools/frontmatter-reference.md`, never delegated. The reference covers agents and skills side by side, because the differences between the two surfaces are what authors get wrong.
 

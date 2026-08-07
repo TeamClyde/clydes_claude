@@ -1,7 +1,9 @@
 import { readdir, writeFile, mkdir } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { join, dirname, resolve, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseFrontmatter, firstHeading, firstParagraph } from './lib/frontmatter.mjs'
+import { resolvedNames } from './lib/component-refs.mjs'
 
 async function listDir(dir) {
   try { return await readdir(dir, { withFileTypes: true }) }
@@ -86,15 +88,19 @@ export async function harvest({ repoRoot }) {
 
 export function buildGateMap(inventory) {
   const names = inventory.map(c => c.name).filter(Boolean)
-  // longest-first so multi-word names match before any shorter prefix
+  // longest-first so multi-word names match before any shorter prefix. This is
+  // load-bearing now: slotEdgeName walks these in order and returns the FIRST
+  // prefix match, so `install-vetting-advisory` has to be tested before
+  // `install-vetting`. (Under the old search-per-name loop the order only
+  // affected push order, which line 110 re-sorted away.)
   const sorted = [...new Set(names)].sort((a, b) => b.length - a.length)
   const edges = []
   for (const c of inventory) {
-    const body = c.body || ''
-    for (const target of sorted) {
-      if (target === c.name) continue
-      const ref = new RegExp(`\`${escapeRe(target)}\`|(?:skill|subagent_type):\\s*['"\`]?${escapeRe(target)}(?![\\w-])`)
-      if (ref.test(body)) edges.push({ from: c.name, to: target })
+    // Tokenize once, then test membership — the inverse of searching for each
+    // known name in turn. Same scan, but it also yields the names that resolve
+    // to NOTHING, which is what scripts/reference-integrity.test.mjs consumes.
+    for (const target of resolvedNames(c.body || '', sorted, c.name)) {
+      edges.push({ from: c.name, to: target })
     }
   }
   const dependentsOf = name => edges.filter(e => e.to === name).map(e => e.from)
@@ -111,7 +117,33 @@ export function buildGateMap(inventory) {
   return { nodes, edges, dependentsOf, dependenciesOf }
 }
 
-function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+/**
+ * Committed files that each scanner SHOULD produce a node from, counted per type.
+ *
+ * Each filter mirrors its scanner's own rule. A count that does not mirror its
+ * scanner reports deliberate exclusions as drops: .claude/hooks holds 18 .mjs
+ * files but only 10 hooks, because scanHooks() skips *.test.mjs on purpose. A
+ * single global "files on disk == nodes" check would fire 8 false positives here
+ * and teach everyone to ignore it.
+ *
+ * Committed state, not readdir: a gitignored scratch directory is not a component
+ * candidate, and a check that goes red locally but green in CI is worse than none.
+ */
+export function committedCandidateCounts(repoRoot) {
+  const ls = (...args) =>
+    execFileSync('git', ['ls-files', '-z', ...args], { cwd: repoRoot, encoding: 'utf8' })
+      .split('\0').filter(Boolean)
+
+  const skillDirs = new Set(
+    ls('skills/').filter(p => /\/skill\.md$/i.test(p)).map(p => p.split('/')[1]),
+  )
+  return {
+    skill: skillDirs.size,
+    agent: ls('agents/').filter(p => p.endsWith('.md')).length,
+    rule: ls('rules/').filter(p => p.endsWith('.md')).length,
+    hook: ls('.claude/hooks/').filter(p => p.endsWith('.mjs') && !p.endsWith('.test.mjs')).length,
+  }
+}
 
 export function renderInventoryMd(nodes) {
   const rows = nodes.map(n => `| ${n.type} | ${n.name} | ${n.event || n.model || ''} | ${(n.description || '').replace(/\|/g, '\\|').slice(0, 100)} |`)
