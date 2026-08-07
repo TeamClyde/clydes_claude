@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, join, isAbsolute } from 'node:path'
 import { harvest, buildGateMap } from './harvest-components.mjs'
+import { resolvedNames } from './lib/component-refs.mjs'
 
 // Repo root resolved the portable way (matches existing .claude/hooks/*.mjs).
 // Do NOT use `new URL('../', import.meta.url).pathname` — yields /C:/… on Windows.
@@ -102,4 +103,34 @@ test('committed inventory matches freshly harvested output (drift guard)', async
   const inv = await harvest({ repoRoot: REPO_ROOT })
   const onDisk = JSON.parse(await readFile(join(REPO_ROOT, 'docs/reference/component-inventory.json'), 'utf8'))
   assert.equal(onDisk.length, inv.length, 'inventory length drifted — run `npm run harvest`')
+})
+
+// The legacy extractor, preserved verbatim as the equivalence oracle. When
+// buildGateMap switches to the tokenizer (Task 3) this stays put: it is the
+// only thing that can prove the switch changed nothing, and it is a far better
+// diagnostic than a byte-diff on a 158-line JSON artifact.
+function legacyEdgeNames(body, sortedNames, self) {
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const found = new Set()
+  for (const target of sortedNames) {
+    if (target === self) continue
+    const re = new RegExp(`\`${esc(target)}\`|(?:skill|subagent_type):\\s*['"\`]?${esc(target)}(?![\\w-])`)
+    if (re.test(body)) found.add(target)
+  }
+  return found
+}
+
+test('tokenizer reproduces the legacy edge set for every component (equivalence)', async () => {
+  const inv = await harvest({ repoRoot: REPO_ROOT })
+  const sorted = [...new Set(inv.map(c => c.name).filter(Boolean))].sort((a, b) => b.length - a.length)
+
+  const divergences = []
+  for (const c of inv) {
+    const body = c.body || ''
+    const legacy = legacyEdgeNames(body, sorted, c.name)
+    const modern = resolvedNames(body, sorted, c.name)
+    for (const n of legacy) if (!modern.has(n)) divergences.push(`${c.type}:${c.name} -> ${n} (legacy only)`)
+    for (const n of modern) if (!legacy.has(n)) divergences.push(`${c.type}:${c.name} -> ${n} (tokenizer only)`)
+  }
+  assert.deepEqual(divergences, [], `edge extraction diverged:\n${divergences.join('\n')}`)
 })
