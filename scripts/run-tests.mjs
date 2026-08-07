@@ -15,7 +15,7 @@ import path from 'node:path';
 // runner and its test agree no matter where either is invoked from.
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-export const ROOTS = ['scripts', '.claude/hooks'];
+export const ROOTS = ['scripts', 'skills', '.claude/hooks'];
 
 export function discover(roots = ROOTS) {
   return roots
