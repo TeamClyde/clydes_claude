@@ -1,5 +1,5 @@
 import { readdir, writeFile, mkdir } from 'node:fs/promises'
-import { join, dirname, resolve } from 'node:path'
+import { join, dirname, resolve, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseFrontmatter, firstHeading, firstParagraph } from './lib/frontmatter.mjs'
 
@@ -73,7 +73,15 @@ export async function harvest({ repoRoot }) {
   if (all.length === 0) {
     throw new Error(`harvest: 0 components found under ${repoRoot} — check repoRoot (Windows path mis-resolution yields an empty scan).`)
   }
-  return all
+  // Scanners build absolute paths because they have to read the files, but the
+  // path we *report* is serialised into committed artifacts. An absolute path
+  // bakes this machine's checkout directory into docs/reference/*.json, so
+  // `harvest:check` could only ever pass here and would fail in CI and in every
+  // other clone. Posix separators for the same reason the ordering above is
+  // code-point sorted: the artifact must be byte-identical on Windows and on a
+  // POSIX CI runner. Relative is also the only form the audit subagents that
+  // read the inventory can resolve.
+  return all.map(c => ({ ...c, file: relative(repoRoot, c.file).split(sep).join('/') }))
 }
 
 export function buildGateMap(inventory) {
