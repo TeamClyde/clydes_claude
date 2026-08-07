@@ -83,8 +83,57 @@ For agents, step 4 is a bare `Agent` tool dispatch (no agent definition file loa
 
 **Routing constraint.** No route delegates to a plugin. A hook routes to `test-driven-development` against `skills/creating-tools/hooks-reference.md`; a command routes to `writing-skills`, because the platform merged custom commands into skills (a command is a skill carrying `disable-model-invocation: true`); full-plugin authoring has no route, because this repo consumes plugins rather than authoring them.
 
+## Reference Integrity
+
+Component names are cited by name in prose throughout the corpus. Until a citation can be *resolved*, one that points at something real is indistinguishable from one that points at nothing — which is how 28 dead references accumulated while `adherence-audit` nominally checked for them at severity `error` the whole time. Authoring quality therefore splits into two layers, the same split `rules/install-vetting.md` draws for its Gate 3: a **deterministic** layer that blocks, and a **semantic** layer that advises.
+
+**One definition of a citation, two consumers.** `scripts/lib/component-refs.mjs` is the single place this repo decides what counts as a citation. It is pure — strings and name sets in, tokens out — with corpus discovery, policy loading, and exemption logic left to its callers. That boundary is what lets one tokenizer serve two consumers reading two different corpora:
+
+- `buildGateMap()` (`scripts/harvest-components.mjs`) tokenizes **component bodies** and turns the names that resolve into `docs/reference/gate-map.json` edges.
+- `scripts/reference-integrity.test.mjs` tokenizes **every committed `*.md` under `skills/`, `agents/`, and `rules/`** and turns the names that resolve to nothing into a `npm test` failure.
+
+Same scan, both answers. The older search-for-each-known-name approach could only ever answer the first question: a cited name absent from the inventory is never searched for, so it cannot be seen.
+
+```mermaid
+flowchart LR
+  BODIES["component bodies<br/>SKILL.md · agents/*.md · rules/**/*.md"] --> TOK
+  CORPUS["citation corpus<br/>all committed *.md under<br/>skills/ agents/ rules/"] --> TOK
+
+  TOK["scripts/lib/component-refs.mjs<br/><b>tokenize()</b>"]
+
+  TOK -->|"resolved names"| EDGES["buildGateMap()"]
+  TOK -->|"unresolved names"| GATE["reference-integrity.test.mjs"]
+
+  POLICY["skill-surface-policy.json<br/>references{}"] -.->|"resolution set<br/>+ exemptions"| GATE
+  MARK["inline &lt;!-- ref-ok: reason --&gt;"] -.->|"line-scoped"| GATE
+
+  EDGES --> ART["docs/reference/gate-map.json"]
+  GATE --> CI{{"npm test — blocking in CI"}}
+  ART --> CI
+```
+
+**Resolution is against committed state, never the working tree.** Both the gate and the invariant source their candidates from `git ls-files`. CI runners are stock images with no `~/.claude` and no gitignored scratch files, so anything resolved by probing the local filesystem is invisible to the CI that is supposed to enforce it — and a check that resolves differently from the job running it is worse than no check. The practical consequence for authors: a **machine-local skill must be declared** in `docs/reference/skill-surface-policy.json` → `references.localOnlySkills` to be citable at all. This is the same principle as `plugins.expected` — without a committed declaration there is nothing to diff and nothing to fail.
+
+**A `ns:name` pair is a citation only when `ns` is declared.** `references.knownNamespaces`, the local skill set, `plugins.expected`, and `plugins.removed` together form a positive declaration of what a component namespace is. The inverse rule — "`ns` is not a known skill or plugin, therefore dead" — is not provable: measured over this corpus it reports 48 findings of which 17 are real, flagging `file:line`, `node:test`, `type:feat`, and CSS declarations as dead references. A positive list is diffable and cannot silently widen; the negative rule widens with every new colon anyone writes.
+
+**Three exemption categories, deliberately not one.** Collapsing them would trade precision for a blanket:
+
+| Category | Mechanism | Scope | Why |
+|---|---|---|---|
+| Historical ledger | `references.historicalLedgers` in policy | File | `plugins/registry.md` exists to name removed plugins, so its citations *must* stay dead. |
+| Provenance | inline `<!-- ref-ok: reason -->` | Line (its own, or the next) | `hooks-reference.md` and `frontmatter-reference.md` open by recording what they were derived from. Blanket-exempting the file would stop checking two documents that should be fully checked. |
+| Negative example | none — the citation is **fixed** | — | A ✅-Good example teaching a dead prefix keeps minting new dead references while the gate stays green. Exempting it would preserve the defect it teaches. |
+
+Every policy exemption is keyed by the exempted thing and valued by the **reason** it is exempt, and a missing or empty reason fails `scripts/skill-surface.test.mjs`. That requirement is the entire mechanism preventing the exemption block from becoming the new place dead references hide.
+
+**No silent drops.** A registry that can lose entries makes every check built on it unfalsifiable: if a skill loses its `SKILL.md` in a bad merge it vanishes from the inventory, and the gate then emits dozens of confident, precise, entirely wrong "dead reference" findings while the actual fault — one missing file — appears nowhere. `committedCandidateCounts()` asserts that every committed candidate produces a node. Its per-root filters **must mirror each scanner's own rules** rather than counting files globally: `.claude/hooks` holds 18 `.mjs` files but yields 10 hook nodes, because `scanHooks()` skips `*.test.mjs` on purpose. A global "files on disk == nodes" check fires 8 false positives there and teaches everyone to ignore it.
+
+**The decidability boundary is permanent.** The deterministic layer checks namespaced references (`ns:name`) and *quoted* invocation slots — shapes whose intent is unambiguous. A bare backticked name in prose stays with the semantic layer forever: `` `code-reviewer` `` may be a citation, a role, a filename, or an English phrase, and no amount of rule-tightening decides that correctly. Unquoted `subagent_type:` in narrative prose is likewise not a dispatch. This is a deliberate precision-over-recall trade — the gate is only useful while every finding it emits is real.
+
 ## Dependencies
 
+- `scripts/lib/component-refs.mjs` — the citation tokenizer. Pure, stdlib-only, shared by `buildGateMap()` and the reference-integrity gate. Changing what counts as a citation means changing this file, and the equivalence test in `scripts/harvest-components.test.mjs` will report any edge the change moves.
+- `docs/reference/skill-surface-policy.json` → `references` — the declared resolution set and exemptions the gate reads. Adding a machine-local skill or a known namespace is an edit here, with a reason string, in the same commit.
 - `skills/creating-tools/frontmatter-reference.md` — the repo's own verified frontmatter inventory for both agents and skills, including the packaging-spec field limit that governs cloud and routine uploads.
 - `skills/creating-tools/hooks-reference.md` — the repo's own hook reference: event taxonomy, exit-code and deny contract, settings.json wiring, and house pattern. Written from the official hooks documentation and the repo's nine working hooks.
 - `pulser` CLI — external tool for static structural evaluation of skill files. Invoked by `writing-skills`. Requires `pulser` to be installed and accessible on `$PATH`.
@@ -104,10 +153,15 @@ _(No accepted ADRs yet.)_
 - **Own the reference rather than suppressing the plugin that holds it.** Structural guidance for every artifact type now lives in this repo. The prior arrangement paid twice — a plugin's always-on skill listing, plus an always-on rule (`rules/plugin-lifecycle.md`) listing its skills as not-to-invoke — and the suppression was soft, so it drifted: the registry and the rule stated opposite lifecycle states for the same plugin for weeks. Both the plugin and the rule were removed 2026-08-06. A cached plugin snapshot also goes stale silently: the hook skill still asserted a settings.json format that has not worked for some time. See `plugins/registry.md` § plugin-dev.
 - **Observational testing for rules has no feedback loop.** Rules cannot fail a Pulser eval or a subagent pressure scenario. The only validation is running 2–3 real sessions that should trigger the rule and observing whether the constraint is followed. This means rule drift (a rule that reads as advisory despite using mandatory language) can go undetected for extended periods.
 - **`adherence-audit` reports only — it never fixes.** Running the audit during a fix attempt contaminates the inventory built in Phase 1. The correct sequence is: run the audit, record findings, exit the audit, then address findings in a separate step.
+- **Editing a component body can legitimately move `gate-map.json`.** Adding or removing a backtick-quoted component name changes the edge set, and `npm run harvest:check` byte-diffs the artifact. Run `npm run harvest` and commit the regenerated `docs/reference/` files in the *same* commit, or CI fails on drift. This is expected behavior, not a fault — resolving a dead citation can add a real edge that the dead reference had been suppressing.
+- **Never resolve a dead reference by creating the thing it points at.** Three review lenses dispatched agent types that did not exist. The fix was to dispatch `general-purpose` and carry the role in the `[role: ...]` prompt marker — not to add `agents/code-reviewer.md`, which would have made the citation resolve by contradicting the multi-lens design it belongs to. Making a broken pointer valid is not the same as making it correct.
+- **A citation to a machine-local skill needs a declaration.** Anything resolved by probing `~/.claude` is invisible to CI. If a component legitimately cites a skill that does not live in this repo, add it to `references.localOnlySkills` with a reason in the same commit, or the gate will report it as dead — correctly, from CI's point of view.
 
 ## Observability
 
-Authoring quality is observed through three signals:
+Authoring quality is observed through four signals:
+
+- **Reference integrity (`scripts/reference-integrity.test.mjs`)**: Runs under `npm test`, blocking in CI. Fails when any citation in a committed `*.md` under `skills/`, `agents/`, or `rules/` resolves to nothing, reporting each as `file:line  ref` with the reason. This is the deterministic floor beneath `adherence-audit`'s Dead References lens — same class of finding, different force. An audit finding is advisory by construction, which is how dead references survived while a skill nominally checking for them existed the whole time; a `npm test` failure is a blocking fact.
 
 - **Structural quality (`pulser`)**: Run after any skill is authored or edited. Pulser performs static lint against Anthropic's 7 skill-quality principles: description format, CSO compliance, token budget, naming conventions, keyword coverage, cross-reference hygiene, and example quality. Output is a pass/fail per principle with actionable findings. A skill that does not pass Pulser is not ready to ship.
 
@@ -119,7 +173,11 @@ Authoring quality is observed through three signals:
 
 **Artifact / component** — Any file that shapes Claude's behavior in the workflow: a skill (`SKILL.md`), agent system prompt (`agents/<name>.md`), rule (`rules/<name>.md`), hook, or command. Distinct from application source code.
 
+**Citation** — A reference to a component by name in prose or in a dispatch. What counts as one is defined in exactly one place, `scripts/lib/component-refs.mjs`: a namespaced `ns:name` pair whose `ns` is declared, or a *quoted* `skill:` / `subagent_type:` invocation slot. A bare backticked name is not a citation for gate purposes — see **Decidability boundary**.
+
 **Coordinator constraint** — The hard rule that `creating-tools` produces zero artifact content. It routes only. Any content written before the delegated skill is invoked is a violation.
+
+**Decidability boundary** — The permanent line between the deterministic and semantic layers. Shapes whose intent is unambiguous (declared namespaces, quoted dispatch slots) are checked by a blocking test; shapes that are not (a bare backticked name, which may be a citation, a role, a filename, or ordinary English) stay with `adherence-audit` forever. Widening the deterministic layer past this line trades real findings for false positives, and a gate that emits false positives teaches its readers to ignore it.
 
 **CSO (Claude Search Optimization)** — A set of conventions for making skills discoverable by future Claude instances: `description:` field limited to triggering conditions only (no workflow summary), rich keyword coverage, active-voice verb-first naming, and token-efficient bodies.
 
