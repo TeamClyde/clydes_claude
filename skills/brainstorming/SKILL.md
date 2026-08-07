@@ -292,7 +292,7 @@ The design doc (`plans/<slug>/<slug>-design.md`) is written at Step 12, after bo
   - Dates live inside the doc, not in the filename
   - (User preferences for spec location override this default)
   - Per `rules/doc-tools.md` § "Diagrams by Default", include a Mermaid diagram where it clarifies structure or flow.
-- Use elements-of-style:writing-clearly-and-concisely skill if available
+- Write clearly and concisely — prefer plain words, cut hedges, and keep sentences short
 - (`plans/` is gitignored — the design doc is a session working artifact, not committed to git)
 
 **Spec Self-Review:**

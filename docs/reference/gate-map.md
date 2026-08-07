@@ -138,6 +138,7 @@ flowchart LR
   subagent_driven_development --> test_runner
   systematic_debugging --> dispatching_parallel_agents
   systematic_debugging --> plan_management
+  systematic_debugging --> test_driven_development
   test_builder --> git_manager
   test_runner --> e2e_init
   test_runner --> systematic_debugging
@@ -166,6 +167,7 @@ flowchart LR
   workflow_phases --> git_manager
   workflow_phases --> jira_workflow_manager
   workflow_phases --> plan_management
+  writing_agents --> test_driven_development
   writing_plans --> executing_plans
   writing_plans --> finishing_a_development_branch
   writing_plans --> git_manager
@@ -177,6 +179,7 @@ flowchart LR
   writing_rules --> writing_agents
   writing_rules --> writing_skills
   writing_skills --> creating_tools
+  writing_skills --> test_driven_development
 ```
 
 ## Edges
@@ -317,6 +320,7 @@ flowchart LR
 | subagent-driven-development | test-runner |
 | systematic-debugging | dispatching-parallel-agents |
 | systematic-debugging | plan-management |
+| systematic-debugging | test-driven-development |
 | test-builder | git-manager |
 | test-runner | e2e-init |
 | test-runner | systematic-debugging |
@@ -345,6 +349,7 @@ flowchart LR
 | workflow-phases | git-manager |
 | workflow-phases | jira-workflow-manager |
 | workflow-phases | plan-management |
+| writing-agents | test-driven-development |
 | writing-plans | executing-plans |
 | writing-plans | finishing-a-development-branch |
 | writing-plans | git-manager |
@@ -356,3 +361,4 @@ flowchart LR
 | writing-rules | writing-agents |
 | writing-rules | writing-skills |
 | writing-skills | creating-tools |
+| writing-skills | test-driven-development |

@@ -164,13 +164,13 @@ After tests pass (or when no testing-plan.md exists), dispatch the spec-complian
 
 ```
 Agent {                                  // Lens 1 — spec compliance
-  subagent_type: "spec-reviewer",
+  subagent_type: "general-purpose",
   model: "claude-sonnet-4-6",            // Sonnet per tier table (M)
   prompt: "[role: spec-reviewer]\n..."   // variable suffix only; hook prepends prefix
 }
 
 Agent {                                  // Lens 2 — code quality
-  subagent_type: "code-quality-reviewer",
+  subagent_type: "general-purpose",
   model: "claude-sonnet-4-6",            // Sonnet per tier table (M)
   prompt: "[role: code-quality-reviewer]\n..."
 }

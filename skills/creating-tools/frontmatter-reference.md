@@ -5,7 +5,7 @@ Canonical field reference for both surfaces. Verified against official documenta
 and [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills).
 
 This file is the repo's own reference. It is not a pointer to a plugin — do not replace it with
-a citation to `plugin-dev:agent-development`, which was uninstalled 2026-08-06. See
+a citation to `plugin-dev:agent-development`, which was uninstalled 2026-08-06. See  <!-- ref-ok: provenance — records the removed skill this file replaces -->
 `hooks-reference.md` § "Why this file exists" for what a cached plugin snapshot drifts into.
 
 ## Contents

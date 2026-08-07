@@ -1040,6 +1040,10 @@
       "to": "plan-management"
     },
     {
+      "from": "systematic-debugging",
+      "to": "test-driven-development"
+    },
+    {
       "from": "test-builder",
       "to": "git-manager"
     },
@@ -1152,6 +1156,10 @@
       "to": "plan-management"
     },
     {
+      "from": "writing-agents",
+      "to": "test-driven-development"
+    },
+    {
       "from": "writing-plans",
       "to": "executing-plans"
     },
@@ -1194,6 +1202,10 @@
     {
       "from": "writing-skills",
       "to": "creating-tools"
+    },
+    {
+      "from": "writing-skills",
+      "to": "test-driven-development"
     }
   ]
 }

@@ -166,7 +166,7 @@ workflow-friction issues accumulate in GitHub (via feedback skill)
 
 **Internal — agents invoked:**
 
-- code-reviewer (agent) — dispatched by `requesting-code-review` to perform the actual diff review.
+- code-reviewer (role, not a registered agent type) — a review lens dispatched by `requesting-code-review` as a prompt to a `general-purpose` agent.
 
 **External tools:**
 

@@ -5,7 +5,7 @@ Canonical hook reference for this repo. Verified against official documentation 
 the nine working hooks in `.claude/hooks/`.
 
 This file is the repo's own reference. It replaced a delegation to
-`plugin-dev:hook-development`, which was **removed** — see
+`plugin-dev:hook-development`, which was **removed** — see  <!-- ref-ok: provenance — records the removed skill this file replaces -->
 [Why this file exists](#why-this-file-exists).
 
 ## Contents
@@ -22,7 +22,7 @@ This file is the repo's own reference. It replaced a delegation to
 
 ## Why this file exists
 
-`plugin-dev:hook-development` was the only plugin-dev skill with a live claim on this repo. On
+`plugin-dev:hook-development` was the only plugin-dev skill with a live claim on this repo. On  <!-- ref-ok: provenance — records the removed skill this file replaces -->
 audit it failed on the claim itself:
 
 | Its claim | Reality |
