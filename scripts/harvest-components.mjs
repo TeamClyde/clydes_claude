@@ -2,6 +2,7 @@ import { readdir, writeFile, mkdir } from 'node:fs/promises'
 import { join, dirname, resolve, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseFrontmatter, firstHeading, firstParagraph } from './lib/frontmatter.mjs'
+import { resolvedNames } from './lib/component-refs.mjs'
 
 async function listDir(dir) {
   try { return await readdir(dir, { withFileTypes: true }) }
@@ -86,15 +87,19 @@ export async function harvest({ repoRoot }) {
 
 export function buildGateMap(inventory) {
   const names = inventory.map(c => c.name).filter(Boolean)
-  // longest-first so multi-word names match before any shorter prefix
+  // longest-first so multi-word names match before any shorter prefix. This is
+  // load-bearing now: slotEdgeName walks these in order and returns the FIRST
+  // prefix match, so `install-vetting-advisory` has to be tested before
+  // `install-vetting`. (Under the old search-per-name loop the order only
+  // affected push order, which line 110 re-sorted away.)
   const sorted = [...new Set(names)].sort((a, b) => b.length - a.length)
   const edges = []
   for (const c of inventory) {
-    const body = c.body || ''
-    for (const target of sorted) {
-      if (target === c.name) continue
-      const ref = new RegExp(`\`${escapeRe(target)}\`|(?:skill|subagent_type):\\s*['"\`]?${escapeRe(target)}(?![\\w-])`)
-      if (ref.test(body)) edges.push({ from: c.name, to: target })
+    // Tokenize once, then test membership — the inverse of searching for each
+    // known name in turn. Same scan, but it also yields the names that resolve
+    // to NOTHING, which is what scripts/reference-integrity.test.mjs consumes.
+    for (const target of resolvedNames(c.body || '', sorted, c.name)) {
+      edges.push({ from: c.name, to: target })
     }
   }
   const dependentsOf = name => edges.filter(e => e.to === name).map(e => e.from)
@@ -110,8 +115,6 @@ export function buildGateMap(inventory) {
   edges.sort((a, b) => cmp(`${a.from}->${a.to}`, `${b.from}->${b.to}`))
   return { nodes, edges, dependentsOf, dependenciesOf }
 }
-
-function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
 
 export function renderInventoryMd(nodes) {
   const rows = nodes.map(n => `| ${n.type} | ${n.name} | ${n.event || n.model || ''} | ${(n.description || '').replace(/\|/g, '\\|').slice(0, 100)} |`)
