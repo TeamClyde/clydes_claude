@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        # 20 is the `engines` floor and the reason scripts/run-tests.mjs does its
+        # own test discovery; 22/24 are the "Node 22+" half of that divergence.
+        node-version: ['20', '22', '24']
+        include:
+          # Windows is the primary development platform here, and the only place
+          # the path.sep -> '/' rewrite in run-tests.mjs is not a no-op.
+          - os: windows-latest
+            node-version: '20'
+    steps:
+      - uses: actions/checkout@v7
+
+      # No install step and no `cache: npm`, deliberately: this repo declares
+      # zero dependencies and ships no package-lock.json, so `npm ci` would fail
+      # outright and the npm cache would have no lockfile to key on.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - run: npm test
+
+      # harvest:check and engine:check regenerate committed artifacts and then
+      # `git diff --exit-code`, so a failure prints the drift as a readable diff.
+      - run: npm run harvest:check
+      - run: npm run engine:check
+      - run: npm run verify:check
+      - run: npm run recall:check
