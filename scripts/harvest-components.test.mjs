@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve, join } from 'node:path'
+import { dirname, resolve, join, isAbsolute } from 'node:path'
 import { harvest, buildGateMap } from './harvest-components.mjs'
 
 // Repo root resolved the portable way (matches existing .claude/hooks/*.mjs).
@@ -25,6 +25,21 @@ test('harvest finds skills, agents, rules, and hooks by type', async () => {
   // hooks classified by event directory
   assert.equal(byName['hook:slash-command-enforcement']?.event, 'userPromptSubmit')
   assert.equal(byName['hook:install-vetting-advisory']?.event, 'preToolUse')
+})
+
+test('component file paths are repo-relative posix — artifacts must be machine-independent', async () => {
+  const inv = await harvest({ repoRoot: REPO_ROOT })
+  // These paths are serialised into docs/reference/*.json and committed. An
+  // absolute path bakes the generating machine's checkout directory into the
+  // artifact, so `npm run harvest:check` can only ever pass on that one machine
+  // in that one directory — it fails in CI and in any second clone. Backslashes
+  // would do the same across Windows and POSIX. The audit subagents that read
+  // the inventory resolve these against the repo root, so relative is also the
+  // only form that is useful to them.
+  for (const c of inv) {
+    assert.ok(!isAbsolute(c.file), `${c.type}:${c.name} — file must be repo-relative, got absolute "${c.file}"`)
+    assert.ok(!c.file.includes('\\'), `${c.type}:${c.name} — file must use posix separators, got "${c.file}"`)
+  }
 })
 
 test('hook .test.mjs files are excluded from the inventory', async () => {

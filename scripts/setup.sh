@@ -409,6 +409,39 @@ HOOK_LINK="$HOME/.claude/hooks/pre-commit"
 install_symlink "$HOOK_TARGET" "$HOOK_LINK" "hooks/pre-commit"
 chmod +x "$HOOK_TARGET"
 
+# Symlinking alone never actually ran the hook: git executes hooks from
+# .git/hooks or core.hooksPath, and nothing pointed at either. Wire it here.
+# Note core.hooksPath REPLACES .git/hooks rather than adding to it, so never
+# clobber a value we did not set — husky and friends manage their own (and set
+# it at local scope, which outranks global regardless).
+HOOKS_DIR="$HOME/.claude/hooks"
+# git rewrites an MSYS /c/... path into native Windows form when it stores it,
+# so a later --get never string-matches what we wrote. Hand it an already-native
+# path instead, which round-trips exactly; otherwise the "already set" branch
+# below is unreachable and every re-run warns spuriously. No-op on macOS/Linux,
+# where cygpath does not exist and $HOME is already native.
+if command -v cygpath >/dev/null 2>&1; then
+  HOOKS_DIR=$(cygpath -m "$HOOKS_DIR")
+fi
+
+EXISTING_HOOKS_PATH=$(git config --global --get core.hooksPath || true)
+
+# Compare slash-insensitively. `cygpath -m` emits forward slashes on stock MSYS
+# but backslashes under some local shims, and git stores whichever it was given,
+# so the two runs of this script can legitimately disagree on slash direction
+# while naming the same directory. Only the direction differs — never the path.
+norm_path() { printf '%s' "${1//\\//}"; }
+
+if [[ -z "$EXISTING_HOOKS_PATH" ]]; then
+  git config --global core.hooksPath "$HOOKS_DIR"
+  success "core.hooksPath → $HOOKS_DIR (pre-commit hook is now active)"
+elif [[ "$(norm_path "$EXISTING_HOOKS_PATH")" == "$(norm_path "$HOOKS_DIR")" ]]; then
+  skip "core.hooksPath already → $HOOKS_DIR"
+else
+  warn "core.hooksPath is '$EXISTING_HOOKS_PATH' — leaving it alone"
+  info "To use the workflow hook instead: git config --global core.hooksPath \"$HOOKS_DIR\""
+fi
+
 # ---------------------------------------------------------------------------
 # Step 7 — Install Claude Code plugins
 # ---------------------------------------------------------------------------
