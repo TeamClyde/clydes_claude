@@ -426,10 +426,16 @@ fi
 
 EXISTING_HOOKS_PATH=$(git config --global --get core.hooksPath || true)
 
+# Compare slash-insensitively. `cygpath -m` emits forward slashes on stock MSYS
+# but backslashes under some local shims, and git stores whichever it was given,
+# so the two runs of this script can legitimately disagree on slash direction
+# while naming the same directory. Only the direction differs — never the path.
+norm_path() { printf '%s' "${1//\\//}"; }
+
 if [[ -z "$EXISTING_HOOKS_PATH" ]]; then
   git config --global core.hooksPath "$HOOKS_DIR"
   success "core.hooksPath → $HOOKS_DIR (pre-commit hook is now active)"
-elif [[ "$EXISTING_HOOKS_PATH" == "$HOOKS_DIR" ]]; then
+elif [[ "$(norm_path "$EXISTING_HOOKS_PATH")" == "$(norm_path "$HOOKS_DIR")" ]]; then
   skip "core.hooksPath already → $HOOKS_DIR"
 else
   warn "core.hooksPath is '$EXISTING_HOOKS_PATH' — leaving it alone"
