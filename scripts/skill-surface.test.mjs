@@ -116,3 +116,19 @@ describe('installed plugin surface', () => {
     )
   })
 })
+
+test('every references exemption carries a non-empty reason', async () => {
+  const policy = await readPolicy()
+  const refs = policy.references
+  assert.ok(refs, 'policy.references must exist')
+
+  const isMeta = k => k.startsWith('$')
+  for (const group of ['historicalLedgers', 'localOnlySkills', 'platformAgentTypes', 'knownNamespaces']) {
+    const entries = Object.entries(refs[group] ?? {}).filter(([k]) => !isMeta(k))
+    assert.ok(entries.length > 0, `${group} must not be empty`)
+    for (const [key, reason] of entries) {
+      assert.equal(typeof reason, 'string', `${group}.${key} reason must be a string`)
+      assert.ok(reason.trim().length > 0, `${group}.${key} requires a reason — an exemption without one is a hiding place`)
+    }
+  }
+})
