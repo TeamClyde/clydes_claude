@@ -111,6 +111,95 @@ export function slotEdgeName(value, sortedNames) {
 }
 
 /**
+ * Path form: `rules/<n>.md`, `skills/<n>/` (or `skills/<n>/SKILL.md`),
+ * `agents/<n>.md`, or a bare `<base>.mjs` hook script — substring-matched
+ * rather than whole-span like backtickEdgeName. resolvedNames() hands rules
+ * only NAMES, no node type, so this cannot ask "is <n> a rule?" and build
+ * `rules/<n>.md` per node — it has to go the other way: strip the citation
+ * down to a candidate name, then test membership.
+ *
+ * Guarded to true path shapes only: a "/" somewhere in the value, or a bare
+ * `.mjs` (hooks are the only node type cited without a directory prefix in
+ * this corpus, so a bare `.mjs` is unambiguous). A bare `<name>.md` with no
+ * directory is deliberately NOT accepted here — `rules/integration-test-
+ * constraints.md` is a path citation, but the bare `integration-test-
+ * constraints.md` seen in the corpus is not; a directory-less ".md" is
+ * common enough (README.md, journal.md, ...) that treating every bare
+ * "*.md" span as a path would risk resolving unrelated doc filenames. That
+ * shape belongs to suffixedEdgeName below, which requires a known head.
+ *
+ * Takes a Set, not sortedNames: unlike suffixedEdgeName there is no
+ * head-prefix ambiguity to resolve against the name list — the ambiguity
+ * here is entirely on the TOKEN side (how many leading path segments are
+ * category prefix vs. part of the name), which is why the walk below tries
+ * the longest candidate (fewest segments dropped) first:
+ * `rules/filesystem/path-portability.md` must resolve to
+ * `filesystem/path-portability`, not fail because `path-portability` alone
+ * isn't a node.
+ */
+export function pathEdgeName(value, nameSet) {
+  if (!value.includes('/') && !/\.mjs$/.test(value)) return null
+  const stripped = value.replace(/\.(md|mjs)$/, '')
+  const segments = stripped.split('/').filter(Boolean)
+  // The "SKILL" filename segment is never itself a node name (see the
+  // scanSkills() note in harvest-components.mjs) — drop it before walking,
+  // but only when it isn't the ONLY segment, which would leave nothing to
+  // match against.
+  if (segments.length > 1 && segments[segments.length - 1].toLowerCase() === 'skill') {
+    segments.pop()
+  }
+  for (let i = 0; i < segments.length; i++) {
+    const candidate = segments.slice(i).join('/')
+    if (nameSet.has(candidate)) return candidate
+  }
+  return null
+}
+
+/**
+ * Colon form: `<n>:<mode>` — a namespaced dispatch cited without a
+ * surrounding namespace, e.g. `plan-management:divergence`. Split on the
+ * FIRST colon (mirrors NSREF's `\b(ns):(name)\b` shape) and test the head
+ * for membership. A Set is enough — the split point is unambiguous (first
+ * colon), so there's no prefix-length ambiguity to resolve the way
+ * slotEdgeName/suffixedEdgeName need sortedNames for.
+ *
+ * Requires a non-empty tail after the colon: `superpowers:` (a real corpus
+ * line — see NSREF's comment above) must stay a non-token, for the same
+ * reason NSREF itself requires a name after the colon.
+ */
+export function colonEdgeName(value, nameSet) {
+  const i = value.indexOf(':')
+  if (i <= 0 || i === value.length - 1) return null
+  const head = value.slice(0, i)
+  return nameSet.has(head) ? head : null
+}
+
+/**
+ * Suffixed form: NAME immediately followed by a structural separator and a
+ * trailing token, e.g. `integration-test-constraints.md` (the bare-filename
+ * case pathEdgeName deliberately declines — see its comment above).
+ * Head-prefix ambiguity is real here (`install-vetting-advisory.md` vs.
+ * `install-vetting.md`), so this takes sortedNames longest-first and
+ * prefix-walks it, exactly like slotEdgeName.
+ *
+ * Separator set is narrower than the architecture blueprint's nominal
+ * `[\s.#§]` class: whitespace is deliberately EXCLUDED. None of the 44
+ * target rows need it (row 44, the only suffixed row, uses `.`), and a
+ * whitespace separator turns ordinary prose into edges: `handoff to the
+ * next session` would resolve to the `handoff` skill, `run the harvest` to
+ * a node named `run`. `.`, `#`, `§` are structural marks that don't open an
+ * English sentence right after a name, so they stay; `\s` does not.
+ */
+export function suffixedEdgeName(value, sortedNames) {
+  for (const n of sortedNames) {
+    if (!value.startsWith(n)) continue
+    const sep = value.charAt(n.length)
+    if (sep && /[.#§]/.test(sep)) return n
+  }
+  return null
+}
+
+/**
  * All names a body cites, as the edge consumer resolves them.
  * `self` is excluded to preserve the existing no-self-edges guarantee.
  */
