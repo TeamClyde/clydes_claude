@@ -5,11 +5,64 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve, join, isAbsolute } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { harvest, buildGateMap, committedCandidateCounts } from './harvest-components.mjs'
-import { resolvedNames } from './lib/component-refs.mjs'
+import {
+  resolvedNames, tokenize, pathEdgeName, colonEdgeName, suffixedEdgeName,
+} from './lib/component-refs.mjs'
 
 // Repo root resolved the portable way (matches existing .claude/hooks/*.mjs).
 // Do NOT use `new URL('../', import.meta.url).pathname` — yields /C:/… on Windows.
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+
+// The known delta between the legacy explicit-only extractor (`legacyEdgeNames`
+// below) and the three new resolution rules added in Task 1 — `pathEdgeName`
+// (path-form citations), `colonEdgeName` (`<n>:<mode>` dispatch), and
+// `suffixedEdgeName` (`<n>.md` / `<n>#anchor` trailing-token citations). The
+// rules exist and are unit-tested (scripts/lib/component-refs.test.mjs), but
+// as of this task `resolvedNames()` does not call them yet — buildGateMap()
+// still runs the legacy path in production. This constant enumerates every
+// edge the new rules will add once wired, proven in advance against the live
+// corpus.
+//
+// Rows 1-44 are the plan's original enumeration; rows 45-55 were added after
+// Task 1's execution proved the original table incomplete — see the parent
+// journal's `[divergence] [decision]` entry (2026-08-10).
+//
+// RETENTION: this constant SURVIVES past this task. Task 3 Step 3b's
+// re-grounded equivalence oracle consumes it as its standing contract, so it
+// must remain a module-level constant — do not move it inside a test
+// function, and do not delete it when the pre-wiring harness test below is
+// removed in Task 6 (that test is a one-time migration proof; this constant
+// is not).
+const EXPECTED_NEW_EDGES = new Set([
+  'doc-author|plan-management', 'executing-plans|plan-management',
+  'writing-plans|plan-management', 'architect|delivery-cadence',
+  'architect|stack-hats', 'architecture-decision-records|doc-tools',
+  'brainstorming|doc-tools', 'doc-author|doc-tools',
+  'doc-tools|doc-backfill', 'doc-tools|docs-refresh',
+  'doc-tools|docs-status', 'docs-status|doc-tools',
+  'executing-plans|stack-hats', 'finishing-a-development-branch|delivery-cadence',
+  'git-manager|delivery-cadence', 'infra-init|filesystem/path-portability',
+  'new-repo-setup|stack-hat-directive', 'plan-docs|planning',
+  'plan-docs|workflow-phases', 'plan-gate|delivery-cadence',
+  'plan-management|doc-tools', 'plan-management|plan-docs',
+  'project-setup|delivery-cadence', 'project-setup|install-vetting',
+  'stack-hats|stack-hat-directive', 'subagent-driven-development|agent-model-pinning',
+  'subagent-driven-development|stack-hats', 'subagent-driven-development|subagent-prefix-prepend',
+  'systematic-debugging|filesystem/efficiency', 'vet-capability-fit|install-vetting',
+  'vet-install|install-vetting', 'vet-reputation|install-vetting',
+  'vet-security|install-vetting', 'writing-agents|architect',
+  'writing-agents|researcher', 'writing-plans|architect',
+  'writing-plans|delivery-cadence', 'writing-plans|doc-tools',
+  'writing-plans|plan-gate', 'writing-rules|cspell',
+  'writing-rules|mcp-governance', 'writing-rules|new-repo-setup',
+  'writing-rules|secrets-handling', 'plan-docs|integration-test-constraints',
+  'different-viewpoints-lite|different-viewpoint', 'doc-author|doc-backfill',
+  'doc-backfill|infra-init', 'docs-refresh|docs-status',
+  'docs-status|docs-refresh', 'e2e-init|infra-init',
+  'filesystem/path-portability|infra-init', 'finishing-a-development-branch|docs-status',
+  'install-vetting|ai-tool-security-reviewer', 'integration-engineer|infra-init',
+  'vet-install|project-setup',
+])
 
 test('harvest finds skills, agents, rules, and hooks by type', async () => {
   const inv = await harvest({ repoRoot: REPO_ROOT })
@@ -134,6 +187,74 @@ test('tokenizer reproduces the legacy edge set for every component (equivalence)
     for (const n of modern) if (!legacy.has(n)) divergences.push(`${c.type}:${c.name} -> ${n} (tokenizer only)`)
   }
   assert.deepEqual(divergences, [], `edge extraction diverged:\n${divergences.join('\n')}`)
+})
+
+// ONE-TIME MIGRATION PROOF — deleted in Task 6, once Task 3 has wired the new
+// rules into resolvedNames() and the equivalence test above (which calls
+// resolvedNames() directly) is re-grounded against EXPECTED_NEW_EDGES instead.
+// EXPECTED_NEW_EDGES itself is NOT deleted alongside this test — see its
+// comment above.
+//
+// This harness deliberately does NOT call resolvedNames(). It calls
+// pathEdgeName / colonEdgeName / suffixedEdgeName directly against each
+// component's backtick tokens, and unions the hits with legacyEdgeNames().
+// That is the entire point: resolvedNames() does not wire the three new
+// rules yet (Task 3's job), so a version of this test that routed through
+// resolvedNames() would assert nothing about the new rules today — it would
+// silently start testing something real only once Task 3 lands, which is
+// backwards from the goal. Testing the rule functions directly makes the
+// assertion true NOW, while the legacy path is still what buildGateMap()
+// actually runs in production, which is what proves the 55-edge delta is
+// known in advance rather than discovered as a surprise diff after Task 3's
+// wiring lands.
+//
+// Do NOT "fix" this by swapping in resolvedNames() — that is the most likely
+// well-intentioned edit a future maintainer would make, and it would destroy
+// exactly what this test exists to prove.
+test('expected-diff audit: path/colon/suffixed rules produce exactly the known 55-edge delta over the legacy set (pre-wiring)', async () => {
+  const inv = await harvest({ repoRoot: REPO_ROOT })
+  const sorted = [...new Set(inv.map(c => c.name).filter(Boolean))].sort((a, b) => b.length - a.length)
+  // Built once outside the component loop — not per token — per the task's
+  // performance note; pathEdgeName/colonEdgeName take a Set, suffixedEdgeName
+  // takes the longest-first array (needed for its prefix-ambiguity walk).
+  const nameSet = new Set(sorted)
+
+  // Corpus-wide `from|to` pairs, not per-component sets: EXPECTED_NEW_EDGES is
+  // a flat set of strings, so the accumulator has to match its shape.
+  const newPairs = new Set()
+  for (const c of inv) {
+    const body = c.body || ''
+    const legacy = legacyEdgeNames(body, sorted, c.name)
+    const backticks = tokenize(body).filter(t => t.kind === 'backtick')
+    for (const t of backticks) {
+      // Precedence order path -> colon -> suffixed, first non-null — the same
+      // order the plan's Blueprint table used to assign each pair a single
+      // shape, and the same order Task 3 will use inside resolvedNames().
+      // (backtickEdgeName is not called: an exact `` `target` `` span is
+      // already covered by legacyEdgeNames' own backtick alternative, so
+      // calling it here would only ever re-derive names already in `legacy`.)
+      const hit = pathEdgeName(t.value, nameSet)
+        || colonEdgeName(t.value, nameSet)
+        || suffixedEdgeName(t.value, sorted)
+      if (!hit || hit === c.name) continue
+      if (!legacy.has(hit)) newPairs.add(`${c.name}|${hit}`)
+    }
+  }
+
+  // Report both directions by name, so a divergence explains itself instead
+  // of surfacing as an opaque byte-diff: `unexpected` means the live rules
+  // found something the Blueprint table didn't predict (rules regressed, or
+  // the corpus changed under us); `missing` means a predicted pair no longer
+  // resolves (same two causes, other direction). Per the task: if either is
+  // non-empty, that is a finding to report, not something to paper over by
+  // editing EXPECTED_NEW_EDGES to match.
+  const unexpected = [...newPairs].filter(p => !EXPECTED_NEW_EDGES.has(p)).sort()
+  const missing = [...EXPECTED_NEW_EDGES].filter(p => !newPairs.has(p)).sort()
+  assert.deepEqual(
+    { unexpected, missing },
+    { unexpected: [], missing: [] },
+    `expected-diff audit failed:\n  unexpected (found, not predicted): ${unexpected.join(', ') || '(none)'}\n  missing (predicted, not found): ${missing.join(', ') || '(none)'}`,
+  )
 })
 
 test('every committed skill directory yields a component', async () => {
