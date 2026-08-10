@@ -144,10 +144,26 @@ test('gate-map excludes self-edges', async () => {
 test('implicit (prose-only) edges are NOT extracted', async () => {
   const inv = await harvest({ repoRoot: REPO_ROOT })
   const { edges } = buildGateMap(inv)
-  // writing-plans references plan-gate only in prose (no backticks / skill: form),
-  // so the first-cut explicit-only extractor must NOT produce this edge.
-  // (Verified: writing-plans/SKILL.md names plan-gate only in prose/tables.)
-  assert.ok(!edges.some(e => e.from === 'writing-plans' && e.to === 'plan-gate'),
+  // writing-plans names brainstorming only in prose — 6 mentions, zero backtick
+  // spans, zero `skill:`/`subagent_type:` slots. Cleanest citation is SKILL.md
+  // line 17: "This should be run in a dedicated worktree (created by
+  // brainstorming skill)." (others: 109, 122, 126, 140, 166). A bare English
+  // mention of a component's name is not a citation of it, and no resolution
+  // rule — explicit or path/colon/suffixed — may promote one to an edge.
+  //
+  // PAIR HISTORY — this is the point of the test, not trivia. The original pair
+  // was writing-plans -> plan-gate, chosen on the premise that plan-gate was
+  // named only in prose there. That premise expired: writing-plans/SKILL.md
+  // line 382 now carries `skills/plan-gate/SKILL.md` in a backtick span, a real
+  // path-form citation, so the pair became a TRUE edge and the assertion was
+  // testing a stale fact rather than the principle. Retired and re-grounded
+  // rather than deleted — the principle is permanent, the exemplar is not.
+  //
+  // If this pair also acquires a real citation one day, do the same thing:
+  // re-ground it on a still-prose-only pair and record the retirement here. Do
+  // NOT relax the assertion to make it pass, and do not delete the test — a
+  // green suite with no prose guard is precisely how recall creep gets in.
+  assert.ok(!edges.some(e => e.from === 'writing-plans' && e.to === 'brainstorming'),
     'precision-over-recall: a prose-only reference must not become an edge')
 })
 
