@@ -33,32 +33,45 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // function, and do not delete it when the pre-wiring harness test below is
 // removed in Task 6 (that test is a one-time migration proof; this constant
 // is not).
+// Row numbers below are anchored to the Blueprint table in
+// plans/component-reference-integrity/graph-integrity/graph-integrity-plan.md
+// § "Expected diff — all 55 new edges" (`| # | from | → to | shape | ... |`).
+// Entries appear in strict table order, 2 per line, so each `// rows N-M`
+// marker below lines up with that table's `#` column — cross-check a pair
+// by row number there, not by hand-walking both lists.
 const EXPECTED_NEW_EDGES = new Set([
+  // rows 1-10
   'doc-author|plan-management', 'executing-plans|plan-management',
   'writing-plans|plan-management', 'architect|delivery-cadence',
   'architect|stack-hats', 'architecture-decision-records|doc-tools',
   'brainstorming|doc-tools', 'doc-author|doc-tools',
   'doc-tools|doc-backfill', 'doc-tools|docs-refresh',
+  // rows 11-20
   'doc-tools|docs-status', 'docs-status|doc-tools',
   'executing-plans|stack-hats', 'finishing-a-development-branch|delivery-cadence',
   'git-manager|delivery-cadence', 'infra-init|filesystem/path-portability',
   'new-repo-setup|stack-hat-directive', 'plan-docs|planning',
   'plan-docs|workflow-phases', 'plan-gate|delivery-cadence',
+  // rows 21-30
   'plan-management|doc-tools', 'plan-management|plan-docs',
   'project-setup|delivery-cadence', 'project-setup|install-vetting',
   'stack-hats|stack-hat-directive', 'subagent-driven-development|agent-model-pinning',
   'subagent-driven-development|stack-hats', 'subagent-driven-development|subagent-prefix-prepend',
   'systematic-debugging|filesystem/efficiency', 'vet-capability-fit|install-vetting',
+  // rows 31-40
   'vet-install|install-vetting', 'vet-reputation|install-vetting',
   'vet-security|install-vetting', 'writing-agents|architect',
   'writing-agents|researcher', 'writing-plans|architect',
   'writing-plans|delivery-cadence', 'writing-plans|doc-tools',
   'writing-plans|plan-gate', 'writing-rules|cspell',
+  // rows 41-44 — end of the plan's original 44-row enumeration
   'writing-rules|mcp-governance', 'writing-rules|new-repo-setup',
   'writing-rules|secrets-handling', 'plan-docs|integration-test-constraints',
+  // rows 45-50 — start of the 2026-08-10 correction (see comment above)
   'different-viewpoints-lite|different-viewpoint', 'doc-author|doc-backfill',
   'doc-backfill|infra-init', 'docs-refresh|docs-status',
   'docs-status|docs-refresh', 'e2e-init|infra-init',
+  // rows 51-55
   'filesystem/path-portability|infra-init', 'finishing-a-development-branch|docs-status',
   'install-vetting|ai-tool-security-reviewer', 'integration-engineer|infra-init',
   'vet-install|project-setup',
@@ -233,6 +246,12 @@ test('expected-diff audit: path/colon/suffixed rules produce exactly the known 5
       // (backtickEdgeName is not called: an exact `` `target` `` span is
       // already covered by legacyEdgeNames' own backtick alternative, so
       // calling it here would only ever re-derive names already in `legacy`.)
+      // `||` (not `??`) is safe here only because none of the three rules
+      // can ever return `''` — each return is either `null` or a value that
+      // passed a Set-membership test against real node names, and no node
+      // is named the empty string. If that ever stopped holding, `hit === ''`
+      // would fall through the `||` chain the same as `null` and be
+      // indistinguishable from "no match" below.
       const hit = pathEdgeName(t.value, nameSet)
         || colonEdgeName(t.value, nameSet)
         || suffixedEdgeName(t.value, sorted)
