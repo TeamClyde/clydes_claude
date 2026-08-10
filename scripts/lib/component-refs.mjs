@@ -110,13 +110,20 @@ export function slotEdgeName(value, sortedNames) {
   return null
 }
 
+// Real containers a path-form citation can be rooted at. Used by the guard
+// inside pathEdgeName below — see that function's comment for why this is
+// a "was the candidate found under a real container" test, not a ".claude"
+// prefix rejection.
+const CONTAINERS = new Set(['rules', 'skills', 'agents'])
+
 /**
  * Path form: `rules/<n>.md`, `skills/<n>/` (or `skills/<n>/SKILL.md`),
- * `agents/<n>.md`, or a bare `<base>.mjs` hook script — substring-matched
- * rather than whole-span like backtickEdgeName. resolvedNames() hands rules
- * only NAMES, no node type, so this cannot ask "is <n> a rule?" and build
- * `rules/<n>.md` per node — it has to go the other way: strip the citation
- * down to a candidate name, then test membership.
+ * `agents/<n>.md`, a bare `<base>.mjs` hook script, or a bare `/<n>`
+ * slash-command reference — substring-matched rather than whole-span like
+ * backtickEdgeName. resolvedNames() hands rules only NAMES, no node type,
+ * so this cannot ask "is <n> a rule?" and build `rules/<n>.md` per node —
+ * it has to go the other way: strip the citation down to a candidate name,
+ * then test membership.
  *
  * Guarded to true path shapes only: a "/" somewhere in the value, or a bare
  * `.mjs` (hooks are the only node type cited without a directory prefix in
@@ -136,9 +143,37 @@ export function slotEdgeName(value, sortedNames) {
  * `rules/filesystem/path-portability.md` must resolve to
  * `filesystem/path-portability`, not fail because `path-portability` alone
  * isn't a node.
+ *
+ * CONTAINER GUARD — read this before "fixing" it. Measured against the full
+ * corpus, the segment-suffix walk alone over-resolves: `.claude/integration-
+ * test-constraints.md` (a repo-level CONFIG file) matches the substring
+ * "integration-test-constraints", which is also a real RULE living at
+ * `rules/integration-test-constraints.md`. Same basename, two different
+ * files — a false positive.
+ *
+ * The trap is reaching for a ".claude" prefix rejection to fix it. That
+ * breaks a REQUIRED row: `.claude/hooks/preToolUse/subagent-prefix-
+ * prepend.mjs` also starts with ".claude" and must still resolve. The
+ * actual discriminator is not what the span starts with, it's whether the
+ * matched candidate sits directly under a real container:
+ *   - `.mjs` spans skip this check entirely. Hooks are the only `.mjs` node
+ *     type, and they're legitimately cited from several roots
+ *     (`.claude/hooks/<event>/`, `sessionStart/`, or bare) — there is no
+ *     analogous "hook config file that isn't a hook" collision to guard
+ *     against, so gating `.mjs` the same way would only cost real rows.
+ *   - `.md` and extensionless spans resolve only when the segment
+ *     immediately before the match is `rules`, `skills`, or `agents`
+ *     (the walk found the name right under a real component directory), OR
+ *     the match starts the span at i===0 (the bare `/<n>` slash-command
+ *     form, e.g. `/doc-backfill` — there's no preceding segment to check,
+ *     and the leading "/" is itself the citation marker).
+ * Verified against the full corpus with this guard: 55 new pairs (up from
+ * the 44-row expected-diff baseline), all 44 original rows retained, 0
+ * `.claude/*.md` basename-collision leaks.
  */
 export function pathEdgeName(value, nameSet) {
   if (!value.includes('/') && !/\.mjs$/.test(value)) return null
+  const isMjs = /\.mjs$/.test(value)
   const stripped = value.replace(/\.(md|mjs)$/, '')
   const segments = stripped.split('/').filter(Boolean)
   // The "SKILL" filename segment is never itself a node name (see the
@@ -150,7 +185,13 @@ export function pathEdgeName(value, nameSet) {
   }
   for (let i = 0; i < segments.length; i++) {
     const candidate = segments.slice(i).join('/')
-    if (nameSet.has(candidate)) return candidate
+    if (!nameSet.has(candidate)) continue
+    if (isMjs || i === 0 || CONTAINERS.has(segments[i - 1])) return candidate
+    // Matched a real node's basename, but not under a real container and
+    // not at the start of the span — the .claude/*.md collision case.
+    // Reject outright rather than falling back to a shorter substring: a
+    // weaker sub-match is not a stronger signal than the one just rejected.
+    return null
   }
   return null
 }
@@ -182,13 +223,18 @@ export function colonEdgeName(value, nameSet) {
  * `install-vetting.md`), so this takes sortedNames longest-first and
  * prefix-walks it, exactly like slotEdgeName.
  *
- * Separator set is narrower than the architecture blueprint's nominal
- * `[\s.#§]` class: whitespace is deliberately EXCLUDED. None of the 44
- * target rows need it (row 44, the only suffixed row, uses `.`), and a
- * whitespace separator turns ordinary prose into edges: `handoff to the
- * next session` would resolve to the `handoff` skill, `run the harvest` to
- * a node named `run`. `.`, `#`, `§` are structural marks that don't open an
- * English sentence right after a name, so they stay; `\s` does not.
+ * Separator set is narrower than the architecture blueprint's original
+ * nominal `[\s.#§]` class: whitespace is EXCLUDED, and the blueprint's rule
+ * table has since been corrected to `[.#§]` to match. This isn't a
+ * theoretical call — it was measured against the full corpus: permitting
+ * `\s` resolves 12 additional spans, and every single one is prose or
+ * console-output text (`"architect skipped"`, `"git-manager clean-gone"`,
+ * `"plan-management repoint"`, `"docs-architect dropped section(s) …"`),
+ * zero of them true citations. None of the 44 baseline target rows need
+ * whitespace either (row 44, the only suffixed row, uses `.`). Do not
+ * "restore" `\s` here — the corpus measurement is why it's gone, not an
+ * oversight. `.`, `#`, `§` are structural marks that don't open an English
+ * sentence right after a name, so they stay.
  */
 export function suffixedEdgeName(value, sortedNames) {
   for (const n of sortedNames) {

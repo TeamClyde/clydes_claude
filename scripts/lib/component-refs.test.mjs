@@ -16,6 +16,7 @@ const REAL_NAMES = [
   'architect', 'integration-test-constraints', 'feedback', 'handoff',
   'git-manager', 'plan-gate', 'test-driven-development',
   'install-vetting', 'install-vetting-advisory',
+  'infra-init', 'ai-tool-security-reviewer',
 ]
 const REAL_NAME_SET = new Set(REAL_NAMES)
 const REAL_NAMES_SORTED = [...REAL_NAMES].sort((a, b) => b.length - a.length)
@@ -179,6 +180,49 @@ test('pathEdgeName does not widen the bare-name shape — "feedback" as a plain 
   // No "/" and no ".mjs" suffix: pathEdgeName must decline outright and
   // leave this shape to the existing exact backtickEdgeName rule, unchanged.
   assert.equal(pathEdgeName('feedback', REAL_NAME_SET), null)
+})
+
+test('pathEdgeName resolves the bare /<n> slash-command form (class A)', () => {
+  assert.equal(pathEdgeName('/doc-backfill', REAL_NAME_SET), 'doc-backfill')
+  assert.equal(pathEdgeName('/infra-init', REAL_NAME_SET), 'infra-init')
+})
+
+test('pathEdgeName resolves an extensionless directory span rooted at a real container (class B)', () => {
+  assert.equal(pathEdgeName('skills/infra-init', REAL_NAME_SET), 'infra-init')
+  assert.equal(pathEdgeName('agents/ai-tool-security-reviewer', REAL_NAME_SET), 'ai-tool-security-reviewer')
+})
+
+test('pathEdgeName rejects a .claude/*.md basename collision with an unrelated rule (class C)', () => {
+  // ".claude/integration-test-constraints.md" is a repo-level CONFIG file.
+  // The rule node "integration-test-constraints" lives at
+  // "rules/integration-test-constraints.md" — a different file that happens
+  // to share a basename. The container guard must catch this: ".claude" is
+  // not a real container (rules/skills/agents), and the match isn't at the
+  // start of the span, so it must not resolve.
+  assert.equal(
+    pathEdgeName('.claude/integration-test-constraints.md', REAL_NAME_SET), null,
+    '.claude/integration-test-constraints.md is a config file, not the integration-test-constraints RULE — same basename, different file',
+  )
+})
+
+test('the container-guard discriminator: .mjs bypasses the check, bare .md under .claude/ does not', () => {
+  // These two spans BOTH start with ".claude" — proof the guard is not a
+  // ".claude" prefix test. The hook .mjs path is a required row and must
+  // stay green; the .md basename collision must stay rejected. Asserted
+  // adjacently so the discriminator (extension, not prefix) is legible.
+  assert.equal(
+    pathEdgeName('.claude/hooks/preToolUse/subagent-prefix-prepend.mjs', REAL_NAME_SET),
+    'subagent-prefix-prepend',
+  )
+  assert.equal(pathEdgeName('.claude/integration-test-constraints.md', REAL_NAME_SET), null)
+})
+
+test('pathEdgeName rejects a <n>.md span whose parent segment is not a real container', () => {
+  // "docs" is not rules/skills/agents — a coincidental basename match under
+  // an unrelated directory must not resolve, same shape as the class C case
+  // above but with a synthetic non-".claude" parent to isolate the guard
+  // from any ".claude"-specific behavior.
+  assert.equal(pathEdgeName('docs/architect.md', REAL_NAME_SET), null)
 })
 
 // --- colonEdgeName -------------------------------------------------------
