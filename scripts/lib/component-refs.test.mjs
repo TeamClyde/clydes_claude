@@ -282,9 +282,28 @@ test('suffixedEdgeName respects longest-first precedence for prefix-ambiguous na
   assert.equal(suffixedEdgeName('install-vetting.md', REAL_NAMES_SORTED), 'install-vetting')
 })
 
-// --- resolvedNames regression — unchanged by this task -------------------
+// --- resolvedNames self-exclusion — survives the precedence chain --------
 
-test('resolvedNames still excludes self-references (regression: resolvedNames itself is not modified by this task)', () => {
+// The header and name above previously read "unchanged by this task" /
+// "resolvedNames itself is not modified by this task". That was accurate when
+// written, while the three resolution rules existed but nothing called them.
+// It is now the opposite of true: resolvedNames() is exactly what the wiring
+// task modified, and a stale disclaimer sitting in the first file a reader
+// opens when debugging that function is worse than no comment at all.
+//
+// The assertion below is UNCHANGED. What changed is its load. It used to guard
+// a function nobody was touching; it now guards that the `hit !== self` filter
+// stayed OUTSIDE the four-rule chain (exact -> path -> colon -> suffixed)
+// rather than being pushed into any single rule. That placement is what makes
+// self-exclusion independent of which rule produced the hit — so widening the
+// chain, as the wiring did, cannot leak a self-edge through a new arm.
+//
+// Scope, stated precisely rather than generously: this fixture's spans are
+// exact node names, so they resolve on the FIRST arm (backtickEdgeName). It
+// therefore proves the filter's placement relative to the chain, not that each
+// of the four arms was individually exercised. The corpus-wide no-self-edges
+// guarantee is asserted separately in scripts/harvest-components.test.mjs.
+test('resolvedNames excludes self-references after the four-rule precedence chain', () => {
   const names = ['git-manager', 'plan-gate']
   const body = 'See `git-manager` for details, then run `plan-gate`.'
   assert.deepEqual(resolvedNames(body, names, 'git-manager'), new Set(['plan-gate']))

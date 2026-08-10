@@ -195,9 +195,12 @@ test('committed inventory matches freshly harvested output (drift guard)', async
 //
 // Its job used to be proving the tokenizer swap changed nothing. That job ended
 // when the three resolution rules were wired in and the graph deliberately
-// moved (176 -> 231 edges). It now anchors the STRONGER contract asserted
+// moved (176 -> 231 edges). It now anchors the RESHAPED contract asserted
 // below: not "nothing changed", but "nothing was lost and only the enumerated
-// 55 were gained". Keeping a real second implementation is still worth far more
+// 55 were gained". (Reshaped, not simply stronger — see the precise breakdown
+// on that test, which spells out where the new form is deliberately more
+// permissive than plain equality and where it is stricter.)
+// Keeping a real second implementation is still worth far more
 // than a byte-diff on the committed artifact — `npm run harvest:check` can tell
 // you the JSON moved, but only this can tell you WHICH edge and in which
 // direction, by name.
@@ -228,9 +231,32 @@ function legacyEdgeNames(body, sortedNames, self) {
 // structurally impossible to satisfy — the 55 new edges are the POINT, not a
 // regression.
 //
-// The re-grounding is a SUPERSET-WITH-KNOWN-DELTA assertion, which is strictly
-// stronger than the equality it replaces, because it splits one bidirectional
-// check into three independently-named ones:
+// The re-grounding is a SUPERSET-WITH-KNOWN-DELTA assertion. Stating its
+// strength precisely, because "strictly stronger than the equality it replaces"
+// is NOT formally true and should not be written here:
+//
+//   old:  legacy == modern
+//   new:  legacy ⊆ modern  AND  modern \ legacy == EXPECTED_NEW_EDGES
+//
+// On the 55 enumerated edges the new form is deliberately MORE PERMISSIVE —
+// plain equality would reject them outright, which is the entire reason it had
+// to be replaced. That carve-out is the point, not an oversight, and it is
+// bounded by enumeration rather than by kind.
+//
+// What is true, in three parts:
+//   1. It preserves the original's precision guarantee UNDILUTED. `lost` is
+//      exactly as strict as the old legacy-only half — not weakened, not
+//      relaxed, same set difference.
+//   2. It is stronger than the ALTERNATIVE THAT WAS REJECTED — a bare
+//      one-directional `modern ⊇ legacy` containment check, which would have
+//      passed while the rules resolved arbitrary extra edges, letting recall
+//      creep in unnoticed.
+//   3. It adds a guarantee the old equality could not express at all: the gain
+//      is not merely bounded, it is EXACTLY the enumerated set — checked in
+//      both directions, so neither an extra edge nor a vanished one passes.
+//
+// It gets there by splitting one bidirectional check into three
+// independently-named ones:
 //
 //   lost       legacy \ modern     MUST be empty. This is the original
 //                                  guarantee, fully preserved and undiluted:
@@ -247,18 +273,24 @@ function legacyEdgeNames(body, sortedNames, self) {
 //                                  or a corpus edit that removes a real
 //                                  citation, lands here by name.
 //
-// What was explicitly NOT done: weakening this to a one-directional "modern
-// contains legacy" check. That would let the rules resolve anything at all so
-// long as they kept the old edges, which is the exact failure mode
-// EXPECTED_NEW_EDGES exists to prevent. If a future change legitimately adds an
-// edge, the correct move is to add the pair to EXPECTED_NEW_EDGES in the same
-// commit that causes it — deliberately, reviewably, one line per edge — not to
-// loosen the assertion.
+// MAINTENANCE CONTRACT — the corollary of point 2 above. When a future change
+// legitimately adds an edge, add the pair to EXPECTED_NEW_EDGES in the same
+// commit that causes it: deliberately, reviewably, one line per edge. Do not
+// loosen the assertion to absorb it. Dropping `unexpected` is precisely the
+// rejected one-directional check, reintroduced by attrition.
 //
 // Pair keys are `from|to` NAMES, not `type:name`, matching EXPECTED_NEW_EDGES's
 // shape and the gate-map's own edge identity (edges carry names, not types).
-// Verified lossless: the inventory has 79 entries and 79 distinct names, so no
-// two components can collapse into one pair key.
+// Two ways a pair key could collide, both foreclosed:
+//   - two components sharing a NAME — ruled out by count: the inventory has 79
+//     entries and 79 distinct names.
+//   - the concatenation boundary itself, where a name containing a literal "|"
+//     would make `a|b` + `c` key identically to `a` + `b|c`. Ruled out by the
+//     character set, not the count: every name derives from a filesystem path
+//     (scanRules/scanSkills/scanAgents/scanHooks in harvest-components.mjs),
+//     and "|" is not a legal filename character on Windows — where this repo is
+//     developed and where the artifact is generated — so no name can contain
+//     the delimiter. The count alone would NOT have ruled this one out.
 test('tokenizer is a superset of the legacy edge set, gaining exactly the known 55 (equivalence)', async () => {
   const inv = await harvest({ repoRoot: REPO_ROOT })
   const sorted = [...new Set(inv.map(c => c.name).filter(Boolean))].sort((a, b) => b.length - a.length)
