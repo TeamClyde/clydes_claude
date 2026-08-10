@@ -253,14 +253,54 @@ export function suffixedEdgeName(value, sortedNames) {
 /**
  * All names a body cites, as the edge consumer resolves them.
  * `self` is excluded to preserve the existing no-self-edges guarantee.
+ *
+ * PRECEDENCE — a `backtick` span is offered to four rules in this fixed order,
+ * first non-null wins: exact -> path -> colon -> suffixed. The order is not
+ * arbitrary, it runs strictest-first so a span resolves to the one name its
+ * most specific reading yields:
+ *   - `backtickEdgeName` first because a span that IS a node name exactly needs
+ *     no interpretation, and letting a looser rule see it first could pick a
+ *     different (shorter) name out of the same characters.
+ *   - `pathEdgeName` before `suffixedEdgeName` because a path citation carries
+ *     a container segment that proves the reading — `rules/filesystem/path-
+ *     portability.md` must resolve to `filesystem/path-portability`, whereas
+ *     the suffixed rule's prefix walk anchors at the START of the span and so
+ *     would never see past the leading `rules/`.
+ *   - `colonEdgeName` before `suffixedEdgeName` so `plan-management:divergence`
+ *     resolves on the colon split rather than being declined by both (the
+ *     suffixed rule's separator class is `[.#§]` and excludes `:`).
+ * The three added rules are only ever consulted AFTER the exact match declines,
+ * so no edge the legacy explicit-only extractor produced can be re-resolved to
+ * a different target by this change — the delta is strictly additive. That
+ * "no legacy edge is lost" half of the contract is asserted directly in
+ * scripts/harvest-components.test.mjs § the equivalence oracle.
+ *
+ * `slot` tokens keep going to `slotEdgeName` alone. A structured invocation
+ * value is already a name by construction; the three added rules exist to read
+ * DOCUMENT-shaped citations (paths, filenames, anchors), none of which appear
+ * in a `skill:` / `subagent_type:` slot in this corpus.
+ *
+ * `||`, not `??`: safe only because none of the four rules can return `''` —
+ * each returns `null` or a value that passed a Set-membership test against real
+ * node names, and no node is named the empty string. If that ever stopped
+ * holding, an `''` hit would fall through the chain indistinguishably from
+ * "no match".
+ *
+ * The name `Set` is built once per call, outside the token loop — rebuilding it
+ * per token would make this O(tokens x names) on a corpus where a single body
+ * can carry hundreds of spans.
  */
 export function resolvedNames(body, sortedNames, self) {
   const nameSet = new Set(sortedNames)
   const found = new Set()
   for (const t of tokenize(body)) {
-    const hit = t.kind === 'backtick' ? backtickEdgeName(t.value, nameSet)
+    const hit = t.kind === 'backtick'
+      ? (backtickEdgeName(t.value, nameSet)
+        || pathEdgeName(t.value, nameSet)
+        || colonEdgeName(t.value, nameSet)
+        || suffixedEdgeName(t.value, sortedNames))
       : t.kind === 'slot' ? slotEdgeName(t.value, sortedNames)
-      : null
+        : null
     if (hit && hit !== self) found.add(hit)
   }
   return found

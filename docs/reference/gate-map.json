@@ -513,15 +513,31 @@
     },
     {
       "from": "architect",
+      "to": "delivery-cadence"
+    },
+    {
+      "from": "architect",
       "to": "researcher"
+    },
+    {
+      "from": "architect",
+      "to": "stack-hats"
     },
     {
       "from": "architect",
       "to": "subagent-driven-development"
     },
     {
+      "from": "architecture-decision-records",
+      "to": "doc-tools"
+    },
+    {
       "from": "brainstorming",
       "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "brainstorming",
+      "to": "doc-tools"
     },
     {
       "from": "brainstorming",
@@ -568,6 +584,10 @@
       "to": "plan-gate"
     },
     {
+      "from": "different-viewpoints-lite",
+      "to": "different-viewpoint"
+    },
+    {
       "from": "dispatching-parallel-agents",
       "to": "librarian"
     },
@@ -581,11 +601,23 @@
     },
     {
       "from": "doc-author",
+      "to": "doc-backfill"
+    },
+    {
+      "from": "doc-author",
+      "to": "doc-tools"
+    },
+    {
+      "from": "doc-author",
       "to": "docs-architect"
     },
     {
       "from": "doc-author",
       "to": "git-manager"
+    },
+    {
+      "from": "doc-author",
+      "to": "plan-management"
     },
     {
       "from": "doc-backfill",
@@ -598,6 +630,10 @@
     {
       "from": "doc-backfill",
       "to": "git-manager"
+    },
+    {
+      "from": "doc-backfill",
+      "to": "infra-init"
     },
     {
       "from": "doc-tools",
@@ -610,6 +646,18 @@
     {
       "from": "doc-tools",
       "to": "doc-author"
+    },
+    {
+      "from": "doc-tools",
+      "to": "doc-backfill"
+    },
+    {
+      "from": "doc-tools",
+      "to": "docs-refresh"
+    },
+    {
+      "from": "doc-tools",
+      "to": "docs-status"
     },
     {
       "from": "doc-tools",
@@ -641,6 +689,10 @@
     },
     {
       "from": "docs-refresh",
+      "to": "docs-status"
+    },
+    {
+      "from": "docs-refresh",
       "to": "git-manager"
     },
     {
@@ -661,7 +713,19 @@
     },
     {
       "from": "docs-status",
+      "to": "doc-tools"
+    },
+    {
+      "from": "docs-status",
+      "to": "docs-refresh"
+    },
+    {
+      "from": "docs-status",
       "to": "project-setup"
+    },
+    {
+      "from": "e2e-init",
+      "to": "infra-init"
     },
     {
       "from": "executing-plans",
@@ -677,11 +741,31 @@
     },
     {
       "from": "executing-plans",
+      "to": "plan-management"
+    },
+    {
+      "from": "executing-plans",
+      "to": "stack-hats"
+    },
+    {
+      "from": "executing-plans",
       "to": "systematic-debugging"
     },
     {
       "from": "executing-plans",
       "to": "test-runner"
+    },
+    {
+      "from": "filesystem/path-portability",
+      "to": "infra-init"
+    },
+    {
+      "from": "finishing-a-development-branch",
+      "to": "delivery-cadence"
+    },
+    {
+      "from": "finishing-a-development-branch",
+      "to": "docs-status"
     },
     {
       "from": "finishing-a-development-branch",
@@ -690,6 +774,10 @@
     {
       "from": "finishing-a-development-branch",
       "to": "infra-init"
+    },
+    {
+      "from": "git-manager",
+      "to": "delivery-cadence"
     },
     {
       "from": "git-manager",
@@ -716,6 +804,14 @@
       "to": "plan-management"
     },
     {
+      "from": "infra-init",
+      "to": "filesystem/path-portability"
+    },
+    {
+      "from": "install-vetting",
+      "to": "ai-tool-security-reviewer"
+    },
+    {
       "from": "install-vetting",
       "to": "vet-capability-fit"
     },
@@ -730,6 +826,10 @@
     {
       "from": "install-vetting",
       "to": "vet-security"
+    },
+    {
+      "from": "integration-engineer",
+      "to": "infra-init"
     },
     {
       "from": "integration-test-constraints",
@@ -789,6 +889,10 @@
     },
     {
       "from": "new-repo-setup",
+      "to": "stack-hat-directive"
+    },
+    {
+      "from": "new-repo-setup",
       "to": "test-builder"
     },
     {
@@ -817,6 +921,10 @@
     },
     {
       "from": "plan-docs",
+      "to": "integration-test-constraints"
+    },
+    {
+      "from": "plan-docs",
       "to": "plan-gate"
     },
     {
@@ -825,7 +933,15 @@
     },
     {
       "from": "plan-docs",
+      "to": "planning"
+    },
+    {
+      "from": "plan-docs",
       "to": "systematic-debugging"
+    },
+    {
+      "from": "plan-docs",
+      "to": "workflow-phases"
     },
     {
       "from": "plan-docs",
@@ -838,6 +954,10 @@
     {
       "from": "plan-gate",
       "to": "architect"
+    },
+    {
+      "from": "plan-gate",
+      "to": "delivery-cadence"
     },
     {
       "from": "plan-gate",
@@ -881,6 +1001,10 @@
     },
     {
       "from": "plan-management",
+      "to": "doc-tools"
+    },
+    {
+      "from": "plan-management",
       "to": "executing-plans"
     },
     {
@@ -890,6 +1014,10 @@
     {
       "from": "plan-management",
       "to": "jira-workflow-manager"
+    },
+    {
+      "from": "plan-management",
+      "to": "plan-docs"
     },
     {
       "from": "plan-management",
@@ -933,6 +1061,10 @@
     },
     {
       "from": "project-setup",
+      "to": "delivery-cadence"
+    },
+    {
+      "from": "project-setup",
       "to": "e2e-init"
     },
     {
@@ -942,6 +1074,10 @@
     {
       "from": "project-setup",
       "to": "infra-init"
+    },
+    {
+      "from": "project-setup",
+      "to": "install-vetting"
     },
     {
       "from": "project-setup",
@@ -993,7 +1129,15 @@
     },
     {
       "from": "stack-hats",
+      "to": "stack-hat-directive"
+    },
+    {
+      "from": "stack-hats",
       "to": "subagent-driven-development"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "agent-model-pinning"
     },
     {
       "from": "subagent-driven-development",
@@ -1025,6 +1169,14 @@
     },
     {
       "from": "subagent-driven-development",
+      "to": "stack-hats"
+    },
+    {
+      "from": "subagent-driven-development",
+      "to": "subagent-prefix-prepend"
+    },
+    {
+      "from": "subagent-driven-development",
       "to": "systematic-debugging"
     },
     {
@@ -1034,6 +1186,10 @@
     {
       "from": "systematic-debugging",
       "to": "dispatching-parallel-agents"
+    },
+    {
+      "from": "systematic-debugging",
+      "to": "filesystem/efficiency"
     },
     {
       "from": "systematic-debugging",
@@ -1109,6 +1265,10 @@
     },
     {
       "from": "vet-capability-fit",
+      "to": "install-vetting"
+    },
+    {
+      "from": "vet-capability-fit",
       "to": "researcher"
     },
     {
@@ -1118,6 +1278,14 @@
     {
       "from": "vet-capability-fit",
       "to": "vet-security"
+    },
+    {
+      "from": "vet-install",
+      "to": "install-vetting"
+    },
+    {
+      "from": "vet-install",
+      "to": "project-setup"
     },
     {
       "from": "vet-install",
@@ -1132,8 +1300,16 @@
       "to": "vet-security"
     },
     {
+      "from": "vet-reputation",
+      "to": "install-vetting"
+    },
+    {
       "from": "vet-security",
       "to": "ai-tool-security-reviewer"
+    },
+    {
+      "from": "vet-security",
+      "to": "install-vetting"
     },
     {
       "from": "vet-security",
@@ -1157,7 +1333,27 @@
     },
     {
       "from": "writing-agents",
+      "to": "architect"
+    },
+    {
+      "from": "writing-agents",
+      "to": "researcher"
+    },
+    {
+      "from": "writing-agents",
       "to": "test-driven-development"
+    },
+    {
+      "from": "writing-plans",
+      "to": "architect"
+    },
+    {
+      "from": "writing-plans",
+      "to": "delivery-cadence"
+    },
+    {
+      "from": "writing-plans",
+      "to": "doc-tools"
     },
     {
       "from": "writing-plans",
@@ -1170,6 +1366,14 @@
     {
       "from": "writing-plans",
       "to": "git-manager"
+    },
+    {
+      "from": "writing-plans",
+      "to": "plan-gate"
+    },
+    {
+      "from": "writing-plans",
+      "to": "plan-management"
     },
     {
       "from": "writing-plans",
@@ -1190,6 +1394,22 @@
     {
       "from": "writing-plans",
       "to": "writing-skills"
+    },
+    {
+      "from": "writing-rules",
+      "to": "cspell"
+    },
+    {
+      "from": "writing-rules",
+      "to": "mcp-governance"
+    },
+    {
+      "from": "writing-rules",
+      "to": "new-repo-setup"
+    },
+    {
+      "from": "writing-rules",
+      "to": "secrets-handling"
     },
     {
       "from": "writing-rules",

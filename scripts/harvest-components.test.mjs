@@ -188,10 +188,23 @@ test('committed inventory matches freshly harvested output (drift guard)', async
   assert.equal(onDisk.length, inv.length, 'inventory length drifted — run `npm run harvest`')
 })
 
-// The legacy extractor, preserved verbatim as the equivalence oracle. When
-// buildGateMap switches to the tokenizer (Task 3) this stays put: it is the
-// only thing that can prove the switch changed nothing, and it is a far better
-// diagnostic than a byte-diff on a 158-line JSON artifact.
+// The legacy explicit-only extractor, preserved VERBATIM as the frozen oracle.
+// Body unchanged since it was lifted out of buildGateMap — that is the whole
+// value: it is the last independent record of what the graph contained before
+// the tokenizer, and it cannot drift because nothing in production calls it.
+//
+// Its job used to be proving the tokenizer swap changed nothing. That job ended
+// when the three resolution rules were wired in and the graph deliberately
+// moved (176 -> 231 edges). It now anchors the STRONGER contract asserted
+// below: not "nothing changed", but "nothing was lost and only the enumerated
+// 55 were gained". Keeping a real second implementation is still worth far more
+// than a byte-diff on the committed artifact — `npm run harvest:check` can tell
+// you the JSON moved, but only this can tell you WHICH edge and in which
+// direction, by name.
+//
+// Do not "modernize" this function, do not refactor it to share code with
+// component-refs.mjs, and do not delete it. An oracle that imports the thing it
+// is checking asserts nothing.
 function legacyEdgeNames(body, sortedNames, self) {
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const found = new Set()
@@ -203,19 +216,78 @@ function legacyEdgeNames(body, sortedNames, self) {
   return found
 }
 
-test('tokenizer reproduces the legacy edge set for every component (equivalence)', async () => {
+// THE PRODUCTION ORACLE. This is the only test that checks the live
+// `resolvedNames()` — the function `buildGateMap()` actually runs — against an
+// independent implementation. Everything gate-map.json contains passes through
+// here first.
+//
+// It began life as a strict equality check ("the tokenizer reproduces the
+// legacy edge set exactly"), which was correct while the tokenizer swap was
+// meant to be a pure refactor. Wiring the three resolution rules into
+// `resolvedNames()` deliberately moved the graph, so strict equality became
+// structurally impossible to satisfy — the 55 new edges are the POINT, not a
+// regression.
+//
+// The re-grounding is a SUPERSET-WITH-KNOWN-DELTA assertion, which is strictly
+// stronger than the equality it replaces, because it splits one bidirectional
+// check into three independently-named ones:
+//
+//   lost       legacy \ modern     MUST be empty. This is the original
+//                                  guarantee, fully preserved and undiluted:
+//                                  no edge the explicit-only extractor found
+//                                  may disappear. A recall-improving change
+//                                  must never cost precision.
+//   unexpected (modern \ legacy) \ EXPECTED_NEW_EDGES
+//                                  MUST be empty. NEW: the gain is capped at
+//                                  the enumerated set. A rule that starts
+//                                  over-resolving lands here by name.
+//   missing    EXPECTED_NEW_EDGES \ (modern \ legacy)
+//                                  MUST be empty. NEW: every enumerated pair
+//                                  must still resolve. A rule that regresses,
+//                                  or a corpus edit that removes a real
+//                                  citation, lands here by name.
+//
+// What was explicitly NOT done: weakening this to a one-directional "modern
+// contains legacy" check. That would let the rules resolve anything at all so
+// long as they kept the old edges, which is the exact failure mode
+// EXPECTED_NEW_EDGES exists to prevent. If a future change legitimately adds an
+// edge, the correct move is to add the pair to EXPECTED_NEW_EDGES in the same
+// commit that causes it — deliberately, reviewably, one line per edge — not to
+// loosen the assertion.
+//
+// Pair keys are `from|to` NAMES, not `type:name`, matching EXPECTED_NEW_EDGES's
+// shape and the gate-map's own edge identity (edges carry names, not types).
+// Verified lossless: the inventory has 79 entries and 79 distinct names, so no
+// two components can collapse into one pair key.
+test('tokenizer is a superset of the legacy edge set, gaining exactly the known 55 (equivalence)', async () => {
   const inv = await harvest({ repoRoot: REPO_ROOT })
   const sorted = [...new Set(inv.map(c => c.name).filter(Boolean))].sort((a, b) => b.length - a.length)
 
-  const divergences = []
+  // Accumulated corpus-wide, NOT compared per-component: the per-component sets
+  // are name sets scoped to one body, while EXPECTED_NEW_EDGES is a flat set of
+  // `from|to` strings spanning the whole corpus. Comparing the per-component
+  // locals directly would be comparing two different shapes.
+  const legacyPairs = new Set()
+  const modernPairs = new Set()
   for (const c of inv) {
     const body = c.body || ''
-    const legacy = legacyEdgeNames(body, sorted, c.name)
-    const modern = resolvedNames(body, sorted, c.name)
-    for (const n of legacy) if (!modern.has(n)) divergences.push(`${c.type}:${c.name} -> ${n} (legacy only)`)
-    for (const n of modern) if (!legacy.has(n)) divergences.push(`${c.type}:${c.name} -> ${n} (tokenizer only)`)
+    for (const n of legacyEdgeNames(body, sorted, c.name)) legacyPairs.add(`${c.name}|${n}`)
+    for (const n of resolvedNames(body, sorted, c.name)) modernPairs.add(`${c.name}|${n}`)
   }
-  assert.deepEqual(divergences, [], `edge extraction diverged:\n${divergences.join('\n')}`)
+
+  const lost = [...legacyPairs].filter(p => !modernPairs.has(p)).sort()
+  const gained = new Set([...modernPairs].filter(p => !legacyPairs.has(p)))
+  const unexpected = [...gained].filter(p => !EXPECTED_NEW_EDGES.has(p)).sort()
+  const missing = [...EXPECTED_NEW_EDGES].filter(p => !gained.has(p)).sort()
+
+  assert.deepEqual(
+    { lost, unexpected, missing },
+    { lost: [], unexpected: [], missing: [] },
+    'edge extraction diverged from the known delta:\n'
+      + `  lost (legacy edge no longer resolved — a precision regression): ${lost.join(', ') || '(none)'}\n`
+      + `  unexpected (gained, not in EXPECTED_NEW_EDGES): ${unexpected.join(', ') || '(none)'}\n`
+      + `  missing (in EXPECTED_NEW_EDGES, no longer gained): ${missing.join(', ') || '(none)'}`,
+  )
 })
 
 // ONE-TIME MIGRATION PROOF — deleted in Task 6, once Task 3 has wired the new
