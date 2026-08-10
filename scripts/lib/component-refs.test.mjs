@@ -182,17 +182,17 @@ test('pathEdgeName does not widen the bare-name shape — "feedback" as a plain 
   assert.equal(pathEdgeName('feedback', REAL_NAME_SET), null)
 })
 
-test('pathEdgeName resolves the bare /<n> slash-command form (class A)', () => {
+test('pathEdgeName resolves the bare /<n> slash-command form', () => {
   assert.equal(pathEdgeName('/doc-backfill', REAL_NAME_SET), 'doc-backfill')
   assert.equal(pathEdgeName('/infra-init', REAL_NAME_SET), 'infra-init')
 })
 
-test('pathEdgeName resolves an extensionless directory span rooted at a real container (class B)', () => {
+test('pathEdgeName resolves an extensionless directory span rooted at a real container', () => {
   assert.equal(pathEdgeName('skills/infra-init', REAL_NAME_SET), 'infra-init')
   assert.equal(pathEdgeName('agents/ai-tool-security-reviewer', REAL_NAME_SET), 'ai-tool-security-reviewer')
 })
 
-test('pathEdgeName rejects a .claude/*.md basename collision with an unrelated rule (class C)', () => {
+test('pathEdgeName rejects a .claude/*.md basename collision with an unrelated rule', () => {
   // ".claude/integration-test-constraints.md" is a repo-level CONFIG file.
   // The rule node "integration-test-constraints" lives at
   // "rules/integration-test-constraints.md" — a different file that happens
@@ -219,9 +219,9 @@ test('the container-guard discriminator: .mjs bypasses the check, bare .md under
 
 test('pathEdgeName rejects a <n>.md span whose parent segment is not a real container', () => {
   // "docs" is not rules/skills/agents — a coincidental basename match under
-  // an unrelated directory must not resolve, same shape as the class C case
-  // above but with a synthetic non-".claude" parent to isolate the guard
-  // from any ".claude"-specific behavior.
+  // an unrelated directory must not resolve, same shape as the .claude/*.md
+  // basename-collision test above but with a synthetic non-".claude" parent
+  // to isolate the guard from any ".claude"-specific behavior.
   assert.equal(pathEdgeName('docs/architect.md', REAL_NAME_SET), null)
 })
 

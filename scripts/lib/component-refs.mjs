@@ -172,8 +172,8 @@ const CONTAINERS = new Set(['rules', 'skills', 'agents'])
  * `.claude/*.md` basename-collision leaks.
  */
 export function pathEdgeName(value, nameSet) {
-  if (!value.includes('/') && !/\.mjs$/.test(value)) return null
   const isMjs = /\.mjs$/.test(value)
+  if (!value.includes('/') && !isMjs) return null
   const stripped = value.replace(/\.(md|mjs)$/, '')
   const segments = stripped.split('/').filter(Boolean)
   // The "SKILL" filename segment is never itself a node name (see the
@@ -189,8 +189,13 @@ export function pathEdgeName(value, nameSet) {
     if (isMjs || i === 0 || CONTAINERS.has(segments[i - 1])) return candidate
     // Matched a real node's basename, but not under a real container and
     // not at the start of the span — the .claude/*.md collision case.
-    // Reject outright rather than falling back to a shorter substring: a
-    // weaker sub-match is not a stronger signal than the one just rejected.
+    // Reject outright rather than falling back to a shorter substring: safe
+    // because no stored node name begins with a CONTAINERS segment —
+    // scanRules()/scanSkills() in harvest-components.mjs strip "rules/" and
+    // "skills/" off before a name ever reaches this function. That means a
+    // shorter suffix can never recover a legitimate match this rejection
+    // missed, so a weaker sub-match is never a stronger signal than the one
+    // just rejected.
     return null
   }
   return null
