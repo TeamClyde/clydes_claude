@@ -214,40 +214,47 @@ test('every declared entry point still has zero inbound edges', async () => {
 // (docs/_coverage-audit.md, written at 76 components). This makes the same
 // check re-runnable and blocking instead of a one-off snapshot.
 //
-// MATCHER — word-boundary, `(?<![\w-])name(?![\w-])`. Re-measured 2026-08-11
-// against the 26 committed docs/explanation/**/*.md files: substring -> 1
-// uncovered, word-boundary -> 1 uncovered, backticked-span -> 12 uncovered.
-// All three agree on the same single gap (`cspell`), so the choice below is
-// not about which node it flags -- it is about which matcher stays correct
-// as the corpus grows. Substring is the loosest of the three: it also counts
-// a name appearing as a fragment of a longer word as coverage, which holds
-// for this corpus today but has no fence against a future coincidental
-// substring match. Word-boundary sits at the strictness ceiling this corpus
-// will bear: a backticked-span matcher is stricter still, and here that is a
-// defect, not a virtue -- it misreports 11 genuinely-documented nodes (e.g.
-// `filesystem/efficiency`) as uncovered, because this corpus cites rule names
-// BY PATH (`` `rules/filesystem/efficiency.md` ``), never as a bare backticked
-// span equal to the node name. That is the same basename-vs-path mismatch
-// slice 2a fixed in the extractor, resurfacing in a different matcher.
+// MATCHER — word-boundary, `(?<![\w-])name(?![\w-])`. Three candidate
+// matchers were compared over the docs/explanation/ corpus: substring,
+// word-boundary, and a backticked-span matcher requiring an exact
+// `` `name` `` occurrence. Substring and word-boundary agree and both isolate
+// the same single catalog-only node (`cspell`); backticked-span is far
+// stricter and over-reports by roughly an order of magnitude, because this
+// corpus cites rule names BY PATH (`` `rules/filesystem/efficiency.md` ``),
+// never as a bare backticked span equal to the node name -- the same
+// basename-vs-path mismatch slice 2a fixed in the extractor, resurfacing in a
+// different matcher. Word-boundary is chosen over substring for the same
+// reason: strict enough not to start silently passing on an unrelated
+// substring match later, but not so strict that it reports genuinely-
+// documented, path-cited nodes as uncovered the way backticked-span does.
 // Node names are escaped before being built into a regex -- an unescaped `/`
 // or `.` in a name like `filesystem/efficiency` would silently change the
-// match semantics, which is also why the naive backticked matcher above was
-// built without escaping and still failed on them for an unrelated reason.
+// match semantics.
+//
+// These are corpus properties, not counts pinned in this comment: which
+// nodes are uncovered, and by how much the three matchers diverge, shifts
+// every time a doc is added to or removed from docs/explanation/ -- a count
+// written here goes stale the moment the corpus changes, silently, with
+// nothing to notice (this happened once already: a prior version of this
+// comment froze a corpus-file count and an uncovered-node count that were
+// both wrong two commits later). To reproduce the comparison, run each
+// matcher over `git ls-files -z '*.md'` filtered to docs/explanation/, same
+// enumeration as committedExplanationDocs() below.
 //
 // Word-boundary's own cost, so this doesn't read as a free choice: it counts
 // any WHOLE-WORD occurrence as coverage, so a node name that is also an
 // ordinary English word matches ordinary prose, not just a citation of that
-// component. Re-measured 2026-08-11: the `planning` node word-boundary-matches
-// throughout docs/explanation/ in sentences like "structured planning" and
-// "planning session" that have nothing to do with citing `rules/planning.md`
-// -- most of its matches in this corpus are exactly that kind of prose
-// coincidence, not a citation. No false pass results today only because
-// `planning` also has genuine backticked citations elsewhere in the corpus;
-// a future single-common-word rule slug with zero real citations would be
-// silently marked covered by prose alone. This is the accepted tradeoff, not
-// an oversight: word-boundary's false-positive risk (coincidental whole-word
-// prose) is judged smaller here than backticked-span's false-negative rate
-// (11 wrongly-flagged nodes, measured above) or substring's unbounded
+// component. The `planning` node word-boundary-matches throughout
+// docs/explanation/ in sentences like "structured planning" and "planning
+// session" that have nothing to do with citing `rules/planning.md` -- most of
+// its matches in this corpus are exactly that kind of prose coincidence, not
+// a citation. No false pass results today only because `planning` also has
+// genuine backticked citations elsewhere in the corpus; a future
+// single-common-word rule slug with zero real citations would be silently
+// marked covered by prose alone. This is the accepted tradeoff, not an
+// oversight: word-boundary's false-positive risk (coincidental whole-word
+// prose) is judged smaller here than backticked-span's much higher
+// false-negative rate (documented above) or substring's unbounded
 // coincidental-fragment risk.
 //
 // BOTH DIRECTIONS — same reasoning as INBOUND DEGREE's staleness test. A
