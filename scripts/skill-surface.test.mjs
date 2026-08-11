@@ -158,3 +158,20 @@ test('every entryPoints exemption carries a non-empty reason', async () => {
     }
   }
 })
+
+// catalogOnly is FLAT, unlike entryPoints -- one exemption class (no docs/explanation/
+// mention), not several invocation sources to group by. No group-set assertion needed:
+// there are no groups, so there is nothing to enumerate before checking reasons.
+test('every catalogOnly exemption carries a non-empty reason', async () => {
+  const policy = await readPolicy()
+  const catalogOnly = policy.catalogOnly
+  assert.ok(catalogOnly, 'policy.catalogOnly must exist')
+
+  const isMeta = k => k.startsWith('$')
+  const entries = Object.entries(catalogOnly).filter(([k]) => !isMeta(k))
+  assert.ok(entries.length > 0, 'catalogOnly must not be empty')
+  for (const [key, reason] of entries) {
+    assert.equal(typeof reason, 'string', `catalogOnly.${key} reason must be a string`)
+    assert.ok(reason.trim().length > 0, `catalogOnly.${key} requires a reason — an exemption without one is a hiding place`)
+  }
+})

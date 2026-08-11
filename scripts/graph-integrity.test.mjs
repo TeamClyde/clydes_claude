@@ -102,11 +102,10 @@ function declaredEntryPoints(block) {
  * directly under the block rather than inside named groups. `$comment` is
  * still filtered at this one level via `isMeta`, same as every other block.
  *
- * The reason strings are not read here, mirroring declaredEntryPoints: this
- * file checks coverage, not reason quality. Unlike entryPoints, no schema
- * check for reason non-emptiness exists yet for this block -- the policy
- * file's own $comment notes the gap rather than claiming a check that isn't
- * there.
+ * The REASON strings are not read here. Their presence and non-emptiness is
+ * the schema check's job (skill-surface.test.mjs) -- the same split
+ * declaredEntryPoints uses for the entryPoints block. Do not re-validate them
+ * here; one owner per rule.
  */
 function declaredCatalogOnly(block) {
   const out = new Map()
@@ -208,7 +207,8 @@ test('every declared entry point still has zero inbound edges', async () => {
 
 // ---------------------------------------------------------------------------
 // DOCUMENTATION COVERAGE — every node is named in >= 1 docs/explanation/ doc,
-// or is a declared catalog-only exemption with a reason. Implements ADR-0003
+// or is a declared catalog-only exemption with a reason. Asserted in BOTH
+// directions, same shape as INBOUND DEGREE above. Implements ADR-0003
 // (docs/explanation/adr/0003-generated-inventory-completeness-oracle.md),
 // which has been Accepted since the mechanism was a point-in-time audit
 // (docs/_coverage-audit.md, written at 76 components). This makes the same
@@ -233,6 +233,30 @@ test('every declared entry point still has zero inbound edges', async () => {
 // or `.` in a name like `filesystem/efficiency` would silently change the
 // match semantics, which is also why the naive backticked matcher above was
 // built without escaping and still failed on them for an unrelated reason.
+//
+// Word-boundary's own cost, so this doesn't read as a free choice: it counts
+// any WHOLE-WORD occurrence as coverage, so a node name that is also an
+// ordinary English word matches ordinary prose, not just a citation of that
+// component. Re-measured 2026-08-11: the `planning` node word-boundary-matches
+// throughout docs/explanation/ in sentences like "structured planning" and
+// "planning session" that have nothing to do with citing `rules/planning.md`
+// -- most of its matches in this corpus are exactly that kind of prose
+// coincidence, not a citation. No false pass results today only because
+// `planning` also has genuine backticked citations elsewhere in the corpus;
+// a future single-common-word rule slug with zero real citations would be
+// silently marked covered by prose alone. This is the accepted tradeoff, not
+// an oversight: word-boundary's false-positive risk (coincidental whole-word
+// prose) is judged smaller here than backticked-span's false-negative rate
+// (11 wrongly-flagged nodes, measured above) or substring's unbounded
+// coincidental-fragment risk.
+//
+// BOTH DIRECTIONS — same reasoning as INBOUND DEGREE's staleness test. A
+// catalogOnly declaration is only ever appended to unless something checks
+// the reverse: that the declared component still exists, and still lacks a
+// docs/explanation/ mention. Without that check, documenting a catalog-only
+// node later leaves its now-unnecessary exemption in place forever, with
+// nothing to notice -- the same hiding-place risk entryPoints already guards
+// against, applied to the other completeness block.
 // ---------------------------------------------------------------------------
 
 const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -276,5 +300,38 @@ test('every node is documented in docs/explanation/ or declared catalog-only', a
       + `${uncovered.map(s => `    ${s}`).join('\n')}\n`
       + '  Each is a coverage miss under ADR-0003 -- document it in the most-fitting explainer, or\n'
       + '  record it catalog-only under docs/reference/skill-surface-policy.json with a reason.',
+  )
+})
+
+test('every declared catalogOnly exemption is still accurate', async () => {
+  const { nodes, catalogOnly } = await graph()
+  const known = new Set(nodes.map(n => n.name))
+  const bodies = await explanationDocBodies()
+
+  const stale = []
+  for (const [name] of catalogOnly) {
+    // Case A: the declaration names a component that no longer exists (renamed
+    // or deleted). Invisible to the coverage test above -- a nonexistent name
+    // is never iterated as a node, so it silently costs nothing there.
+    if (!known.has(name)) {
+      stale.push(`${name} is declared catalogOnly but is not a node in the graph`)
+      continue
+    }
+    // Case B: the component now HAS a docs/explanation/ mention, so the
+    // exemption has outlived the fact it described -- the direct analogue of
+    // an entryPoints declaration that gained an inbound edge.
+    if (isDocumented(name, bodies)) {
+      stale.push(`${name} is declared catalogOnly but is now documented in docs/explanation/`)
+    }
+  }
+
+  assert.deepEqual(
+    stale, [],
+    `${stale.length} stale catalogOnly declaration(s):\n`
+      + `${stale.map(s => `    ${s}`).join('\n')}\n`
+      + '  A catalogOnly entry that names a component no longer in the graph, or whose component is\n'
+      + '  now documented, is no longer earning its exemption -- delete the declaration from\n'
+      + '  docs/reference/skill-surface-policy.json. A catalogOnly block that is only ever appended\n'
+      + '  to stops being a declaration and becomes a hiding place.',
   )
 })
