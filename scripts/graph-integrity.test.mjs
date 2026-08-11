@@ -1,7 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
+import { dirname, resolve, join } from 'node:path'
 import { harvest, buildGateMap } from './harvest-components.mjs'
 import { readPolicy } from './lib/skill-surface.mjs'
 
@@ -56,7 +58,12 @@ function graph() {
     // basis of the inbound-degree question below.
     const { nodes, dependentsOf } = buildGateMap(inv)
     const policy = await readPolicy()
-    return { nodes, dependentsOf, entryPoints: declaredEntryPoints(policy.entryPoints) }
+    return {
+      nodes,
+      dependentsOf,
+      entryPoints: declaredEntryPoints(policy.entryPoints),
+      catalogOnly: declaredCatalogOnly(policy.catalogOnly),
+    }
   })())
 }
 
@@ -84,6 +91,28 @@ function declaredEntryPoints(block) {
       if (isMeta(name)) continue
       out.set(name, group)
     }
+  }
+  return out
+}
+
+/**
+ * Declared catalog-only name -> reason. Flat, unlike entryPoints: there is
+ * exactly one exemption class here ("no docs/explanation/ doc describes
+ * this"), not several invocation sources to group by, so entries sit
+ * directly under the block rather than inside named groups. `$comment` is
+ * still filtered at this one level via `isMeta`, same as every other block.
+ *
+ * The reason strings are not read here, mirroring declaredEntryPoints: this
+ * file checks coverage, not reason quality. Unlike entryPoints, no schema
+ * check for reason non-emptiness exists yet for this block -- the policy
+ * file's own $comment notes the gap rather than claiming a check that isn't
+ * there.
+ */
+function declaredCatalogOnly(block) {
+  const out = new Map()
+  for (const [name, reason] of Object.entries(block ?? {})) {
+    if (isMeta(name)) continue
+    out.set(name, reason)
   }
   return out
 }
@@ -174,5 +203,78 @@ test('every declared entry point still has zero inbound edges', async () => {
       + '  A declared entry point that has gained an inbound edge is no longer an entry point —\n'
       + '  delete the declaration. An entryPoints block that is only ever appended to stops\n'
       + '  being a declaration and becomes a hiding place.',
+  )
+})
+
+// ---------------------------------------------------------------------------
+// DOCUMENTATION COVERAGE — every node is named in >= 1 docs/explanation/ doc,
+// or is a declared catalog-only exemption with a reason. Implements ADR-0003
+// (docs/explanation/adr/0003-generated-inventory-completeness-oracle.md),
+// which has been Accepted since the mechanism was a point-in-time audit
+// (docs/_coverage-audit.md, written at 76 components). This makes the same
+// check re-runnable and blocking instead of a one-off snapshot.
+//
+// MATCHER — word-boundary, `(?<![\w-])name(?![\w-])`. Re-measured 2026-08-11
+// against the 26 committed docs/explanation/**/*.md files: substring -> 1
+// uncovered, word-boundary -> 1 uncovered, backticked-span -> 12 uncovered.
+// All three agree on the same single gap (`cspell`), so the choice below is
+// not about which node it flags -- it is about which matcher stays correct
+// as the corpus grows. Substring is the loosest of the three: it also counts
+// a name appearing as a fragment of a longer word as coverage, which holds
+// for this corpus today but has no fence against a future coincidental
+// substring match. Word-boundary sits at the strictness ceiling this corpus
+// will bear: a backticked-span matcher is stricter still, and here that is a
+// defect, not a virtue -- it misreports 11 genuinely-documented nodes (e.g.
+// `filesystem/efficiency`) as uncovered, because this corpus cites rule names
+// BY PATH (`` `rules/filesystem/efficiency.md` ``), never as a bare backticked
+// span equal to the node name. That is the same basename-vs-path mismatch
+// slice 2a fixed in the extractor, resurfacing in a different matcher.
+// Node names are escaped before being built into a regex -- an unescaped `/`
+// or `.` in a name like `filesystem/efficiency` would silently change the
+// match semantics, which is also why the naive backticked matcher above was
+// built without escaping and still failed on them for an unrelated reason.
+// ---------------------------------------------------------------------------
+
+const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// Committed state, not the working tree -- same discipline as
+// reference-integrity.test.mjs: CI runners are stock ubuntu/windows images
+// with no working-tree extras, so a filesystem walk would resolve
+// differently there than here.
+function committedExplanationDocs() {
+  return execFileSync('git', ['ls-files', '-z', '*.md'], { cwd: REPO_ROOT, encoding: 'utf8' })
+    .split('\0')
+    .filter(Boolean)
+    .filter(p => p.startsWith('docs/explanation/'))
+    .sort()
+}
+
+async function explanationDocBodies() {
+  const files = committedExplanationDocs()
+  return Promise.all(files.map(f => readFile(join(REPO_ROOT, f), 'utf8')))
+}
+
+// Tested per-file rather than against one concatenated string, so the end of
+// one doc can never coincidentally complete a match that starts in another.
+function isDocumented(name, bodies) {
+  const re = new RegExp(`(?<![\\w-])${escapeRegExp(name)}(?![\\w-])`)
+  return bodies.some(body => re.test(body))
+}
+
+test('every node is documented in docs/explanation/ or declared catalog-only', async () => {
+  const { nodes, catalogOnly } = await graph()
+  const bodies = await explanationDocBodies()
+
+  const uncovered = nodes
+    .filter(n => !catalogOnly.has(n.name))
+    .filter(n => !isDocumented(n.name, bodies))
+    .map(n => `${n.type} ${n.name} (${n.file})`)
+
+  assert.deepEqual(
+    uncovered, [],
+    `${uncovered.length} node(s) named in no docs/explanation/ doc and not declared catalog-only:\n`
+      + `${uncovered.map(s => `    ${s}`).join('\n')}\n`
+      + '  Each is a coverage miss under ADR-0003 -- document it in the most-fitting explainer, or\n'
+      + '  record it catalog-only under docs/reference/skill-surface-policy.json with a reason.',
   )
 })

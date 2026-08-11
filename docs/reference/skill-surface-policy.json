@@ -166,5 +166,24 @@
       "using-superpowers": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in skills/brainstorming/SKILL.md, which 2a deliberately does not extract as a citation.",
       "verification-before-completion": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in agents/test-runner.md, skills/systematic-debugging/SKILL.md, and skills/writing-skills/eval-methodology.md, which 2a deliberately does not extract as a citation."
     }
+  },
+
+  "catalogOnly": {
+    "$comment": [
+      "Declared exemptions from the ADR-0003 documentation-coverage oracle, enforced by",
+      "scripts/graph-integrity.test.mjs. Every component in the generated inventory must be",
+      "named in >= 1 docs/explanation/ doc, or be recorded here catalog-only with a stated",
+      "reason for having no narrative home. Every entry is keyed by the exempted component and",
+      "valued by the REASON it is exempt -- unlike the references and entryPoints blocks above,",
+      "reason non-emptiness is not yet schema-checked for this block.",
+      "",
+      "This answers a different question than entryPoints: entryPoints is 'nothing cites this",
+      "in the graph, by design'; catalogOnly is 'no docs/explanation/ doc describes this, by",
+      "design'. A node can legitimately be in one, both, or neither -- do not conflate them.",
+      "",
+      "docs/_coverage-audit.md remains the narrative record of the original 76-component audit;",
+      "this block is the checked one that is re-verified on every test run."
+    ],
+    "cspell": "A self-contained tooling-hygiene rule (spellcheck false-positive word-list maintenance). It has no subsystem narrative — forcing it into a feature explainer would be artificial. Fully described by its own file + its `component-inventory.md` line. The instruction-loading-layer model that governs all rules is explained in `docs/explanation/architecture.md`."
   }
 }
