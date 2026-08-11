@@ -5,7 +5,8 @@ description: >
   to act on them — scanning the meta-workflow system for context, proposing multi-angle fixes,
   and routing improvements to the right component. This is about the WORKFLOW SYSTEM itself,
   not reviewing code changes — for code review, use requesting-code-review. Run periodically
-  or after several friction issues accumulate.
+  or after several friction issues accumulate. For consistency and drift checks, use
+  `adherence-audit`.
 argument-hint: "(no arguments needed — reads open workflow-friction GitHub issues)"
 allowed-tools: Read, Write, Edit, Glob, Agent, Skill
 ---

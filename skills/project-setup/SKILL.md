@@ -1,6 +1,6 @@
 ---
 name: project-setup
-description: Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUDE.md is missing or generic, or the codebase graph hasn't been generated. Configures Jira integration, testing setup, and workflow preferences.
+description: Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUDE.md is missing or generic, or the codebase graph hasn't been generated. Configures Jira integration, testing setup, and workflow preferences. For the codebase symbol graph, use `infra-init`.
 argument-hint: "(no arguments needed — interactive)"
 allowed-tools: Read, Write, Edit, Bash, Glob, Skill
 ---

@@ -1,6 +1,6 @@
 ---
 name: infra-init
-description: Use when starting a new repo session, before exploring an unfamiliar codebase, or when code structure has changed significantly. Builds a queryable symbol graph and CODEBASE.md so future navigation uses the graph instead of broad file searches.
+description: Use when starting a new repo session, before exploring an unfamiliar codebase, or when code structure has changed significantly. Builds a queryable symbol graph and CODEBASE.md so future navigation uses the graph instead of broad file searches. For first-time workflow onboarding, use `project-setup`.
 allowed-tools: Bash, Read, Write, Agent
 ---
 

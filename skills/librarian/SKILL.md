@@ -1,6 +1,6 @@
 ---
 name: librarian
-description: Use when the user wants deep, multi-source WEB research on a topic or on a source document's topics — produced by a regulated parallel fan-out that searches the web, cites sources, and adversarially verifies claims (not a single pass, not memory-only). Triggers on requests to research a topic from scratch, validate a brief's claims against live sources, or produce a cited research report across several sub-questions. Does NOT trigger on quick single-pass summaries or on pure analysis of a document's own content with no external research.
+description: Use when the user wants deep, multi-source WEB research on a topic or on a source document's topics — produced by a regulated parallel fan-out that searches the web, cites sources, and adversarially verifies claims (not a single pass, not memory-only). Triggers on requests to research a topic from scratch, validate a brief's claims against live sources, or produce a cited research report across several sub-questions. Does NOT trigger on quick single-pass summaries or on pure analysis of a document's own content with no external research. For non-research fan-out, use `dispatching-parallel-agents`.
 allowed-tools: Read, Bash, Workflow
 ---
 

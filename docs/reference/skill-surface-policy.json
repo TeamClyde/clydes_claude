@@ -79,12 +79,20 @@
       "(code.claude.com/docs/en/skills), so anything longer loses its trailing trigger keywords.",
       "",
       "totalDescriptionChars is a RATCHET, not a target. It sits just above the measured baseline",
-      "(12749 on 2026-08-06) so that unnoticed growth fails, while not manufacturing an immediate",
-      "trimming chore. The local surface is not what blew the budget -- one third-party plugin was",
-      "4.5x the entire local skill set. Trimming the long descriptions is worthwhile but separate;",
-      "lower this number when that work happens."
+      "so that unnoticed growth fails. The local surface is not what blew the budget -- one",
+      "third-party plugin was 4.5x the entire local skill set. Trimming the long descriptions is",
+      "worthwhile but separate; lower this number when that work happens.",
+      "",
+      "RAISED 2026-08-11: ceiling 13000 -> 13375, measured baseline 12749 -> 13371 (+622).",
+      "Issue #139 asked for explicit boundary clauses on four confusable skill groups, so nine",
+      "descriptions each gained one clause naming the sibling to route to instead: git-manager /",
+      "using-git-worktrees / finishing-a-development-branch, librarian /",
+      "dispatching-parallel-agents, project-setup / infra-init, adherence-audit / review-workflow.",
+      "Raising the ceiling here is the 'deliberate, reviewable change' the test's own failure",
+      "message names as the sanctioned path -- it is not drift. Headroom is 4 chars on purpose:",
+      "a ceiling carrying slack is not a ratchet, and the next unplanned growth must fail at once."
     ],
-    "totalDescriptionChars": 13000,
+    "totalDescriptionChars": 13375,
     "perSkillMaxChars": 1536
   },
 
