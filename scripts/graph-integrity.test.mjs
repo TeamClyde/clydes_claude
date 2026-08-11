@@ -22,7 +22,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 //
 // Neither can see a property that only exists across the whole graph. Slice 2a
 // made the graph precise enough to ask those questions; this file asks them.
-// The first is REACHABILITY, below.
+// The first is INBOUND DEGREE, below.
 //
 // SIZE CHECKPOINT — read before adding the next invariant. harvest-components
 // .test.mjs reached 353 lines before two reviewers flagged it and it had to be
@@ -50,8 +50,10 @@ function graph() {
   return (cached ??= (async () => {
     const inv = await harvest({ repoRoot: REPO_ROOT })
     // `dependentsOf(name)` — the components with an edge INTO `name`. buildGateMap
-    // has returned it since slice 1 and nothing consumed it until now; it is the
-    // whole basis of the inbound-degree question this file asks.
+    // has returned it since slice 1, and harvest-components.test.mjs:136 has
+    // exercised it as a unit ever since; what it has never done is DRIVE A POLICY
+    // CHECK. This file is the first invariant built on it, and it is the whole
+    // basis of the inbound-degree question below.
     const { nodes, dependentsOf } = buildGateMap(inv)
     const policy = await readPolicy()
     return { nodes, dependentsOf, entryPoints: declaredEntryPoints(policy.entryPoints) }
@@ -87,13 +89,14 @@ function declaredEntryPoints(block) {
 }
 
 // ---------------------------------------------------------------------------
-// REACHABILITY — asserted in BOTH directions.
+// INBOUND DEGREE — every node has at least one citer, or is a declared entry
+// point. Asserted in BOTH directions.
 //
-// A node with no inbound edge is either a DEFECT (something should dispatch or
-// cite it and doesn't — an unreachable component the workflow believes it has)
-// or an ENTRY POINT BY DESIGN (a hook the harness fires, a skill the user types).
-// The graph cannot tell those apart, so the policy declares the second set by
-// name with a reason.
+// A node nothing cites is either a DEFECT (something should dispatch or cite it
+// and doesn't — a component the workflow believes it has wired up) or an ENTRY
+// POINT BY DESIGN (a hook the harness fires, a skill the user types). The graph
+// cannot tell those apart, so the policy declares the second set by name with a
+// reason.
 //
 // The forward direction alone is not enough. A declaration list that is only
 // ever appended to becomes a hiding place: wire up a citation to a declared
@@ -102,6 +105,24 @@ function declaredEntryPoints(block) {
 // have zero inbound edges — is what keeps the block a declaration. It is the
 // same requirement slice 1 put on the `references` reason strings, applied to
 // the other half of the same file.
+//
+// LIMITATION — this is LOCAL IN-DEGREE, not transitive reachability, and the
+// two are not the same property. A cluster of components citing only each other
+// with no path in from any entry point has in-degree >= 1 throughout and passes
+// silently. The risk is not theoretical: reciprocal citation is common in this
+// corpus (`install-vetting` <-> `vet-security` is one of many), so an island
+// needs only such a pair to lose its last inbound edge from outside. Measured
+// 2026-08-11: none exists — a BFS from (declared entry points ∪ zero-in-degree
+// nodes) reaches all 79 of 79 nodes.
+//
+// A true traversal is the stronger invariant and is DELIBERATELY deferred, not
+// overlooked. `entryPoints` is keyed to in-degree semantics — its entries ARE
+// the zero-in-degree set — and the staleness assertion below is inherently an
+// in-degree property, so upgrading only the forward direction would leave the
+// two halves asserting different things about one policy block. Redefining a
+// declared entry point from "nothing cites it" to "root of a reachable region"
+// is a plan change, not a review fix. A future traversal wants `dependenciesOf`
+// or the raw `edges` list; buildGateMap returns both and this file uses neither.
 // ---------------------------------------------------------------------------
 
 test('every node with no inbound edge is a declared entry point', async () => {
