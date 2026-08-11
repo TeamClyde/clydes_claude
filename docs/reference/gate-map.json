@@ -673,6 +673,10 @@
     },
     {
       "from": "docs-refresh",
+      "to": "api-documenter"
+    },
+    {
+      "from": "docs-refresh",
       "to": "architecture-decision-records"
     },
     {
