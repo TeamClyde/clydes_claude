@@ -1,6 +1,6 @@
 ---
 name: vet-reputation
-description: Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustworthy before installing it. Gate 1 of the install-vetting funnel.
+description: Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustworthy before installing it. Gate 1 of the install-vetting funnel, run by `vet-install`.
 allowed-tools: WebFetch, WebSearch
 ---
 

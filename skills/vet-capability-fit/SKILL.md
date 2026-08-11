@@ -1,6 +1,6 @@
 ---
 name: vet-capability-fit
-description: Use when you need to determine whether a candidate tool actually covers a stated need and which component of it provides that capability. Gate 2 of the install-vetting funnel.
+description: Use when you need to determine whether a candidate tool actually covers a stated need and which component of it provides that capability. Gate 2 of the install-vetting funnel, run by `vet-install`.
 allowed-tools: Read, WebFetch, Agent
 ---
 

@@ -456,7 +456,7 @@
     {
       "type": "skill",
       "name": "vet-capability-fit",
-      "description": "Use when you need to determine whether a candidate tool actually covers a stated need and which component of it provides that capability. Gate 2 of the install-vetting funnel.",
+      "description": "Use when you need to determine whether a candidate tool actually covers a stated need and which component of it provides that capability. Gate 2 of the install-vetting funnel, run by `vet-install`.",
       "file": "skills/vet-capability-fit/SKILL.md"
     },
     {
@@ -468,13 +468,13 @@
     {
       "type": "skill",
       "name": "vet-reputation",
-      "description": "Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustworthy before installing it. Gate 1 of the install-vetting funnel.",
+      "description": "Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustworthy before installing it. Gate 1 of the install-vetting funnel, run by `vet-install`.",
       "file": "skills/vet-reputation/SKILL.md"
     },
     {
       "type": "skill",
       "name": "vet-security",
-      "description": "Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of the install-vetting funnel.",
+      "description": "Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of the install-vetting funnel, run by `vet-install`.",
       "file": "skills/vet-security/SKILL.md"
     },
     {

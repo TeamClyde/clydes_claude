@@ -175,3 +175,37 @@ test('every catalogOnly exemption carries a non-empty reason', async () => {
     assert.ok(reason.trim().length > 0, `catalogOnly.${key} requires a reason — an exemption without one is a hiding place`)
   }
 })
+
+// overlapVerdicts is keyed by a PAIR and valued by an OBJECT, not by a component name and a
+// reason string, so it needs its own check rather than a fourth pass of the loop above.
+//
+// The ENUM check is the load-bearing half. scripts/graph-integrity.overlap.test.mjs re-verifies
+// `boundary` verdicts against the description text and accepts everything else as declared, so a
+// typo (`boundry`) would silently downgrade a checked verdict to an unchecked one -- a hole in
+// exactly the mechanism that block exists to provide. Validated HERE, not there, because this
+// file is the declared owner of shape validation for every block of the policy: one owner per
+// rule, the same split graph-integrity.test.mjs already documents for the reason strings.
+test('every overlapVerdicts entry has a valid verdict and a non-empty reason', async () => {
+  const policy = await readPolicy()
+  const overlapVerdicts = policy.overlapVerdicts
+  assert.ok(overlapVerdicts, 'policy.overlapVerdicts must exist')
+
+  const isMeta = k => k.startsWith('$')
+  const entries = Object.entries(overlapVerdicts).filter(([k]) => !isMeta(k))
+  assert.ok(entries.length > 0, 'overlapVerdicts must not be empty')
+  for (const [key, entry] of entries) {
+    // The key IS the pair identity the gate matches on, so a malformed one silently matches
+    // nothing and reads as a stale verdict rather than as the typo it is.
+    assert.match(key, /^[^|]+\|[^|]+$/, `overlapVerdicts key "${key}" must be "skill-a|skill-b"`)
+    const [a, b] = key.split('|')
+    assert.ok(a < b, `overlapVerdicts key "${key}" must have its two names sorted — the band builds keys sorted, so an unsorted key can never match`)
+    assert.ok(entry && typeof entry === 'object', `overlapVerdicts.${key} must be an object`)
+    assert.ok(
+      ['boundary', 'distinct'].includes(entry.verdict),
+      `overlapVerdicts.${key} verdict must be "boundary" or "distinct", got ${JSON.stringify(entry.verdict)}. ` +
+        'Anything else is treated as unchecked by scripts/graph-integrity.overlap.test.mjs.',
+    )
+    assert.equal(typeof entry.reason, 'string', `overlapVerdicts.${key} reason must be a string`)
+    assert.ok(entry.reason.trim().length > 0, `overlapVerdicts.${key} requires a reason — a verdict without one is a hiding place`)
+  }
+})
