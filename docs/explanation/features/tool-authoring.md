@@ -3,8 +3,8 @@
 **C4 Layer:** C3 Component
 **Status:** Active
 **Owner:** solo
-**Last updated:** 2026-06-18
-**Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
+**Last updated:** 2026-08-10
+**Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs); plans/component-reference-integrity/graph-integrity/ (citation-shape coverage)
 **Related ADRs:** _(none)_
 **Key files:**
   - `skills/creating-tools/SKILL.md` — the component-creation router
@@ -130,9 +130,34 @@ Every policy exemption is keyed by the exempted thing and valued by the **reason
 
 **The decidability boundary is permanent.** The deterministic layer checks namespaced references (`ns:name`) and *quoted* invocation slots — shapes whose intent is unambiguous. A bare backticked name in prose stays with the semantic layer forever: `` `code-reviewer` `` may be a citation, a role, a filename, or an English phrase, and no amount of rule-tightening decides that correctly. Unquoted `subagent_type:` in narrative prose is likewise not a dispatch. This is a deliberate precision-over-recall trade — the gate is only useful while every finding it emits is real.
 
+**Precision and citation-shape coverage are two halves of one contract.** Everything above answers one question: *does this citation resolve to something real?* That question has a blind spot in exactly the opposite direction — a citation written in a shape the tokenizer cannot read emits no token at all, so it is never dangling, fails nothing, and the edge it should have produced simply does not exist. Precision alone is structurally incapable of noticing that a component went uncited because nobody could write a shape the resolver understood. `scripts/harvest-components.shape-coverage.test.mjs` asks the mirror question — *is a component cited in a shape we cannot see?* — by CONTAINMENT rather than resolution: a `backtick` span that resolves under none of the four rules below is split on `[./:#\s]`, and any segment (or contiguous slash-joined run of segments) that names a real node makes the span a candidate. Containment is deliberately weaker than resolution — it can be wrong about intent, since a span can name a component without citing it — and that weakness is the feature: it is the only way to see a shape nobody has written a resolution rule for yet. The two gates are not restatements of each other; each is blind to precisely what the other one sees, and together they are the completeness contract this repo makes about its own citation graph.
+
+**The four declared resolution shapes**, applied in this fixed precedence order by `resolvedNames()` (`scripts/lib/component-refs.mjs`) — first non-null wins:
+
+| Rule | Shape | Example |
+|---|---|---|
+| `backtickEdgeName` | exact backtick span | `` `writing-plans` `` |
+| `pathEdgeName` | path form | `` `skills/writing-plans/SKILL.md` ``, `` `rules/doc-tools.md` `` |
+| `colonEdgeName` | colon dispatch | `` `plan-management:divergence` `` |
+| `suffixedEdgeName` | trailing separator | `` `integration-test-constraints.md` `` |
+
+A span resolving under any of the four becomes a real `gate-map.json` edge, which is exactly what makes it invisible to the shape-coverage gate — coverage only ever examines spans none of the four already explained. What survives that filter is either a genuinely new citation shape (add a fifth rule) or a span that names a component without citing it (add a declared exemption to `SHAPE_COVERAGE_EXEMPTIONS`, with a reviewable reason, checked for staleness in both directions the same way the policy exemptions above are).
+
+```mermaid
+flowchart LR
+  BODY["component body / committed *.md<br/>skills/ agents/ rules/"] --> TOK["component-refs.mjs<br/><b>tokenize() + 4 resolution rules</b>"]
+  TOK -->|"resolves to nothing"| PREC["reference-integrity.test.mjs<br/>PRECISION — is this citation real?"]
+  TOK -->|"resolves under none of the 4 rules,<br/>but the span NAMES a real node"| SHAPE["harvest-components.shape-coverage.test.mjs<br/>COVERAGE — is a component cited unreadably?"]
+  PREC -->|"dangling, no exemption"| CI{{"npm test — blocking in CI"}}
+  SHAPE -->|"unexplained finding, or a stale exemption"| CI
+```
+
+**Every claim about the corpus is generated or gated, never hand-authored.** Node and edge counts, the expected-diff set (`EXPECTED_NEW_EDGES` in `scripts/harvest-components.test.mjs`), and the exemption lists on both gates are code that runs against the live corpus on every `npm test`, not prose typed once and left to drift. `npm run harvest:check` byte-diffs `gate-map.json` against the committed artifact; the shape-coverage gate fails on a stale exemption exactly as loudly as it fails on an unexplained finding, and a duplicate exemption entry (same `from`/`to`, different reason) is caught by an assertion comparing the exemption array's length against its derived key-set size, so a silently-collapsed duplicate cannot hide as dead weight. If this document ever states a corpus count (a node total, an edge total), treat it as a snapshot of what the generator produced at write time, not a maintained fact — trust the check that regenerates it, not the prose that once reported it, if the two disagree.
+
 ## Dependencies
 
 - `scripts/lib/component-refs.mjs` — the citation tokenizer. Pure, stdlib-only, shared by `buildGateMap()` and the reference-integrity gate. Changing what counts as a citation means changing this file, and the equivalence test in `scripts/harvest-components.test.mjs` will report any edge the change moves.
+- `scripts/harvest-components.shape-coverage.test.mjs` — the citation-shape coverage gate, the recall counterpart to `scripts/reference-integrity.test.mjs`. Declares its exemptions in `SHAPE_COVERAGE_EXEMPTIONS`, guarded against a silently-duplicated `from`/`to` pair by an array-length-vs-derived-Set-size assertion.
 - `docs/reference/skill-surface-policy.json` → `references` — the declared resolution set and exemptions the gate reads. Adding a machine-local skill or a known namespace is an edit here, with a reason string, in the same commit.
 - `skills/creating-tools/frontmatter-reference.md` — the repo's own verified frontmatter inventory for both agents and skills, including the packaging-spec field limit that governs cloud and routine uploads.
 - `skills/creating-tools/hooks-reference.md` — the repo's own hook reference: event taxonomy, exit-code and deny contract, settings.json wiring, and house pattern. Written from the official hooks documentation and the repo's nine working hooks.
@@ -159,9 +184,11 @@ _(No accepted ADRs yet.)_
 
 ## Observability
 
-Authoring quality is observed through four signals:
+Authoring quality is observed through five signals:
 
 - **Reference integrity (`scripts/reference-integrity.test.mjs`)**: Runs under `npm test`, blocking in CI. Fails when any citation in a committed `*.md` under `skills/`, `agents/`, or `rules/` resolves to nothing, reporting each as `file:line  ref` with the reason. This is the deterministic floor beneath `adherence-audit`'s Dead References lens — same class of finding, different force. An audit finding is advisory by construction, which is how dead references survived while a skill nominally checking for them existed the whole time; a `npm test` failure is a blocking fact.
+
+- **Citation-shape coverage (`scripts/harvest-components.shape-coverage.test.mjs`)**: Runs under `npm test`, blocking in CI. Fails when a component is cited in a shape none of the four resolution rules can read and no declared exemption explains it, or when a declared exemption's finding no longer occurs (stale). This is the recall counterpart to reference integrity above — together the two gates report on the citation graph's completeness from both directions, precision and coverage, as one contract.
 
 - **Structural quality (`pulser`)**: Run after any skill is authored or edited. Pulser performs static lint against Anthropic's 7 skill-quality principles: description format, CSO compliance, token budget, naming conventions, keyword coverage, cross-reference hygiene, and example quality. Output is a pass/fail per principle with actionable findings. A skill that does not pass Pulser is not ready to ship.
 
