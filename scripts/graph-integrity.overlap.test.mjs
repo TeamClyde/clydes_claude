@@ -188,19 +188,24 @@ function band() {
     // Skills only. Agents and rules carry descriptions too, but only skills
     // compete for the skill-listing budget this whole policy file governs, and
     // only skills are what a reader picks between at invocation time.
-    //
-    // harvest() falls back to the first body paragraph when a skill has no
-    // frontmatter `description`, which would quietly compute the band over body
-    // prose instead of the declared field. Measured 2026-08-11: all 42 skills
-    // carry a non-empty frontmatter description, so the fallback is not in play
-    // — the assertion below is what keeps that true.
     const skills = inv.filter(c => c.type === 'skill').sort((x, y) => (x.name < y.name ? -1 : 1))
     const names = skills.map(s => s.name)
-    assert.ok(
-      skills.every(s => (s.description ?? '').trim().length > 0),
-      'a skill has an empty description — the band would be computed over nothing for it',
-    )
 
+    // PROVENANCE — step 1 of the tokenization contract is "the `description`
+    // FRONTMATTER field only", and `s.description` here is the harvested value,
+    // which is `fields.description || firstParagraph(body)`
+    // (harvest-components.mjs:21). A skill shipping without a frontmatter
+    // description gets body prose substituted, and that value is NON-EMPTY — so
+    // no assertion made against the harvested value can detect the swap, and
+    // the band would silently score body prose against descriptions.
+    //
+    // Enforced by 'every skill's description is declared, not a body fallback'
+    // in skill-surface.test.mjs, which reads the frontmatter field directly.
+    // That file is the declared owner of shape facts about the local skill
+    // corpus — the same one-owner split used for this policy file's schema.
+    // Both run under `npm test`, so the suite cannot be green while the
+    // contract is violated. Measured 2026-08-11: all 42 skills carry a
+    // non-empty frontmatter description, so the fallback is dormant.
     const tokens = new Map(skills.map(s => [s.name, descriptionTokens(s.description)]))
     const mentions = new Map(skills.map(s => [s.name, namesMentionedIn(s.description, names.filter(n => n !== s.name))]))
 

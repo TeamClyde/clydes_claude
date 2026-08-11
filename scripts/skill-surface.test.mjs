@@ -5,7 +5,11 @@
 // cleanup silently regressed. `npm test` is the only path in this repo with proven execution.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { join } from 'node:path'
+import { parseFrontmatter } from './lib/frontmatter.mjs'
 import {
+  REPO_ROOT,
   readPolicy,
   scanLocalSkillDescriptions,
   readInstalledPlugins,
@@ -54,6 +58,48 @@ describe('local skill description budget', () => {
         `as a deliberate, reviewable change.`,
     )
   })
+})
+
+// PROVENANCE, not just presence. Every consumer that reads a skill's "description" through
+// harvest-components.mjs gets `fields.description || firstParagraph(body)` (line 21), so a skill
+// with no frontmatter description silently receives BODY PROSE — and that value is non-empty, so
+// it passes any emptiness check made downstream. scripts/graph-integrity.overlap.test.mjs depends
+// on this not happening: its tokenization contract is "the description frontmatter field ONLY",
+// and body prose scored against real descriptions produces meaningless similarity numbers that
+// can manufacture a verdict requirement. Only reading the field itself tells declared from
+// substituted, which is why this asserts on frontmatter rather than on the harvested value.
+//
+// Non-emptiness of the field is sufficient to prove the fallback never fired: `||` returns its
+// left operand whenever that operand is a non-empty string.
+//
+// Enumerated from COMMITTED state via `git ls-files` — unlike scanLocalSkillDescriptions() above,
+// which walks the filesystem. The stricter source is deliberate: an uncommitted SKILL.md is
+// invisible to CI, so a filesystem walk would verify a file the gate will never see. The path
+// filter mirrors scanSkills()'s own `/^skill\.md$/i` so this covers exactly the files harvest reads.
+test("every skill's description is declared, not a body fallback", async () => {
+  const files = execFileSync('git', ['ls-files', '-z', 'skills'], { cwd: REPO_ROOT, encoding: 'utf8' })
+    .split('\0')
+    .filter(Boolean)
+    .filter((p) => /^skills\/[^/]+\/skill\.md$/i.test(p))
+    .sort()
+  assert.ok(files.length > 0, 'no committed skills/<dir>/SKILL.md files found — the check would be vacuous')
+
+  const substituted = []
+  for (const file of files) {
+    const { fields } = await parseFrontmatter(join(REPO_ROOT, file))
+    if ((fields.description ?? '').trim().length === 0) substituted.push(file)
+  }
+
+  assert.deepEqual(
+    substituted,
+    [],
+    `${substituted.length} skill(s) with no non-empty frontmatter \`description\`:\n  ` +
+      substituted.join('\n  ') +
+      '\n  harvest() substitutes the first body paragraph for these, which is non-empty and so passes ' +
+      'every downstream emptiness check while silently feeding body prose into the skill-overlap band ' +
+      '(scripts/graph-integrity.overlap.test.mjs). Add a frontmatter `description` — every skill needs ' +
+      'one regardless, since it is what the skill listing displays.',
+  )
 })
 
 describe('installed plugin surface', () => {
