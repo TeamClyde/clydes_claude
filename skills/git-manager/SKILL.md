@@ -4,7 +4,9 @@ description: >
   Use when committing files, creating a branch, pushing to remote, syncing with
   main, opening a pull request, or when a merge conflict needs to be surfaced and
   handled safely. Invoke for any git action during development — starting work,
-  recording progress, shipping, or managing conflicts.
+  recording progress, shipping, or managing conflicts. Owns git operations;
+  `using-git-worktrees` isolates a workspace first, `finishing-a-development-branch`
+  integrates after.
 argument-hint: "commit files:[file1,file2] type:feat|fix|refactor|chore|docs|test|perf description:'...' jira-key:PROJ-N"
 allowed-tools: Skill, Bash, Read
 ---

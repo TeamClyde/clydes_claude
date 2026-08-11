@@ -14,7 +14,15 @@
     "skills, so rarely-used skills lose their trigger keywords and become harder to invoke,",
     "which keeps them at the front of the drop queue. Overlap evicts your own skills.",
     "",
-    "The target this file enforces toward is written up in docs/reference/skill-surface-standard.md."
+    "The target this file enforces toward is written up in docs/reference/skill-surface-standard.md.",
+    "",
+    "BLAST RADIUS. This file carries SIX top-level blocks -- plugins, localSkills, references,",
+    "entryPoints, catalogOnly, overlapVerdicts -- and FOUR test files read it (counted 2026-08-11",
+    "by grepping the repo for `readPolicy`): scripts/skill-surface.test.mjs, which owns SHAPE",
+    "validation for every block; scripts/graph-integrity.test.mjs; scripts/reference-integrity",
+    ".test.mjs; and scripts/graph-integrity.overlap.test.mjs. It is parsed as one document, so a",
+    "malformed edit anywhere -- a trailing comma, an unescaped quote -- fails all four at once,",
+    "not the block you were editing. Add a block only alongside the test that consumes it."
   ],
 
   "plugins": {
@@ -79,12 +87,27 @@
       "(code.claude.com/docs/en/skills), so anything longer loses its trailing trigger keywords.",
       "",
       "totalDescriptionChars is a RATCHET, not a target. It sits just above the measured baseline",
-      "(12749 on 2026-08-06) so that unnoticed growth fails, while not manufacturing an immediate",
-      "trimming chore. The local surface is not what blew the budget -- one third-party plugin was",
-      "4.5x the entire local skill set. Trimming the long descriptions is worthwhile but separate;",
-      "lower this number when that work happens."
+      "so that unnoticed growth fails. The local surface is not what blew the budget -- one",
+      "third-party plugin was 4.5x the entire local skill set. Trimming the long descriptions is",
+      "worthwhile but separate; lower this number when that work happens.",
+      "",
+      "RAISED 2026-08-11: ceiling 13000 -> 13375, measured baseline 12749 -> 13371 (+622).",
+      "Issue #139 asked for explicit boundary clauses on four confusable skill groups, so nine",
+      "descriptions each gained one clause naming the sibling to route to instead: git-manager /",
+      "using-git-worktrees / finishing-a-development-branch, librarian /",
+      "dispatching-parallel-agents, project-setup / infra-init, adherence-audit / review-workflow.",
+      "Raising the ceiling here is the 'deliberate, reviewable change' the test's own failure",
+      "message names as the sanctioned path -- it is not drift. Headroom is 4 chars on purpose:",
+      "a ceiling carrying slack is not a ratchet, and the next unplanned growth must fail at once.",
+      "",
+      "RAISED AGAIN 2026-08-11: ceiling 13375 -> 13441, measured baseline 13371 -> 13437 (+66).",
+      "The three install-vetting gate skills each gained the same 22-char clause naming their own",
+      "router (`vet-capability-fit`, `vet-reputation`, `vet-security`: '... funnel, run by",
+      "`vet-install`.'). Each said 'Gate N of the install-vetting funnel' without ever naming the",
+      "skill that runs the funnel, which left all three pairs unresolved under the overlapVerdicts",
+      "gate below. Same 4-char headroom, for the same reason."
     ],
-    "totalDescriptionChars": 13000,
+    "totalDescriptionChars": 13441,
     "perSkillMaxChars": 1536
   },
 
@@ -129,6 +152,152 @@
     "historicalLedgers": {
       "plugins/registry.md": "Removal ledger -- its purpose is to name removed plugins, so its citations must stay dead. Outside the slice-1 corpus (skills/, agents/, rules/); declared now because slice 3's corpus-wide entry point brings it into scope.",
       "plugins/history.md": "Append-only state-transition log; same reason as registry.md."
+    }
+  },
+
+  "entryPoints": {
+    "$comment": [
+      "Declared exemptions for zero-inbound-edge nodes in the component graph.",
+      "",
+      "A node with no inbound edge is either a defect -- something should cite it but doesn't --",
+      "or an entry point by design -- nothing is supposed to dispatch it. This block records the",
+      "latter. Every entry is keyed by the orphaned component and valued by the REASON it is",
+      "exempt. A missing or empty reason fails the schema check in skill-surface.test.mjs -- the",
+      "same mechanism that guards the references block above.",
+      "",
+      "Checked in both directions by the graph invariant that consumes this block: every",
+      "zero-inbound-edge node must appear here, and every name declared here must still have",
+      "zero inbound edges -- a stale exemption fails exactly like a missing one."
+    ],
+    "harnessInvoked": {
+      "$comment": "Dispatched by the Claude Code harness on an event. No component dispatches a hook, so nothing produces an inbound edge -- an inbound edge to a hook is not impossible in general (see gate-map.json edges into stack-hat-directive, agent-model-pinning, subagent-prefix-prepend), it simply doesn't happen for these seven because nothing cites them.",
+      "git-prohibitions": "Dispatched by the Claude Code harness on an event; nothing in the corpus dispatches it. No component cites it in a shape the extractor resolves: its only corpus mention lives in skills/creating-tools/hooks-reference.md, an aux file that scanSkills() does not read (SKILL.md only). Widening the edge corpus to aux files would recover this single edge, and that widening was considered and declined.",
+      "graph-tools-directive": "Dispatched by the Claude Code harness on an event; nothing in the corpus dispatches it. No component cites it in a shape the extractor resolves. Not named anywhere in the corpus.",
+      "graph-tools-enforcement": "Dispatched by the Claude Code harness on an event; nothing in the corpus dispatches it. No component cites it in a shape the extractor resolves. Not named anywhere in the corpus.",
+      "graph-tools-self-heal": "Dispatched by the Claude Code harness on an event; nothing in the corpus dispatches it. No component cites it in a shape the extractor resolves. Not named anywhere in the corpus.",
+      "install-vetting-advisory": "Dispatched by the Claude Code harness on an event; nothing in the corpus dispatches it. No component cites it in a shape the extractor resolves. Not named anywhere in the corpus.",
+      "session-start": "Dispatched by the Claude Code harness on an event; nothing in the corpus dispatches it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in skills/git-manager/SKILL.md and skills/using-git-worktrees/SKILL.md, which 2a deliberately does not extract as a citation.",
+      "slash-command-enforcement": "Dispatched by the Claude Code harness on an event; nothing in the corpus dispatches it. No component cites it in a shape the extractor resolves. Not named anywhere in the corpus."
+    },
+    "userInvoked": {
+      "$comment": "Invoked by the user directly, not dispatched by any other component. Several of these ARE named in other component bodies, but as bare, unbackticked prose, which 2a deliberately declined to widen the citation shape to cover -- so the mention exists in the doc without producing an edge.",
+      "different-viewpoints-lite": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves. Not named anywhere in the corpus, in any shape.",
+      "feedback": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: the only backticked mentions of `feedback` in the corpus are its own `/feedback <example>` usage lines within its own SKILL.md -- self-citations, excluded by design. Also named as bare, unbackticked prose in skills/review-workflow/SKILL.md ('Use /feedback to capture friction as you work'), which 2a deliberately does not extract as a citation.",
+      "operating-model": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves. Not named anywhere else in the corpus, in any shape -- its own description points outbound, to dispatching-parallel-agents, not the reverse.",
+      "receiving-code-review": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in skills/requesting-code-review/SKILL.md, which 2a deliberately does not extract as a citation.",
+      "requesting-code-review": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in skills/receiving-code-review/SKILL.md, skills/review-workflow/SKILL.md, and skills/subagent-driven-development/SKILL.md, and as a path-form mention in the aux file skills/subagent-driven-development/code-quality-reviewer-prompt.md, which scanSkills() does not read -- none of these shapes is extracted as a citation.",
+      "using-superpowers": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in skills/brainstorming/SKILL.md, which 2a deliberately does not extract as a citation.",
+      "verification-before-completion": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in agents/test-runner.md, skills/systematic-debugging/SKILL.md, and skills/writing-skills/eval-methodology.md, which 2a deliberately does not extract as a citation."
+    }
+  },
+
+  "catalogOnly": {
+    "$comment": [
+      "Declared exemptions from the ADR-0003 documentation-coverage oracle, enforced by",
+      "scripts/graph-integrity.test.mjs. Every component in the generated inventory must be",
+      "named in >= 1 docs/explanation/ doc, or be recorded here catalog-only with a stated",
+      "reason for having no narrative home. Every entry is keyed by the exempted component and",
+      "valued by the REASON it is exempt. A missing or empty reason fails the schema check in",
+      "skill-surface.test.mjs -- the same mechanism that guards the references and entryPoints",
+      "blocks above. Checked in both directions by graph-integrity.test.mjs: every entry must",
+      "still name a real component with no docs/explanation/ mention -- a stale exemption fails",
+      "exactly like a missing one.",
+      "",
+      "This answers a different question than entryPoints: entryPoints is 'nothing cites this",
+      "in the graph, by design'; catalogOnly is 'no docs/explanation/ doc describes this, by",
+      "design'. A node can legitimately be in one, both, or neither -- do not conflate them.",
+      "",
+      "docs/_coverage-audit.md remains the narrative record of the original 76-component audit;",
+      "this block is the checked one that is re-verified on every test run."
+    ],
+    "cspell": "A self-contained tooling-hygiene rule (spellcheck false-positive word-list maintenance). It has no subsystem narrative — forcing it into a feature explainer would be artificial. Fully described by its own file + its `component-inventory.md` line. The instruction-loading-layer model that governs all rules is explained in `docs/explanation/architecture.md`."
+  },
+
+  "overlapVerdicts": {
+    "$comment": [
+      "Recorded confusability verdicts for the skill-description candidate band, enforced by",
+      "scripts/graph-integrity.overlap.test.mjs. Structurally UNLIKE references / entryPoints /",
+      "catalogOnly: those are keyed by a single component name and valued by a reason string;",
+      "this is keyed by a PAIR (`skill-a|skill-b`, names sorted, matching the key form the band",
+      "computation builds) and valued by { verdict, reason }.",
+      "",
+      "The band is every skill pair whose deduped, stop-worded description tokens exceed a",
+      "declared Jaccard threshold. BAND MEMBERSHIP IS NOT A DEFECT -- it means two descriptions",
+      "read similarly enough that a reader could plausibly confuse them. What fails is a band",
+      "member with NO VERDICT here. The already-disambiguated pairs sit in the band and pass.",
+      "",
+      "Two verdicts, deliberately not three:",
+      "  boundary -- one description names the other skill, or both name a common router. The",
+      "              gate RE-VERIFIES this against the description text; the text is the proof,",
+      "              so there is no evidence field to fill in and none to be trusted. This is",
+      "              the only verdict the gate can check, and checking it is what stops this",
+      "              block becoming the new place unresolved overlap hides.",
+      "  distinct -- the overlap is lexical coincidence. Accepted as declared; the reason must",
+      "              name the shared terms that caused the false match.",
+      "A third `merge-candidate` state was designed and dropped: it would have carried a real",
+      "extra requirement (a link to a remediation finding) but ZERO band members would use it.",
+      "Building and red-state-testing a branch against no live data is speculative. Add it when",
+      "a real instance first needs it.",
+      "",
+      "The threshold, the stop list and the tokenization live in the test file, next to the",
+      "sizing measurements that justify them -- they are the CONTRACT OF THE COMPUTATION, and",
+      "the band is not reproducible without them. This block records only the human judgments."
+    ],
+    "brainstorming|test-driven-development": {
+      "verdict": "distinct",
+      "reason": "Lexical coincidence. The six shared tokens are `code`, `feature`, `first`, `implementation`, `refactor` and `writing` -- both descriptions are phrased around what to do BEFORE writing implementation code, which is a shared sentence shape, not a shared job. brainstorming explores solution approaches when the design is not obvious; test-driven-development governs the red-green-refactor order once the design is settled. Neither is an alternative route to the other's outcome, so a routing clause between them would be misinformation."
+    },
+    "different-viewpoint|different-viewpoints-lite": {
+      "verdict": "boundary",
+      "reason": "different-viewpoints-lite opens by contrasting itself with different-viewpoint (`Unlike different-viewpoint (full sweep in order), this selects the 5 questions most likely to falsify...`), which is the whole distinction: full ordered sweep vs adversarial 5-question selection."
+    },
+    "doc-author|doc-backfill": {
+      "verdict": "boundary",
+      "reason": "doc-author names doc-backfill as one of its callers (`Invoked by ... /doc-backfill (whole-repo backfill)`). The pair is a caller/callee, not two ways to do one thing: doc-backfill decides WHICH docs a repo needs, doc-author writes one."
+    },
+    "doc-author|docs-refresh": {
+      "verdict": "boundary",
+      "reason": "Same caller/callee shape as doc-author|doc-backfill: doc-author names docs-refresh among the entry points that invoke it (`/docs-refresh feature|architecture (manual refresh)`). docs-refresh routes to a specialist; doc-author is one of the things it routes to."
+    },
+    "executing-plans|subagent-driven-development": {
+      "verdict": "boundary",
+      "reason": "executing-plans carries an explicit routing clause (`For isolated fresh-subagent-per-task execution instead, use subagent-driven-development`). Both execute a written plan; the axis is single continuing context vs a fresh subagent per task, and the clause states it. One of the two calibration-anchor control pairs asserted by the gate."
+    },
+    "git-manager|using-git-worktrees": {
+      "verdict": "boundary",
+      "reason": "git-manager names using-git-worktrees in the ownership clause added for the confusable-git-skills fix (`Owns git operations; using-git-worktrees isolates a workspace first, finishing-a-development-branch integrates after`). Recorded as a boundary AND flagged in the test file's Step 9 finding: this trio is one domain with no shared name prefix, so the durable fix is namespacing, deferred to its own slice."
+    },
+    "infra-init|project-setup": {
+      "verdict": "boundary",
+      "reason": "infra-init routes first-time onboarding away from itself (`For first-time workflow onboarding, use project-setup`). Entered the band only as a RESULT of that clause -- the shared vocabulary it introduced raised the pair's similarity -- which is the anti-correlation this whole design is built around."
+    },
+    "receiving-code-review|requesting-code-review": {
+      "verdict": "boundary",
+      "reason": "receiving-code-review states the direction split explicitly (`Owns the 'respond to feedback' direction. For submitting work to be reviewed, use requesting-code-review`). The other calibration-anchor control pair asserted by the gate."
+    },
+    "vet-capability-fit|vet-reputation": {
+      "verdict": "boundary",
+      "reason": "Both name their router `vet-install` (`Gate N of the install-vetting funnel, run by vet-install`). Gates 2 and 1 answer different questions -- does it cover the need, and is it reputable -- and are ordered cheap-to-expensive by the router, so the router is the correct thing for a reader to be pointed at rather than each other."
+    },
+    "vet-capability-fit|vet-security": {
+      "verdict": "boundary",
+      "reason": "Same shared router as vet-capability-fit|vet-reputation: both name `vet-install`. Gate 2 (capability fit) vs Gate 3 (malware/CVE scan of the finalist)."
+    },
+    "vet-reputation|vet-security": {
+      "verdict": "boundary",
+      "reason": "Same shared router as the other two vet-* pairs: both name `vet-install`. The highest-scoring pair in the band -- three sibling gates written to one template will always read alike -- and prefix-namespacing plus the router clause is the appropriate answer, not divergent prose."
+    },
+    "writing-agents|writing-rules": {
+      "verdict": "boundary",
+      "reason": "Both close with `Route through creating-tools, not directly`, so both name the same router. This is the router form the gate exists to accept: the right disambiguation points at the PARENT that dispatches by artifact type, not at a sibling authoring skill."
+    },
+    "writing-agents|writing-skills": {
+      "verdict": "boundary",
+      "reason": "Same `Route through creating-tools, not directly` clause in both. Highest-scoring of the three writing-* pairs; the family is prefix-namespaced, so a reader has a structural cue before reading either description."
+    },
+    "writing-rules|writing-skills": {
+      "verdict": "boundary",
+      "reason": "Same `Route through creating-tools, not directly` clause in both."
     }
   }
 }

@@ -26,7 +26,7 @@ This skill is a thin router. Specialists handle their own internal logic.
 | `architecture` | `doc-author` skill | `docs/explanation/architecture.md` (no args); mode=update; context-source resolved per "plan-doc resolution" below |
 | `adr` | `architecture-decision-records` skill | `docs/explanation/adr/NNNN-<title>.md` (auto-numbered) |
 | `changelog` | `changelog-automation` skill | `CHANGELOG.md` (overwrites/extends `[Unreleased]`) |
-| `openapi` | `openapi-spec-generation` skill | `openapi.yaml` |
+| `openapi` | `openapi-spec-generation` skill (API-reference authoring backed by the `api-documenter` agent) | `openapi.yaml` |
 | `diagram` | `mermaid-expert` agent | inline in user-specified target file |
 
 **plan-doc resolution (load-bearing — `doc-author` refuses `context-source=journal` without `plan-doc` arg):**

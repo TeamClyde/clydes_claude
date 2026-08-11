@@ -1,6 +1,6 @@
 ---
 name: dispatching-parallel-agents
-description: Use when dispatching 2+ agent tasks as a regulated fan-out — parallel independent work, a sequential pipeline where each step feeds the next, or multi-lens review — applying quorum, retries, model-pinning, and token-budget gating consistently
+description: Use when dispatching 2+ agent tasks as a regulated fan-out — parallel independent work, a sequential pipeline where each step feeds the next, or multi-lens review — applying quorum, retries, model-pinning, and token-budget gating consistently. For web research with cited sources, use `librarian`.
 allowed-tools: Agent, Read
 ---
 

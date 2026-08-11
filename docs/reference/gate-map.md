@@ -46,6 +46,7 @@ flowchart LR
   doc_tools --> plan_management
   doc_tools --> project_setup
   doc_tools --> writing_plans
+  docs_refresh --> api_documenter
   docs_refresh --> architecture_decision_records
   docs_refresh --> changelog_automation
   docs_refresh --> doc_author
@@ -283,6 +284,7 @@ flowchart LR
 | doc-tools | plan-management |
 | doc-tools | project-setup |
 | doc-tools | writing-plans |
+| docs-refresh | api-documenter |
 | docs-refresh | architecture-decision-records |
 | docs-refresh | changelog-automation |
 | docs-refresh | doc-author |

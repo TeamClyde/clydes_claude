@@ -1,6 +1,6 @@
 ---
 name: vet-security
-description: Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of the install-vetting funnel.
+description: Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of the install-vetting funnel, run by `vet-install`.
 allowed-tools: Bash, Read, Grep, Agent
 ---
 

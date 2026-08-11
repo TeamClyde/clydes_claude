@@ -6,6 +6,7 @@ description: >
   finds dead references, invocation mismatches, convention conflicts, priority conflicts,
   orphaned components, trigger gaps, and workflow gaps. Triggers on "audit workflow",
   "check consistency", "adherence audit", "find conflicts", "workflow audit", "check for drift".
+  For acting on friction issues, use `review-workflow`.
 allowed-tools: Read, Glob, Grep, Bash, Agent
 ---
 

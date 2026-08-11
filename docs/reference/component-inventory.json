@@ -251,7 +251,7 @@
   {
     "type": "skill",
     "name": "adherence-audit",
-    "description": "Use when adding new workflow components, after modifying rules or skills, or periodically to check for drift. Audits semantic consistency across all skills, agents, rules, and CLAUDE.md: finds dead references, invocation mismatches, convention conflicts, priority conflicts, orphaned components, trigger gaps, and workflow gaps. Triggers on \"audit workflow\", \"check consistency\", \"adherence audit\", \"find conflicts\", \"workflow audit\", \"check for drift\".",
+    "description": "Use when adding new workflow components, after modifying rules or skills, or periodically to check for drift. Audits semantic consistency across all skills, agents, rules, and CLAUDE.md: finds dead references, invocation mismatches, convention conflicts, priority conflicts, orphaned components, trigger gaps, and workflow gaps. Triggers on \"audit workflow\", \"check consistency\", \"adherence audit\", \"find conflicts\", \"workflow audit\", \"check for drift\". For acting on friction issues, use `review-workflow`.",
     "file": "skills/adherence-audit/SKILL.md"
   },
   {
@@ -293,7 +293,7 @@
   {
     "type": "skill",
     "name": "dispatching-parallel-agents",
-    "description": "Use when dispatching 2+ agent tasks as a regulated fan-out — parallel independent work, a sequential pipeline where each step feeds the next, or multi-lens review — applying quorum, retries, model-pinning, and token-budget gating consistently",
+    "description": "Use when dispatching 2+ agent tasks as a regulated fan-out — parallel independent work, a sequential pipeline where each step feeds the next, or multi-lens review — applying quorum, retries, model-pinning, and token-budget gating consistently. For web research with cited sources, use `librarian`.",
     "file": "skills/dispatching-parallel-agents/SKILL.md"
   },
   {
@@ -341,13 +341,13 @@
   {
     "type": "skill",
     "name": "finishing-a-development-branch",
-    "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup",
+    "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup. Owns integration decisions; for git operations use `git-manager`.",
     "file": "skills/finishing-a-development-branch/SKILL.md"
   },
   {
     "type": "skill",
     "name": "git-manager",
-    "description": "Use when committing files, creating a branch, pushing to remote, syncing with main, opening a pull request, or when a merge conflict needs to be surfaced and handled safely. Invoke for any git action during development — starting work, recording progress, shipping, or managing conflicts.",
+    "description": "Use when committing files, creating a branch, pushing to remote, syncing with main, opening a pull request, or when a merge conflict needs to be surfaced and handled safely. Invoke for any git action during development — starting work, recording progress, shipping, or managing conflicts. Owns git operations; `using-git-worktrees` isolates a workspace first, `finishing-a-development-branch` integrates after.",
     "file": "skills/git-manager/SKILL.md"
   },
   {
@@ -359,13 +359,13 @@
   {
     "type": "skill",
     "name": "infra-init",
-    "description": "Use when starting a new repo session, before exploring an unfamiliar codebase, or when code structure has changed significantly. Builds a queryable symbol graph and CODEBASE.md so future navigation uses the graph instead of broad file searches.",
+    "description": "Use when starting a new repo session, before exploring an unfamiliar codebase, or when code structure has changed significantly. Builds a queryable symbol graph and CODEBASE.md so future navigation uses the graph instead of broad file searches. For first-time workflow onboarding, use `project-setup`.",
     "file": "skills/infra-init/SKILL.md"
   },
   {
     "type": "skill",
     "name": "librarian",
-    "description": "Use when the user wants deep, multi-source WEB research on a topic or on a source document's topics — produced by a regulated parallel fan-out that searches the web, cites sources, and adversarially verifies claims (not a single pass, not memory-only). Triggers on requests to research a topic from scratch, validate a brief's claims against live sources, or produce a cited research report across several sub-questions. Does NOT trigger on quick single-pass summaries or on pure analysis of a document's own content with no external research.",
+    "description": "Use when the user wants deep, multi-source WEB research on a topic or on a source document's topics — produced by a regulated parallel fan-out that searches the web, cites sources, and adversarially verifies claims (not a single pass, not memory-only). Triggers on requests to research a topic from scratch, validate a brief's claims against live sources, or produce a cited research report across several sub-questions. Does NOT trigger on quick single-pass summaries or on pure analysis of a document's own content with no external research. For non-research fan-out, use `dispatching-parallel-agents`.",
     "file": "skills/librarian/SKILL.md"
   },
   {
@@ -395,7 +395,7 @@
   {
     "type": "skill",
     "name": "project-setup",
-    "description": "Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUDE.md is missing or generic, or the codebase graph hasn't been generated. Configures Jira integration, testing setup, and workflow preferences.",
+    "description": "Use when onboarding a repo to the Claude workflow for the first time — no project.json exists, CLAUDE.md is missing or generic, or the codebase graph hasn't been generated. Configures Jira integration, testing setup, and workflow preferences. For the codebase symbol graph, use `infra-init`.",
     "file": "skills/project-setup/SKILL.md"
   },
   {
@@ -413,7 +413,7 @@
   {
     "type": "skill",
     "name": "review-workflow",
-    "description": "Use when workflow friction issues have accumulated in TeamClyde/clydes_claude and you want to act on them — scanning the meta-workflow system for context, proposing multi-angle fixes, and routing improvements to the right component. This is about the WORKFLOW SYSTEM itself, not reviewing code changes — for code review, use requesting-code-review. Run periodically or after several friction issues accumulate.",
+    "description": "Use when workflow friction issues have accumulated in TeamClyde/clydes_claude and you want to act on them — scanning the meta-workflow system for context, proposing multi-angle fixes, and routing improvements to the right component. This is about the WORKFLOW SYSTEM itself, not reviewing code changes — for code review, use requesting-code-review. Run periodically or after several friction issues accumulate. For consistency and drift checks, use `adherence-audit`.",
     "file": "skills/review-workflow/SKILL.md"
   },
   {
@@ -437,7 +437,7 @@
   {
     "type": "skill",
     "name": "using-git-worktrees",
-    "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification",
+    "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification. Owns workspace isolation before work starts; `finishing-a-development-branch` is the cleanup pair.",
     "file": "skills/using-git-worktrees/SKILL.md"
   },
   {
@@ -455,7 +455,7 @@
   {
     "type": "skill",
     "name": "vet-capability-fit",
-    "description": "Use when you need to determine whether a candidate tool actually covers a stated need and which component of it provides that capability. Gate 2 of the install-vetting funnel.",
+    "description": "Use when you need to determine whether a candidate tool actually covers a stated need and which component of it provides that capability. Gate 2 of the install-vetting funnel, run by `vet-install`.",
     "file": "skills/vet-capability-fit/SKILL.md"
   },
   {
@@ -467,13 +467,13 @@
   {
     "type": "skill",
     "name": "vet-reputation",
-    "description": "Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustworthy before installing it. Gate 1 of the install-vetting funnel.",
+    "description": "Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustworthy before installing it. Gate 1 of the install-vetting funnel, run by `vet-install`.",
     "file": "skills/vet-reputation/SKILL.md"
   },
   {
     "type": "skill",
     "name": "vet-security",
-    "description": "Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of the install-vetting funnel.",
+    "description": "Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of the install-vetting funnel, run by `vet-install`.",
     "file": "skills/vet-security/SKILL.md"
   },
   {
