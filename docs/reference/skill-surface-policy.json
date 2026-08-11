@@ -130,5 +130,41 @@
       "plugins/registry.md": "Removal ledger -- its purpose is to name removed plugins, so its citations must stay dead. Outside the slice-1 corpus (skills/, agents/, rules/); declared now because slice 3's corpus-wide entry point brings it into scope.",
       "plugins/history.md": "Append-only state-transition log; same reason as registry.md."
     }
+  },
+
+  "entryPoints": {
+    "$comment": [
+      "Declared exemptions for zero-inbound-edge nodes in the component graph.",
+      "",
+      "A node with no inbound edge is either a defect -- something should cite it but doesn't --",
+      "or an entry point by design -- nothing is supposed to dispatch it. This block records the",
+      "latter. Every entry is keyed by the orphaned component and valued by the REASON it is",
+      "exempt. A missing or empty reason fails the schema check in skill-surface.test.mjs -- the",
+      "same mechanism that guards the references block above.",
+      "",
+      "Checked in both directions by the graph invariant that consumes this block: every",
+      "zero-inbound-edge node must appear here, and every name declared here must still have",
+      "zero inbound edges -- a stale exemption fails exactly like a missing one."
+    ],
+    "harnessInvoked": {
+      "$comment": "Dispatched by the Claude Code harness on an event. No component dispatches a hook, so nothing produces an inbound edge -- an inbound edge to a hook is not impossible in general (see gate-map.json edges into stack-hat-directive, agent-model-pinning, subagent-prefix-prepend), it simply doesn't happen for these seven because nothing cites them.",
+      "git-prohibitions": "Dispatched by the Claude Code harness on an event; no component dispatches it, so nothing produces an inbound edge. Also named in skills/creating-tools/hooks-reference.md, but that is an aux file -- scanSkills() reads SKILL.md only, so the mention is invisible to the edge extractor and incidental to why this has no edge.",
+      "graph-tools-directive": "Dispatched by the Claude Code harness on an event; no component dispatches it, so nothing produces an inbound edge. Not named anywhere in the corpus.",
+      "graph-tools-enforcement": "Dispatched by the Claude Code harness on an event; no component dispatches it, so nothing produces an inbound edge. Not named anywhere in the corpus.",
+      "graph-tools-self-heal": "Dispatched by the Claude Code harness on an event; no component dispatches it, so nothing produces an inbound edge. Not named anywhere in the corpus.",
+      "install-vetting-advisory": "Dispatched by the Claude Code harness on an event; no component dispatches it, so nothing produces an inbound edge. Not named anywhere in the corpus.",
+      "session-start": "Dispatched by the Claude Code harness on an event; no component dispatches it, so nothing produces an inbound edge. Named as bare, unbackticked prose in skills/git-manager/SKILL.md and skills/using-git-worktrees/SKILL.md -- 2a deliberately does not extract the bare-name shape as a citation.",
+      "slash-command-enforcement": "Dispatched by the Claude Code harness on an event; no component dispatches it, so nothing produces an inbound edge. Not named anywhere in the corpus."
+    },
+    "userInvoked": {
+      "$comment": "Invoked by the user directly, not dispatched by any other component. Several of these ARE named in other component bodies, but as bare, unbackticked prose, which 2a deliberately declined to widen the citation shape to cover -- so the mention exists in the doc without producing an edge.",
+      "different-viewpoints-lite": "Invoked by the user directly; no component dispatches it, so nothing produces an inbound edge. Not named anywhere else in the corpus, in any shape.",
+      "feedback": "Invoked by the user directly; no component dispatches it, so nothing produces an inbound edge. The only backticked mentions of `feedback` in the corpus are its own `/feedback <example>` usage lines within its own SKILL.md -- self-citations, excluded by design.",
+      "operating-model": "Invoked by the user directly; no component dispatches it, so nothing produces an inbound edge. Not named anywhere else in the corpus, in any shape -- its own description points outbound, to dispatching-parallel-agents, not the reverse.",
+      "receiving-code-review": "Invoked by the user directly; no component dispatches it, so nothing produces an inbound edge. Named as bare, unbackticked prose in skills/requesting-code-review/SKILL.md, which 2a deliberately does not extract as a citation.",
+      "requesting-code-review": "Invoked by the user directly; no component dispatches it, so nothing produces an inbound edge. Named as bare, unbackticked prose in skills/receiving-code-review/SKILL.md, skills/review-workflow/SKILL.md, and skills/subagent-driven-development/SKILL.md, which 2a deliberately does not extract as a citation.",
+      "using-superpowers": "Invoked by the user directly; no component dispatches it, so nothing produces an inbound edge. Named as bare, unbackticked prose in skills/brainstorming/SKILL.md, which 2a deliberately does not extract as a citation.",
+      "verification-before-completion": "Invoked by the user directly; no component dispatches it, so nothing produces an inbound edge. Named as bare, unbackticked prose in agents/test-runner.md and skills/systematic-debugging/SKILL.md, which 2a deliberately does not extract as a citation."
+    }
   }
 }
