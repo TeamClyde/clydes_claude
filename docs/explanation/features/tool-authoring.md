@@ -3,9 +3,9 @@
 **C4 Layer:** C3 Component
 **Status:** Active
 **Owner:** solo
-**Last updated:** 2026-08-10
-**Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs); plans/component-reference-integrity/graph-integrity/ (citation-shape coverage)
-**Related ADRs:** _(none)_
+**Last updated:** 2026-08-11
+**Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs); plans/component-reference-integrity/graph-integrity/ (citation-shape coverage; graph invariants)
+**Related ADRs:** ADR-0013 (component-graph-invariants)
 **Key files:**
   - `skills/creating-tools/SKILL.md` — the component-creation router
   - `skills/creating-tools/routing-table.md` — per-artifact routing details
@@ -154,9 +154,43 @@ flowchart LR
 
 **Every claim about the corpus is generated or gated, never hand-authored.** Node and edge counts, the expected-diff set (`EXPECTED_NEW_EDGES` in `scripts/harvest-components.test.mjs`), and the exemption lists on both gates are code that runs against the live corpus on every `npm test`, not prose typed once and left to drift. `npm run harvest:check` byte-diffs `gate-map.json` against the committed artifact; the shape-coverage gate fails on a stale exemption exactly as loudly as it fails on an unexplained finding, and a duplicate exemption entry (same `from`/`to`, different reason) is caught by an assertion comparing the exemption array's length against its derived key-set size, so a silently-collapsed duplicate cannot hide as dead weight. If this document ever states a corpus count (a node total, an edge total), treat it as a snapshot of what the generator produced at write time, not a maintained fact — trust the check that regenerates it, not the prose that once reported it, if the two disagree.
 
+## Graph Invariants
+
+Precision and citation-shape coverage, above, each answer a question about one edge at a time: does this citation resolve, and is every component citable in a shape the tokenizer can read. Three further checks — two in `scripts/graph-integrity.test.mjs`, one in `scripts/graph-integrity.overlap.test.mjs` — ask about properties that only exist across the *whole* graph: is every unreached node an entry point on purpose, is every component actually documented, and is every lexically-similar skill pair either disambiguated or flagged for triage. All three follow the shape the `references` exemption block above already established: a declared list in `docs/reference/skill-surface-policy.json`, keyed by the exempted thing and valued by a reason, checked in **both directions** so a stale declaration fails exactly as loudly as a missing one.
+
+**Inbound degree** (`scripts/graph-integrity.test.mjs`). A node with no inbound edge is either a defect — something should cite it and doesn't — or an entry point by design: a hook the harness dispatches, a skill the user types directly. The graph cannot tell those apart on its own, so `skill-surface-policy.json` → `entryPoints` declares the second set, grouped by invocation source (`harnessInvoked`, `userInvoked`). Measured 2026-08-11: 14 nodes with zero inbound edges, 14 declared across the two groups — 7 harness-dispatched hooks, 7 user-invoked skills. The forward direction alone would let the declaration rot into a hiding place: wire up a citation to a declared entry point and the exemption would silently outlive the fact it described. The reverse direction — every declared name must *still* have zero inbound edges, and must still name a real node — is what keeps `entryPoints` a live declaration rather than an append-only graveyard.
+
+This is **local in-degree, not transitive reachability**, and the two are not the same property. A cluster of components citing only each other, with no path in from any real entry point, has in-degree ≥ 1 throughout and would pass silently — reciprocal citation is common in this corpus: 35 two-cycle pairs exist in the live edge set (measured 2026-08-11), one of them `install-vetting` ↔ `vet-security`. A true traversal is the stronger invariant, and its absence is a **known, deliberate deferral**, not an oversight: a BFS seeded from (declared entry points ∪ zero-in-degree nodes) reaches all 79 of 79 nodes today, so no island exists yet — but only one two-cycle pair needs to lose its last inbound edge from outside to open one. It stays deferred because `entryPoints` is keyed to in-degree semantics — its entries *are* the zero-in-degree set — and the staleness half of the check above is inherently an in-degree property too; upgrading only the forward direction to "reachable from an entry point" would leave the two halves of one policy block asserting different things about what an entry point means. Redefining a declared entry point from "nothing cites it" to "root of a reachable region" is a plan change, not a review fix.
+
+**Documentation coverage** (`scripts/graph-integrity.test.mjs`) implements the already-Accepted [ADR-0003](../adr/0003-generated-inventory-completeness-oracle.md), previously a point-in-time narrative audit (`docs/_coverage-audit.md`, written at 76 components); this makes the same check re-runnable and blocking. Every node must be named (word-boundary matched) in at least one committed `docs/explanation/**/*.md` file, or declared `catalogOnly` with a reason. Measured 2026-08-11: 78 of 79 nodes documented; the sole `catalogOnly` entry is a self-contained spellcheck-hygiene rule with no subsystem narrative to belong to — named in `skill-surface-policy.json` rather than here, since spelling it out in this prose would itself satisfy the coverage matcher and silently invalidate its own exemption. Checked bidirectionally, same as `entryPoints`: a `catalogOnly` entry naming a node that has since gained a documentation mention is stale and fails, exactly like one naming a node no longer in the graph.
+
+`entryPoints` and `catalogOnly` answer two different questions about the same node and are not interchangeable: `entryPoints` says *nothing cites this in the graph, by design*; `catalogOnly` says *no `docs/explanation/` doc describes this, by design*. A component can legitimately sit in one, both, or neither.
+
+**Overlap triage** (`scripts/graph-integrity.overlap.test.mjs`) is **declare-and-resolve, not detect-and-flag**. Every skill pair whose deduped, stop-worded description tokens exceed a declared Jaccard threshold (0.125) forms a *candidate band* — band membership is not itself a defect, it means two descriptions are lexically similar enough that a reader could plausibly confuse them. What fails is a band member carrying no recorded verdict in `skill-surface-policy.json` → `overlapVerdicts`. Measured 2026-08-11: 14 pairs in the band, all 14 carrying a recorded verdict — 13 `boundary` (one description names the other skill, or both name a common router; the gate **re-verifies this against the description text**, so the text is the proof and there is no separate evidence field to trust) and 1 `distinct` (lexical coincidence, resolved by no textual clause). A verdict for a pair that has since fallen out of the band is stale and fails, the same staleness discipline as the two invariants above.
+
+**Why detect-and-flag by similarity threshold does not work here — the principle, not just the outcome.** *Overlapping outputs are legitimate; overlapping triggers are not, because the trigger is where routing happens.* Two skills can produce similar-shaped artifacts without being confusable — what matters for the graph to gate is whether a reader would pick the wrong one **before either skill runs**, not whether their outputs later resemble each other. A pair earns a `boundary` verdict precisely *because* someone already noticed it was confusable and wrote a clause naming the sibling — and that clause adds shared vocabulary, raising the pair's similarity score in the same stroke that resolves it. Similarity therefore anti-correlates with "still needs disambiguation": the already-fixed pairs rank as the *most* similar, not the least, so no similarity threshold can separate a genuinely-confusable pair from an already-resolved one. See [ADR-0013](../adr/0013-component-graph-invariants.md) for the measured falsification. This is why the graph gates *routing ambiguity* — the trigger-selection moment — and never *output overlap*: gating on output similarity would flag correct designs, and a detector built on description similarity would flag the wrong pairs first.
+
+```mermaid
+flowchart TB
+    A["PRECISION<br/>reference-integrity.test.mjs<br/>does this citation resolve?"] --> B["CITATION-SHAPE COVERAGE<br/>harvest-components.shape-coverage.test.mjs<br/>is a component cited unreadably?"]
+    B --> C["INBOUND DEGREE<br/>every zero-in-edge node is a<br/>declared entryPoint (both directions)"]
+    B --> D["DOCUMENTATION COVERAGE<br/>every node is documented or<br/>declared catalogOnly (both directions)"]
+    B --> E["OVERLAP TRIAGE<br/>every candidate-band skill pair<br/>carries a re-verified verdict"]
+
+    style A fill:#ddeeff,stroke:#6699cc
+    style B fill:#ddeeff,stroke:#6699cc
+    style C fill:#f5f5dc,stroke:#999
+    style D fill:#f5f5dc,stroke:#999
+    style E fill:#f5f5dc,stroke:#999
+```
+
+Edge-local checks (top) establish that the graph's edges are trustworthy one at a time. Graph invariants (bottom) ask properties that only exist once the whole graph is in view — and each depends on the edge set being precise and complete first, which is why they were built second.
+
 ## Dependencies
 
 - `scripts/lib/component-refs.mjs` — the citation tokenizer. Pure, stdlib-only, shared by `buildGateMap()` and the reference-integrity gate. Changing what counts as a citation means changing this file, and the equivalence test in `scripts/harvest-components.test.mjs` will report any edge the change moves.
+- `scripts/graph-integrity.test.mjs` — the inbound-degree and documentation-coverage invariants. Reads the live graph via `buildGateMap()` and `docs/reference/skill-surface-policy.json` → `entryPoints` / `catalogOnly`.
+- `scripts/graph-integrity.overlap.test.mjs` — the skill-overlap triage gate. Reads only skill descriptions (no edges) and `skill-surface-policy.json` → `overlapVerdicts`; split into its own file because the band computation shares no data with the two invariants above.
 - `scripts/harvest-components.shape-coverage.test.mjs` — the citation-shape coverage gate, the recall counterpart to `scripts/reference-integrity.test.mjs`. Declares its exemptions in `SHAPE_COVERAGE_EXEMPTIONS`, guarded against a silently-duplicated `from`/`to` pair by an array-length-vs-derived-Set-size assertion.
 - `docs/reference/skill-surface-policy.json` → `references` — the declared resolution set and exemptions the gate reads. Adding a machine-local skill or a known namespace is an edit here, with a reason string, in the same commit.
 - `skills/creating-tools/frontmatter-reference.md` — the repo's own verified frontmatter inventory for both agents and skills, including the packaging-spec field limit that governs cloud and routine uploads.
@@ -166,7 +200,7 @@ flowchart LR
 
 ## Decisions
 
-_(No accepted ADRs yet.)_
+- [ADR-0013](../adr/0013-component-graph-invariants.md) — Component-graph invariants: declare-and-resolve over the citation graph, not detect-and-flag (Accepted)
 
 ## Known Issues & Gotchas
 
