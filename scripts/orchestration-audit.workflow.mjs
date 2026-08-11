@@ -787,10 +787,18 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
 // rather than silently risking a #76-class hang.
 if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing timer support — cannot guarantee liveness');
 
-// args = { hookFinding: '<Task-1 answer + URL>', cap }. The Workflow tool may deliver `args` as a
-// JSON string — parse-if-string so the script is robust to both object and stringified delivery.
+// args = { hookFinding: '<Task-1 answer + URL>', cap, edgeCount }. The Workflow tool may deliver
+// `args` as a JSON string — parse-if-string so the script is robust to both object and stringified
+// delivery.
 const input = typeof args === 'string' ? JSON.parse(args) : args;
-const { hookFinding } = input;
+const { hookFinding, edgeCount } = input;
+// `edgeCount`: the sandbox can't read gate-map.json (see the GATEMAP comment below) to count its
+// own edges, so the synthesize prompt's edge-list size would otherwise be a hand-authored literal
+// that goes stale on the next harvest. Main context reads gate-map.json's `edges.length` and passes
+// it here — the same "sandbox can't compute it, main context does" pattern `cap` uses below.
+if (!Number.isInteger(edgeCount) || edgeCount <= 0) {
+  throw new Error('orchestration-audit: args.edgeCount must be a positive integer (gate-map.json edges.length)');
+}
 
 // --- tunables (regulation dossier §10.1 — conservative defaults; revisit at run) ---
 const FINDER_TIMEOUT_MS = 240_000;   // per finder agent
@@ -855,9 +863,13 @@ const FINDINGS_SCHEMA = {
 
 // Audit INPUTS live in the repo; the sandbox can't read files, but the finder/synthesize subagents
 // can — they read the canonical artifacts themselves (single source of truth). The script only
-// distributes slice rules.
-const GATEMAP = 'docs/reference/gate-map.json';             // { nodes, edges:[{from,to}] } — 140 edges, sorted
-const INVENTORY = 'docs/reference/component-inventory.json'; // [{ type, name, file }] — 76 components
+// distributes slice rules. Edge/node counts are deliberately NOT stated here as numbers — a
+// hand-authored count goes stale the instant harvest-components.mjs re-runs; see `edgeCount` above.
+const GATEMAP = 'docs/reference/gate-map.json';             // { nodes, edges:[{from,to}] }, sorted
+const INVENTORY = 'docs/reference/component-inventory.json'; // [{ type, name, file }] — the same
+                                                               // node list GATEMAP embeds (both are
+                                                               // harvest-components.mjs's map.nodes),
+                                                               // so its count can't drift from GATEMAP's.
 
 // the six gate-map subsystem clusters (drives the conventions dimension + per-edge classification)
 const CLUSTERS = {
@@ -924,11 +936,12 @@ for (let i = 0; i < jobs.length; i += MAX_CONCURRENT) {
 
 const allFindings = finderResults.flatMap((r) => r.findings ?? []);
 const finderClass = finderResults.flatMap((r) => r.edgeClassifications ?? []);
-// Default-fill is performed by the synthesize agent (which reads gate-map.json's full 140-edge
-// list) rather than here — the sandbox can't read the file. Only the `conventions` cluster finders
-// classify edges, and each sees only its own members, so edges touching unclustered components
-// (hooks, utility skills, some agents) get no finder row; synthesize stubs those none-yet/low and
-// states the coverage gap explicitly (never a silent truncation).
+// Default-fill is performed by the synthesize agent (which reads gate-map.json's full edge list,
+// sized via args.edgeCount above) rather than here — the sandbox can't read the file. Only the
+// `conventions` cluster finders classify edges, and each sees only its own members, so edges
+// touching unclustered components (hooks, utility skills, some agents) get no finder row;
+// synthesize stubs those none-yet/low and states the coverage gap explicitly (never a silent
+// truncation).
 
 phase('Verify');
 const verified = await tieredVerify(allFindings, { profile: 'audit', agent, perTierTimeoutMs: VERIFY_TIMEOUT_MS });
@@ -941,8 +954,8 @@ const report = await agent(
   `Synthesize the orchestration audit. Hook-verification result (authoritative): ${hookFinding}\n` +
   `Confirmed findings: ${JSON.stringify(confirmedFindings)}\n` +
   `Finder edge-classifications so far: ${JSON.stringify(finderClass)}\n` +
-  `Read ${GATEMAP} for the full 140-edge list. Produce, as markdown: (1) findings grouped by ` +
-  `dimension with file:line citations; (2) the FULL per-edge classification table covering ALL 140 ` +
+  `Read ${GATEMAP} for the full ${edgeCount}-edge list. Produce, as markdown: (1) findings grouped by ` +
+  `dimension with file:line citations; (2) the FULL per-edge classification table covering ALL ${edgeCount} ` +
   `edges — use the finder classifications where present, and for every remaining edge emit ` +
   `enforcement: none-yet / maturity: settling / confidence: low (set hardenable per the hook ` +
   `result), stating this default-fill explicitly as a coverage note (never silent); (3) a triaged ` +
