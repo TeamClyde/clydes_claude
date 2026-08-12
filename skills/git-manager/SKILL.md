@@ -151,8 +151,8 @@ Empty output → no binding → **no warning anywhere.** This is the soft-warn c
    5. **Intersection non-empty** → in-scope commit. Check whether `<top>-plan.md` is in the staged set.
       - Yes → proceed to commit.
       - No → **refuse** unless commit message contains `[no-plan-update]`:
-        > "Active plan scope touched but `<top>-plan.md` not staged. Update plan via `plan-management:divergence` or include `[no-plan-update]` in commit message to override. If `plans/` is gitignored in this repo, stage the plan with `git add -f <plan-path>` after invoking `plan-management:divergence`."
-   6. **Override token `[no-plan-update]`**: allows the commit to proceed. The validator does NOT write to the journal — that would bypass the three-edit atomic invariant owned by `plan-management:divergence`. If the caller wants the override recorded, they invoke `plan-management:divergence` separately. The journal is written only by `plan-management:divergence`, never by this skill.
+        > "Active plan scope touched but `<top>-plan.md` not staged. Update plan via `plan-management` with `status: divergence`, or include `[no-plan-update]` in commit message to override. If `plans/` is gitignored in this repo, stage the plan with `git add -f <plan-path>` after invoking `plan-management`."
+   6. **Override token `[no-plan-update]`**: allows the commit to proceed. The validator does NOT write to the journal — that would bypass the three-edit atomic invariant owned by `plan-management`'s `divergence` mode. If the caller wants the override recorded, they invoke `plan-management` with `status: divergence` separately. The journal is written only by that call, never by this skill.
    - Path-level matching is the MVP. Symbol-level (DocSync-style) is deferred.
    - This validator runs in addition to (not replacing) the existing bash `hooks/pre-commit`.
 5.5. **Branch soft-warn (P2)** (runs after all pre-commit validations, before `git commit`):
