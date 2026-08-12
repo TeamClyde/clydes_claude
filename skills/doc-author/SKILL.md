@@ -1,6 +1,6 @@
 ---
 name: doc-author
-description: Use when authoring or updating a feature-doc (docs/explanation/features/<slug>.md) or docs/explanation/architecture.md. Wraps the docs-architect agent with merge-not-replace + 2-step (backlink-first → content-second) constraints. Invoked by plan-management:close-subplan (after ADR Promotion Scan), /doc-backfill (whole-repo backfill), and /docs-refresh feature|architecture (manual refresh). Triggers on "draft feature doc", "update feature explainer", "synthesize architecture doc".
+description: Use when authoring or updating a feature-doc (docs/explanation/features/<slug>.md) or docs/explanation/architecture.md. Wraps the docs-architect agent with merge-not-replace + 2-step (backlink-first → content-second) constraints. Invoked by plan-management (close-subplan, after ADR Promotion Scan), /doc-backfill (whole-repo backfill), and /docs-refresh feature|architecture (manual refresh). Triggers on "draft feature doc", "update feature explainer", "synthesize architecture doc".
 allowed-tools: Read, Write, Edit, Glob, Grep, Skill, Agent, get_architecture, query_graph, search_graph, search_code
 ---
 
@@ -13,7 +13,7 @@ Single execution kernel for all mutations of:
 - `docs/explanation/features/<slug>.md` (feature explainers, arc42-lite)
 - `docs/explanation/architecture.md` (C1/C2 system context)
 
-Wraps the `docs-architect` agent so every feature/architecture doc mutation goes through the same merge-not-replace, backlink-first, structure-preserving pipeline. Callers (`plan-management:close-subplan`, `/doc-backfill`, `/docs-refresh feature|architecture`) do not invoke `docs-architect` directly — they invoke this skill, which enforces the contract.
+Wraps the `docs-architect` agent so every feature/architecture doc mutation goes through the same merge-not-replace, backlink-first, structure-preserving pipeline. Callers (`plan-management`'s `close-subplan` mode, `/doc-backfill`, `/docs-refresh feature|architecture`) do not invoke `docs-architect` directly — they invoke this skill, which enforces the contract.
 
 ## Inputs (args)
 
@@ -122,7 +122,7 @@ doc-author refuses (returns failure with a clear message — does not silently d
 - doc-author returns the proposed file contents (or a diff against the prior state) to the caller.
 - doc-author does NOT auto-commit.
 - doc-author does NOT invoke `git-manager`.
-- The caller (`plan-management:close-subplan`, `/doc-backfill`, `/docs-refresh feature|architecture`) owns review and commit.
+- The caller (`plan-management`'s `close-subplan` mode, `/doc-backfill`, `/docs-refresh feature|architecture`) owns review and commit.
 
 ## Non-Goals
 
@@ -136,7 +136,7 @@ doc-author refuses (returns failure with a clear message — does not silently d
 
 | Caller | mode | context-source | accepted-adrs |
 |---|---|---|---|
-| `plan-management:close-subplan` (after ADR Promotion Scan) | `create` or `update` | `journal` | list of ADRs promoted during scan |
+| `plan-management`, `close-subplan` (after ADR Promotion Scan) | `create` or `update` | `journal` | list of ADRs promoted during scan |
 | `/doc-backfill` | `create` (per feature) | `codegraph` | resolved per-feature from existing ADRs |
 | `/docs-refresh feature \| architecture` | `update` (or `create` if missing) | `journal` or `codegraph` per user arg | optional |
 

@@ -105,9 +105,16 @@
       "router (`vet-capability-fit`, `vet-reputation`, `vet-security`: '... funnel, run by",
       "`vet-install`.'). Each said 'Gate N of the install-vetting funnel' without ever naming the",
       "skill that runs the funnel, which left all three pairs unresolved under the overlapVerdicts",
-      "gate below. Same 4-char headroom, for the same reason."
+      "gate below. Same 4-char headroom, for the same reason.",
+      "",
+      "RAISED AGAIN 2026-08-11: ceiling 13441 -> 13442, measured baseline 13437 -> 13438 (+1).",
+      "ADR-0014 retires the `plan-management:<mode>` colon notation. doc-author's description is the",
+      "only frontmatter site carrying it; the compact parenthetical form (`plan-management",
+      "(close-subplan, after ADR Promotion Scan)`) is the shortest rewrite that names the mode without",
+      "the colon. Raised deliberately in the same commit as the edit rather than shipping on the",
+      "remaining 4-char margin -- headroom stays 4, so the next unplanned growth still fails at once."
     ],
-    "totalDescriptionChars": 13441,
+    "totalDescriptionChars": 13442,
     "perSkillMaxChars": 1536
   },
 

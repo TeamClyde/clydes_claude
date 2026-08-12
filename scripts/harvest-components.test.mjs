@@ -26,9 +26,13 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // journal's `[divergence] [decision]` entry (2026-08-10).
 //
 // RETENTION: this constant is the standing contract of the re-grounded
-// equivalence oracle below, which asserts that the tokenizer gains EXACTLY
-// these 55 edges over the legacy extractor and loses none. It must remain a
-// module-level constant — do not move it inside a test function.
+// equivalence oracle below, which asserts that the tokenizer gains EXACTLY the
+// edges enumerated here over the legacy extractor, and loses none. It is
+// deliberately NOT described by a count: the set shrinks as ADR-0014 rewrites
+// colon-shape citations into a shape the legacy extractor can also read, and a
+// count written here would go stale on each such commit — the exact trap this
+// epic exists to close. It must remain a module-level constant — do not move it
+// inside a test function.
 // The pre-wiring migration harness that once shared this constant HAS BEEN
 // DELETED (Task 6): it computed the same delta by calling the three rule
 // functions directly, which was only meaningful while `resolvedNames` was
@@ -42,8 +46,8 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // marker below lines up with that table's `#` column — cross-check a pair
 // by row number there, not by hand-walking both lists.
 const EXPECTED_NEW_EDGES = new Set([
-  // rows 1-10
-  'doc-author|plan-management', 'executing-plans|plan-management',
+  // rows 1-10 (row 1 has since moved to MIGRATED_TO_LEGACY_SHAPE below)
+  'executing-plans|plan-management',
   'writing-plans|plan-management', 'architect|delivery-cadence',
   'architect|stack-hats', 'architecture-decision-records|doc-tools',
   'brainstorming|doc-tools', 'doc-author|doc-tools',
@@ -77,6 +81,25 @@ const EXPECTED_NEW_EDGES = new Set([
   'filesystem/path-portability|infra-init', 'finishing-a-development-branch|docs-status',
   'install-vetting|ai-tool-security-reviewer', 'integration-engineer|infra-init',
   'vet-install|project-setup',
+])
+
+// ADR-0014 MIGRATION. Pairs that were in EXPECTED_NEW_EDGES until the namespace
+// migration rewrote their citation from `plan-management:<mode>` -- a span only
+// `colonEdgeName` (a new rule) can read -- to a bare `plan-management` span,
+// which `legacyEdgeNames` reads too. The EDGE IS UNCHANGED; only its PROVENANCE
+// moved. It is therefore no longer a *gain* over legacy and correctly leaves the
+// `modern \ legacy` delta. That is the migration working, not a regression:
+// gate-map.json holds steady at 232 edges across every commit of this plan.
+//
+// They are pinned here rather than simply deleted. `missing` was the only named
+// assertion that these edges resolve AT ALL, and doc-author, executing-plans and
+// writing-plans each reach plan-management through this single citation and no
+// other -- deleting the line outright would retire a real guarantee as a side
+// effect of a notation change. The assertion below keeps that guarantee under a
+// claim that is still true: the pair must be in `modernPairs`. It says nothing
+// about legacy, because after the rewrite legacy resolves it too.
+const MIGRATED_TO_LEGACY_SHAPE = new Set([
+  'doc-author|plan-management',
 ])
 
 test('harvest finds skills, agents, rules, and hooks by type', async () => {
@@ -281,6 +304,15 @@ function legacyEdgeNames(body, sortedNames, self) {
 // loosen the assertion to absorb it. Dropping `unexpected` is precisely the
 // rejected one-directional check, reintroduced by attrition.
 //
+// The SYMMETRIC clause, which the contract above did not originally state and
+// ADR-0014 forced: when a corpus edit rewrites a citation into a shape the
+// LEGACY extractor can also read, the pair stops being a gain and lands in
+// `missing` even though its edge is untouched. Do NOT reach for the delete key
+// and do NOT relax `missing` — move the pair to MIGRATED_TO_LEGACY_SHAPE in the
+// same commit as the rewrite that causes it. `missing` is doing its job here:
+// it cannot distinguish "the citation was deleted" from "the citation changed
+// shape", so the maintainer has to say which, in the diff, once per pair.
+//
 // Pair keys are `from|to` NAMES, not `type:name`, matching EXPECTED_NEW_EDGES's
 // shape and the gate-map's own edge identity (edges carry names, not types).
 // Two ways a pair key could collide, both foreclosed:
@@ -293,7 +325,7 @@ function legacyEdgeNames(body, sortedNames, self) {
 //     and "|" is not a legal filename character on Windows — where this repo is
 //     developed and where the artifact is generated — so no name can contain
 //     the delimiter. The count alone would NOT have ruled this one out.
-test('tokenizer is a superset of the legacy edge set, gaining exactly the known 55 (equivalence)', async () => {
+test('tokenizer is a superset of the legacy edge set, gaining exactly the enumerated delta (equivalence)', async () => {
   const inv = await harvest({ repoRoot: REPO_ROOT })
   const sorted = [...new Set(inv.map(c => c.name).filter(Boolean))].sort((a, b) => b.length - a.length)
 
@@ -321,6 +353,19 @@ test('tokenizer is a superset of the legacy edge set, gaining exactly the known 
       + `  lost (legacy edge no longer resolved — a precision regression): ${lost.join(', ') || '(none)'}\n`
       + `  unexpected (gained, not in EXPECTED_NEW_EDGES): ${unexpected.join(', ') || '(none)'}\n`
       + `  missing (in EXPECTED_NEW_EDGES, no longer gained): ${missing.join(', ') || '(none)'}`,
+  )
+
+  // The ADR-0014 migrants left the delta on purpose (see MIGRATED_TO_LEGACY_SHAPE),
+  // so `missing` no longer speaks for them. This is what still must hold: the edge
+  // itself resolves. Each of these components reaches its target through exactly
+  // one citation, so a rewrite that dropped the bare span would silently delete a
+  // real edge and only ever surface as a gate-map.json byte-diff.
+  const migrantsUnresolved = [...MIGRATED_TO_LEGACY_SHAPE].filter(p => !modernPairs.has(p)).sort()
+  assert.deepEqual(
+    migrantsUnresolved,
+    [],
+    'a citation rewritten by ADR-0014 no longer resolves at all — the rewrite dropped the '
+      + `bare component span instead of just the colon: ${migrantsUnresolved.join(', ')}`,
   )
 })
 

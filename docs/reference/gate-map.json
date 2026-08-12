@@ -300,7 +300,7 @@
     {
       "type": "skill",
       "name": "doc-author",
-      "description": "Use when authoring or updating a feature-doc (docs/explanation/features/<slug>.md) or docs/explanation/architecture.md. Wraps the docs-architect agent with merge-not-replace + 2-step (backlink-first → content-second) constraints. Invoked by plan-management:close-subplan (after ADR Promotion Scan), /doc-backfill (whole-repo backfill), and /docs-refresh feature|architecture (manual refresh). Triggers on \"draft feature doc\", \"update feature explainer\", \"synthesize architecture doc\".",
+      "description": "Use when authoring or updating a feature-doc (docs/explanation/features/<slug>.md) or docs/explanation/architecture.md. Wraps the docs-architect agent with merge-not-replace + 2-step (backlink-first → content-second) constraints. Invoked by plan-management (close-subplan, after ADR Promotion Scan), /doc-backfill (whole-repo backfill), and /docs-refresh feature|architecture (manual refresh). Triggers on \"draft feature doc\", \"update feature explainer\", \"synthesize architecture doc\".",
       "file": "skills/doc-author/SKILL.md"
     },
     {
