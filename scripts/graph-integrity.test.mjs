@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve, join } from 'node:path'
 import { harvest, buildGateMap } from './harvest-components.mjs'
 import { readPolicy } from './lib/skill-surface.mjs'
+import { escapeRegExp } from './lib/regex.mjs'
 
 // Repo root resolved the portable way (matches the sibling test files and
 // .claude/hooks/*.mjs). Do NOT use `new URL('../', import.meta.url).pathname`
@@ -265,8 +266,6 @@ test('every declared entry point still has zero inbound edges', async () => {
 // nothing to notice -- the same hiding-place risk entryPoints already guards
 // against, applied to the other completeness block.
 // ---------------------------------------------------------------------------
-
-const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // Committed state, not the working tree -- same discipline as
 // reference-integrity.test.mjs: CI runners are stock ubuntu/windows images

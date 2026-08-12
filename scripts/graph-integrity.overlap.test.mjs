@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { harvest } from './harvest-components.mjs'
 import { readPolicy } from './lib/skill-surface.mjs'
+import { escapeRegExp } from './lib/regex.mjs'
 
 // Repo root resolved the portable way (matches the sibling test files and
 // .claude/hooks/*.mjs). Do NOT use `new URL('../', import.meta.url).pathname`
@@ -150,7 +151,6 @@ function jaccard(a, b) {
 // descriptions today, so this is a fence against the next edit, not a fix for
 // a live miss. Names are escaped before being built into a regex — several
 // carry `-` and a future one could carry `.` or `/`.
-const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 function namesMentionedIn(description, otherNames) {
   const text = (description ?? '').toLowerCase()
