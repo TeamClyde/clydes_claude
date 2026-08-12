@@ -91,7 +91,7 @@ Every L-sized plan doc MUST contain:
 - External resources with actual names (DynamoDB tables, SQS queues, SES templates, EventBridge rules)
 - Entry points and triggers involved
 
-**Task Reference table** — **Authoritative durable progress record.** Columns: #, Task, Size, Complexity, Scope, Jira Key. Complexity (S/M/L) drives tier-aware dispatch — see `subagent-driven-development` Model Selection. Size is independent of complexity (a small but architecturally complex task may be `Size: S, Complexity: L`). Jira Key column is intentionally blank during planning — keys are assigned at execution start. Rows marked ✅ as tasks complete. The mechanism that keeps this table current is `plan-management:divergence` — do not rely on "remember to update it."
+**Task Reference table** — **Authoritative durable progress record.** Columns: #, Task, Size, Complexity, Scope, Jira Key. Complexity (S/M/L) drives tier-aware dispatch — see `subagent-driven-development` Model Selection. Size is independent of complexity (a small but architecturally complex task may be `Size: S, Complexity: L`). Jira Key column is intentionally blank during planning — keys are assigned at execution start. Rows marked ✅ as tasks complete. The mechanism that keeps this table current is `plan-management`'s `divergence` mode — do not rely on "remember to update it."
 
 **Testing** — appended by `test-strategy` agent **after** architect review. This section does not exist at architect review time. This is correct — do not flag its absence during architect review.
 
@@ -107,7 +107,7 @@ A plan is ready when a model with an empty context window could receive it with 
 
 Editing or refining an existing plan doc before execution begins is S-sized: no architect review, no new TODO.md entry, no new Jira ticket required.
 
-During execution, divergences (architecture changes, scope shifts, discovered bugs, test-mechanics changes) are not "plan doc refinements" — they are handled by `plan-management:divergence`, which atomically writes a journal entry, edits the relevant plan section, and refreshes the handoff. Do not treat mid-execution updates as a separate S-sized editing task.
+During execution, divergences (architecture changes, scope shifts, discovered bugs, test-mechanics changes) are not "plan doc refinements" — they are handled by `plan-management`'s `divergence` mode, which atomically writes a journal entry, edits the relevant plan section, and refreshes the handoff. Do not treat mid-execution updates as a separate S-sized editing task.
 
 ---
 

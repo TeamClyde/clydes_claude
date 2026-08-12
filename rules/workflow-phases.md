@@ -60,7 +60,7 @@ The plan doc's Task Reference table is the **durable progress record**. The jour
 | Event | Required action |
 | ----- | --------------- |
 | Task completes | Mark Task Reference row ✅; refresh handoff status table |
-| Plan deviation (architecture, scope, file path, signature) | Invoke `plan-management:divergence` — atomic three-write: journal append + plan section edit + handoff refresh |
+| Plan deviation (architecture, scope, file path, signature) | Invoke `plan-management` with `status: divergence` — atomic three-write: journal append + plan section edit + handoff refresh |
 | Jira ticket transitions to Done (when Jira enabled) | Invoke `plan-management` with: ticket key, plan doc path, `status: completed`, 1–2 sentence summary. The skill marks the Task Reference row ✅ and updates TODO.md if the item is fully done. |
 | One TODO.md item maps to multiple Jira tickets | Invoke `plan-management` after every Done transition; it accumulates progress across partial completions. |
 

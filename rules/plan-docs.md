@@ -48,7 +48,7 @@ The declaration belongs to the plan author — path-heuristic detection was reje
 
 ### Form B — Small addition: appended section in parent plan
 
-Append new rows to the parent's Task Reference table. No new files. `plan-management:spawn-subplan` is not invoked. The parent journal and handoff continue to serve.
+Append new rows to the parent's Task Reference table. No new files. `plan-management`'s `spawn-subplan` mode is not invoked. The parent journal and handoff continue to serve.
 
 Sizing rule: Form A when the sub-plan is itself L-sized; Form B otherwise. See `rules/planning.md` for the L-sizing heuristic.
 
@@ -59,7 +59,7 @@ Sizing rule: Form A when the sub-plan is itself L-sized; Form B otherwise. See `
 `.claude/active-plan` holds the relative path (from repo root) to the currently active `<slug>-plan.md`.
 
 - Single source of truth for "what am I working on right now."
-- Updated by `plan-management:spawn-subplan` (set to child), `plan-management:close-subplan` (reverted to parent / cleared at tree completion), and `plan-management:repoint` (switched to a different active plan during a context switch — moves the marker, never clears it). `repoint` does not contradict the "close-subplan is the only path to clear the marker" invariant: it relocates the pointer, it does not clear it.
+- Updated by `plan-management`'s `spawn-subplan` mode (set to child), `close-subplan` (reverted to parent / cleared at tree completion), and `repoint` (switched to a different active plan during a context switch — moves the marker, never clears it). `repoint` does not contradict the "close-subplan is the only path to clear the marker" invariant: it relocates the pointer, it does not clear it.
 - Set on plan creation; cleared on plan tree completion.
 - All triggers and hooks consult this file — never guess from heuristics.
 
@@ -94,12 +94,12 @@ Never preload `plan.md`, `journal.md`, or `design.md` at session start.
 | Event | Required action |
 |-------|----------------|
 | Task completes | Mark Task Reference row ✅; refresh handoff status table |
-| Plan deviation (architecture, file path, signature, scope) | Invoke `plan-management:divergence` — atomic three-write: journal append + plan section edit + handoff refresh |
-| `systematic-debugging` Phase 4 exit | Mandatory `plan-management:divergence` to record root cause and fix |
-| Discovered bug or test debt | Tagged journal entry via `plan-management:divergence` (tags: `[bug]`, `[test-debt]`) |
+| Plan deviation (architecture, file path, signature, scope) | Invoke `plan-management` with `status: divergence` — atomic three-write: journal append + plan section edit + handoff refresh |
+| `systematic-debugging` Phase 4 exit | Mandatory `plan-management` call with `status: divergence` to record root cause and fix |
+| Discovered bug or test debt | Tagged journal entry via `plan-management` with `status: divergence` (tags: `[bug]`, `[test-debt]`) |
 | Test-running mechanics change | Journal entry tagged `[test-mechanics]`; if permanent, update the relevant testing artifact (`.claude/testing-plan.md`, `scripts/run-tests.sh`, or repo equivalent) in the same divergence call |
 
-`plan-management:divergence` always writes to the **top-level** journal/handoff regardless of which sub-plan is currently active.
+`plan-management`'s `divergence` mode always writes to the **top-level** journal/handoff regardless of which sub-plan is currently active.
 
 ### What to journal
 
@@ -113,7 +113,7 @@ When in doubt, journal it — a short extra entry costs less than a lost learnin
 
 ### Sub-plan spawn
 
-Invoke `plan-management:spawn-subplan`. The skill:
+Invoke `plan-management` with `status: spawn-subplan`. The skill:
 1. Appends a dated spawn entry to the top-level journal.
 2. Scaffolds `plans/<parent>/<child>/` with empty design and plan files.
 3. Updates top-level handoff: `Active sub-plan: <child-slug>`.
@@ -121,7 +121,7 @@ Invoke `plan-management:spawn-subplan`. The skill:
 
 ### Sub-plan close (the rollup)
 
-When all tasks in `<child>-plan.md` are ✅, invoke `plan-management:close-subplan`. The skill requires structured closeout content before proceeding (refuses otherwise):
+When all tasks in `<child>-plan.md` are ✅, invoke `plan-management` with `status: close-subplan`. The skill requires structured closeout content before proceeding (refuses otherwise):
 - 1-paragraph summary of what the sub-plan accomplished
 - Key decisions made during execution
 - Gotchas and lessons worth preserving
@@ -134,10 +134,10 @@ This structured closeout requirement is the forcing function that prevents sub-p
 
 When all tasks in `<top>-plan.md` are ✅:
 
-1. Invoke `plan-management:close-subplan` with `closeout-summary`, `closeout-decisions`, and `closeout-gotchas`. The skill writes the final journal entry, refreshes the handoff to terminal status, and clears `.claude/active-plan` atomically.
+1. Invoke `plan-management` with `status: close-subplan` and `closeout-summary`, `closeout-decisions`, `closeout-gotchas`. The skill writes the final journal entry, refreshes the handoff to terminal status, and clears `.claude/active-plan` atomically.
 2. Run the `finishing-a-development-branch` flow.
 
-Do not clear `.claude/active-plan` manually — `plan-management:close-subplan` is the only sanctioned path.
+Do not clear `.claude/active-plan` manually — `plan-management`'s `close-subplan` mode is the only sanctioned path.
 
 ---
 
