@@ -120,7 +120,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 | `e2e-init` | New repo, test backbone needed | Generates testing-plan.md, run-tests.sh, integration-test-constraints.md (static section) |
 | `project-setup` | Onboarding new repo to Claude workflow | CLAUDE.md + project.json setup wizard; Phase 4 (Tooling Setup) detects stacks → proposes project.json "stacks" → drives the vet-install funnel per catalog tool → writes docs/reference/stack-setup.md |
 | `adherence-audit` | Periodic / when adding new tools | Semantic consistency check across all components |
-| `doc-author` | Invoked by `plan-management:close-subplan`, `/doc-backfill`, `/docs-refresh feature\|architecture` | Wrapper around `docs-architect` agent with merge-not-replace + 2-step (backlink → synthesis) constraints. Single entry point for all `docs/explanation/architecture.md` and `features/*.md` mutations. Args: target, mode (`create`/`update`/`backlink-only`), context-source (`codegraph`/`journal`), accepted-adrs, optional plan-doc. Does not auto-commit — caller owns review + commit. |
+| `doc-author` | Invoked by `plan-management`'s `close-subplan` mode, `/doc-backfill`, `/docs-refresh feature\|architecture` | Wrapper around `docs-architect` agent with merge-not-replace + 2-step (backlink → synthesis) constraints. Single entry point for all `docs/explanation/architecture.md` and `features/*.md` mutations. Args: target, mode (`create`/`update`/`backlink-only`), context-source (`codegraph`/`journal`), accepted-adrs, optional plan-doc. Does not auto-commit — caller owns review + commit. |
 | `doc-backfill` | User-invoked `/doc-backfill` (no args) | Whole-repo one-shot codegraph-driven backfill. Generates `docs/explanation/architecture.md` (C1+C2) + one `features/<slug>.md` per detected C3 component via `doc-author` mode=`create`. Preflight requires `/infra-init` to have been run. C1 actors written as TODO comments (codegraph cannot detect external systems). |
 
 ### Thinking tools
@@ -176,7 +176,7 @@ Every top-level L-sized plan consists of four sibling files under `plans/<slug>/
 | `<slug>-journal.md` | Append-only history: divergences, decisions, debugging cascades, sub-plan events | Append-only — never edit prior entries |
 | `<slug>-handoff.md` | Live entry-point: current state, active task, open gotchas | Continuously refreshed (overwritten in place) |
 
-`.claude/active-plan` holds the relative path to the currently active `<slug>-plan.md`. Updated by `plan-management:spawn-subplan` and `plan-management:close-subplan`. SessionStart reads this file to surface the correct handoff.
+`.claude/active-plan` holds the relative path to the currently active `<slug>-plan.md`. Updated by `plan-management`'s `spawn-subplan` and `close-subplan` modes. SessionStart reads this file to surface the correct handoff.
 
 ### Sub-plan structure
 

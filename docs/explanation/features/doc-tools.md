@@ -59,7 +59,7 @@ Documentation completeness is enforced by cross-referencing the generated, drift
 
 ### Skills and Their Roles
 
-**`doc-author`** is the single execution kernel for all mutations of `docs/explanation/features/<slug>.md` and `docs/explanation/architecture.md`. It wraps the `docs-architect` agent with a strict two-step pipeline and a five-constraint prompt that enforces merge-not-replace behavior, section-structure preservation, and front-matter integrity. Callers — `plan-management:close-subplan`, `/doc-backfill`, and `/docs-refresh feature|architecture` — never invoke `docs-architect` directly; they always go through `doc-author`. The wrapper is the value: without it, `docs-architect`'s default behavior is full-document synthesis that will rewrite sections, reorder content, and drop front-matter conventions.
+**`doc-author`** is the single execution kernel for all mutations of `docs/explanation/features/<slug>.md` and `docs/explanation/architecture.md`. It wraps the `docs-architect` agent with a strict two-step pipeline and a five-constraint prompt that enforces merge-not-replace behavior, section-structure preservation, and front-matter integrity. Callers — `plan-management`'s `close-subplan` mode, `/doc-backfill`, and `/docs-refresh feature|architecture` — never invoke `docs-architect` directly; they always go through `doc-author`. The wrapper is the value: without it, `docs-architect`'s default behavior is full-document synthesis that will rewrite sections, reorder content, and drop front-matter conventions.
 
 **`docs-status`** audits a repo's documentation health. It compares the manifest checklist against the filesystem, classifies each entry into one of three severity tiers, optionally runs a broken-link check, and performs three regex sweeps to validate ADR-to-feature-doc cross-link integrity. It is a read-only skill — it never modifies files except scaffolding `docs/manifest.md` on first use if the user accepts. It produces a structured tiered report and a summary line.
 
@@ -123,7 +123,7 @@ ADR candidates are captured at two points: `brainstorming` Step 10 surfaces cand
 
 ### Authoring a New Feature Doc (primary flow)
 
-The normal path for a new feature explainer runs through `plan-management:close-subplan`:
+The normal path for a new feature explainer runs through `plan-management`'s `close-subplan` mode:
 
 1. All tasks in the sub-plan reach ✅.
 2. `close-subplan` runs the **ADR Promotion Scan** first. For each `[adr-candidate]` journal tag: decide promote or decline. For each promoted ADR, `architecture-decision-records` drafts the file under `docs/explanation/adr/NNNN-<slug>.md`.
@@ -179,7 +179,7 @@ The audit runs in a fixed sequence:
 ## Dependencies
 
 - **`docs-architect` agent** — the content synthesis engine wrapped by `doc-author`. All content generation passes through this agent; `doc-author` is the wrapper that enforces constraints before dispatching it and validates the returned content before writing.
-- **`plan-management:close-subplan`** — the primary caller of `doc-author` in the normal workflow. Owns the ADR Promotion Scan ordering (ADRs first, `doc-author` second) and owns commit after human review.
+- **`plan-management`'s `close-subplan` mode** — the primary caller of `doc-author` in the normal workflow. Owns the ADR Promotion Scan ordering (ADRs first, `doc-author` second) and owns commit after human review.
 - **`architecture-decision-records` skill** — drafts ADR files. Invoked by `/docs-refresh adr` and by the ADR Promotion Scan. `doc-author` reads ADR files (already written) but does not draft them.
 - **`git-manager` skill** — handles all commits of documentation artifacts. Neither `doc-author` nor `docs-refresh` nor `doc-backfill` commit directly.
 - **`codebase-memory MCP`** (`get_architecture`, `query_graph`, `search_graph`, `search_code`) — required by `doc-backfill` (and by `doc-author` when `context-source=codegraph`). Requires `.claude-init/CODEBASE.md` to exist, seeded by `/infra-init`.
@@ -231,7 +231,7 @@ Doc health is observed via three mechanisms:
 
 **Manifest** — `docs/manifest.md`, the source of truth for what documentation this repo aspires to have. A Diátaxis-organized checkbox list seeded from a domain template. Entries marked `[x]` must exist on disk; entries marked `[ ]` are aspirational. Never delete entries without deliberate intent.
 
-**ADR Promotion Scan** — The step that runs at `plan-management:close-subplan`, before `doc-author`, to convert `[adr-candidate]` journal tags into actual ADR files. The scan decides for each candidate: promote (draft the ADR) or decline. Only promoted ADRs are passed to `doc-author` as `accepted-adrs`.
+**ADR Promotion Scan** — The step that runs at `plan-management`'s `close-subplan` mode, before `doc-author`, to convert `[adr-candidate]` journal tags into actual ADR files. The scan decides for each candidate: promote (draft the ADR) or decline. Only promoted ADRs are passed to `doc-author` as `accepted-adrs`.
 
 **Merge-not-replace** — The `doc-author` behavioral constraint for `mode=update`: existing prose in any section is authoritative, and the content pass may only append or refine individual sentences, never replace entire sections. Enforced via the constraint prompt dispatched to `docs-architect`.
 

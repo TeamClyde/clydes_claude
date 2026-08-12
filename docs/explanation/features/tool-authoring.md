@@ -138,7 +138,7 @@ Every policy exemption is keyed by the exempted thing and valued by the **reason
 |---|---|---|
 | `backtickEdgeName` | exact backtick span | `` `writing-plans` `` |
 | `pathEdgeName` | path form | `` `skills/writing-plans/SKILL.md` ``, `` `rules/doc-tools.md` `` |
-| `colonEdgeName` | colon dispatch | `` `plan-management:divergence` `` |
+| `colonEdgeName` | colon dispatch | `` `<name>:<mode>` `` — notation retired; the rule is kept as a guard |
 | `suffixedEdgeName` | trailing separator | `` `integration-test-constraints.md` `` |
 
 A span resolving under any of the four becomes a real `gate-map.json` edge, which is exactly what makes it invisible to the shape-coverage gate — coverage only ever examines spans none of the four already explained. What survives that filter is either a genuinely new citation shape (add a fifth rule) or a span that names a component without citing it (add a declared exemption to `SHAPE_COVERAGE_EXEMPTIONS`, with a reviewable reason, checked for staleness in both directions the same way the policy exemptions above are).
