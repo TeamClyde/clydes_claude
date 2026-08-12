@@ -125,14 +125,81 @@ test('a bare namespace prefix with no name is not reported', async () => {
     'the counter-example prefix must not be flagged')
 })
 
-test('valid local-skill colon notation is not reported', async () => {
-  // 41 in-corpus occurrences of `plan-management:<mode>` are prose notation for
-  // "the <mode> mode of plan-management". `plan-management` IS a local skill, so
-  // they resolve. Whether the notation should exist at all is slice 4's ADR, not
-  // this gate's call.
+test('the retired colon notation is reported by ADR-0014, not by the dangling gate', async () => {
+  // Was: "41 in-corpus occurrences of plan-management:<mode> resolve, so the dangling
+  // gate must not flag them; whether the notation should exist is slice 4's ADR."
+  // Slice 4 answered: ADR-0014 retires it, and the check below owns the finding.
+  // The dangling gate must STILL stay silent here -- two gates reporting one defect
+  // with two different explanations is how a reader learns to ignore both.
   const dangling = await collectDangling()
   assert.ok(!dangling.some(d => d.ref.startsWith('plan-management:')),
-    'plan-management: notation resolves and must not be flagged')
+    'the dangling gate must not double-report what the ADR-0014 check owns')
+})
+
+// ADR-0014: a local component name may never appear as the HEAD of an `ns:name`
+// token. `:` addresses the NAMESPACE axis and nothing else, so a component name
+// in the head position is either a mode written as a namespace (the notation
+// this ADR retires) or a genuine foreign-namespace collision. Both are defects.
+//
+// CORPUS IS WIDER THAN CORPUS_ROOTS -- repo-wide, minus `plans/`. Deliberate: this
+// asks a far narrower question than the dangling-reference gate above (one
+// membership test on the head, no resolution attempt), so it does not carry the
+// unmeasured-corpus risk that got the adherence-audit slice cut. 29 of the 70
+// original sites lived in `docs/`, which CORPUS_ROOTS does not read at all, so
+// scoping this check to CORPUS_ROOTS would leave 41% of the migration ungated.
+//
+// `plans/` is excluded because it is gitignored working state (.gitignore:10);
+// the two occurrences that remain there sit in a committed leftover plan doc
+// that RECORDS a past state, and editing it would make the record lie.
+//
+// COLLISION CLASS -- read before adding a component named `harvest`, `verify`,
+// `recall`, `engine` or `build`. npm script references tokenize as nsrefs:
+// measured over the committed markdown, `harvest:` appears 6 times, `verify:` 6,
+// `recall:` 1 (all currently undeclared prose, and so ignored). Naming a
+// component after one of those heads would fire this check on every mention of
+// `npm run harvest:check`. That is not hypothetical -- scripts/harvest-components.mjs
+// already exists. The escape hatch is an inline `<!-- ref-ok: ... -->` marker,
+// honored here exactly as it is by the dangling gate above.
+const NSREF_CHECK_ROOT_EXCLUDE = 'plans/'
+
+async function collectComponentHeadedNsrefs() {
+  const inv = await harvest({ repoRoot: REPO_ROOT })
+  const componentNames = new Set(inv.map(c => c.name).filter(Boolean))
+
+  const files = execFileSync('git', ['ls-files', '-z', '*.md'], { cwd: REPO_ROOT, encoding: 'utf8' })
+    .split('\0')
+    .filter(Boolean)
+    .filter(p => !p.startsWith(NSREF_CHECK_ROOT_EXCLUDE))
+    .sort()
+
+  const found = []
+  for (const file of files) {
+    const src = await readFile(join(REPO_ROOT, file), 'utf8')
+    const exempt = exemptLines(src)
+    for (const t of tokenize(src)) {
+      if (t.kind !== 'nsref') continue
+      if (exempt.has(t.line)) continue
+      if (componentNames.has(t.ns)) found.push({ file, line: t.line, ref: t.value, ns: t.ns })
+    }
+  }
+  return found.sort((a, b) => (a.file + a.line).localeCompare(b.file + b.line))
+}
+
+test('no local component name is used as a namespace prefix (ADR-0014)', async () => {
+  const found = await collectComponentHeadedNsrefs()
+  const report = found.map(f => `  ${f.file}:${f.line}  ${f.ref}`).join('\n')
+  assert.equal(
+    found.length,
+    0,
+    `${found.length} reference(s) use a local component name as a namespace prefix:\n${report}\n` +
+      `ADR-0014: \`:\` qualifies a reference into a DIFFERENT namespace. A local component is in ` +
+      `the current namespace, so it is cited BARE. A mode is an argument, not an addressing axis — ` +
+      `write \`plan-management\` with \`status: divergence\` (the space after the colon is ` +
+      `load-bearing; \`status:divergence\` would itself tokenize).\n` +
+      `If this is a genuine foreign namespace that happens to collide with a local component name ` +
+      `(e.g. an npm script like \`harvest:check\`), mark the line with ` +
+      `\`<!-- ref-ok: <reason> -->\` — the same escape hatch the dangling gate uses.`,
+  )
 })
 
 test('an inline ref-ok marker exempts only its own line, not the file', async () => {

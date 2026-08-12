@@ -170,18 +170,22 @@ This is **local in-degree, not transitive reachability**, and the two are not th
 
 **Why detect-and-flag by similarity threshold does not work here — the principle, not just the outcome.** *Overlapping outputs are legitimate; overlapping triggers are not, because the trigger is where routing happens.* Two skills can produce similar-shaped artifacts without being confusable — what matters for the graph to gate is whether a reader would pick the wrong one **before either skill runs**, not whether their outputs later resemble each other. A pair earns a `boundary` verdict precisely *because* someone already noticed it was confusable and wrote a clause naming the sibling — and that clause adds shared vocabulary, raising the pair's similarity score in the same stroke that resolves it. Similarity therefore anti-correlates with "still needs disambiguation": the already-fixed pairs rank as the *most* similar, not the least, so no similarity threshold can separate a genuinely-confusable pair from an already-resolved one. See [ADR-0013](../adr/0013-component-graph-invariants.md) for the measured falsification. This is why the graph gates *routing ambiguity* — the trigger-selection moment — and never *output overlap*: gating on output similarity would flag correct designs, and a detector built on description similarity would flag the wrong pairs first.
 
+**Namespace notation** (`scripts/reference-integrity.test.mjs`) enforces ADR-0014: a local component name may never be the head of an `ns:name` token. `:` addresses the namespace axis and nothing else, so a component name in the head position is either a mode written as a namespace or a real foreign-namespace collision — both defects. Unlike the four checks above, its corpus is **repo-wide minus `plans/`**, not `CORPUS_ROOTS`: it asks a strictly narrower question (one membership test on the head, no resolution attempt), and 29 of the 70 sites the ADR retired lived in `docs/`, which `CORPUS_ROOTS` does not read at all. Measured 2026-08-11: 70 occurrences before the migration, 0 after; the only remaining component-headed tokens repo-wide are 2 in a committed leftover plan doc that records a past state. `colonEdgeName` (`scripts/lib/component-refs.mjs`) is deliberately **kept** even though nothing now feeds it — the check makes its input set *provably* empty, and the guard is what makes that emptiness *enforceable* if the check is ever relaxed. They are complements; do not remove one because the other exists.
+
 ```mermaid
 flowchart TB
     A["PRECISION<br/>reference-integrity.test.mjs<br/>does this citation resolve?"] --> B["CITATION-SHAPE COVERAGE<br/>harvest-components.shape-coverage.test.mjs<br/>is a component cited unreadably?"]
     B --> C["INBOUND DEGREE<br/>every zero-in-edge node is a<br/>declared entryPoint (both directions)"]
     B --> D["DOCUMENTATION COVERAGE<br/>every node is documented or<br/>declared catalogOnly (both directions)"]
     B --> E["OVERLAP TRIAGE<br/>every candidate-band skill pair<br/>carries a re-verified verdict"]
+    B --> F["NAMESPACE NOTATION<br/>no local component name appears<br/>as an ns:name head (ADR-0014)"]
 
     style A fill:#ddeeff,stroke:#6699cc
     style B fill:#ddeeff,stroke:#6699cc
     style C fill:#f5f5dc,stroke:#999
     style D fill:#f5f5dc,stroke:#999
     style E fill:#f5f5dc,stroke:#999
+    style F fill:#f5f5dc,stroke:#999
 ```
 
 Edge-local checks (top) establish that the graph's edges are trustworthy one at a time. Graph invariants (bottom) ask properties that only exist once the whole graph is in view — and each depends on the edge set being precise and complete first, which is why they were built second.
