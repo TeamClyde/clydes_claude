@@ -41,8 +41,7 @@
       "$stray-local-records": "context7 and security-guidance were declared [local, user] until 2026-08-06. The local record was a duplicate enable in template-image-generator that registry.md had claimed was purged on 2026-06-18; it never was, and declaring the observed state as expected turned a known defect into policy. Removed via the casing fix below. They are NOT in the `removed` set -- the plugin itself is still wanted at user scope, and `removed` is keyed by plugin name, so listing one there would fail the resurrection check against its own legitimate install.",
 
       "$project-scoped": "Scoped to another repo, so they never appear in user-level enabledPlugins and cost this repo nothing. marketing-skills moved user -> project on 2026-08-06: it was 47 skills and ~12006 always-on tokens in EVERY session, more than the entire ~10000-token listing budget on a 1M-context model and 74% of all plugin cost here. registry.md had claimed it was project-scoped since 2026-06-18 while it sat at user scope.",
-      "marketing-skills@marketingskills": ["project"],
-      "frontend-design@claude-plugins-official": ["project"]
+      "marketing-skills@marketingskills": ["project"]
     },
     "removed": {
       "$comment": "Deleted deliberately. Reinstalling one fails the check until this file says otherwise.",
