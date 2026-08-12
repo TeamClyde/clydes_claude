@@ -213,9 +213,26 @@ test('an inline ref-ok marker exempts only its own line, not the file', async ()
   assert.ok(!exempt.has(3), 'the next line is not — exemption is line-scoped, never file-scoped')
 })
 
-test('the historical-ledger exemption is file-scoped', async () => {
+test('the historical-ledger exemption is declared, and currently dormant by construction', async () => {
   const policy = await readPolicy()
   const ledgers = declared(policy.references.historicalLedgers)
   assert.ok(ledgers.has('plugins/registry.md'))
   assert.ok(ledgers.has('plugins/history.md'))
+
+  // DORMANCY, asserted rather than assumed. Every declared ledger sits outside
+  // CORPUS_ROOTS, so collectDangling()'s `if (ledgers.has(file)) continue` skip
+  // has never executed -- committedMarkdown() never yields a file it could match.
+  // That is fine, and it is deliberately NOT deleted: the branch is what would
+  // keep the ledgers exempt the moment CORPUS_ROOTS widens. Asserting the
+  // dormancy is what stops it activating silently -- widen CORPUS_ROOTS and this
+  // fails, telling you a previously-dead branch just became live and needs a
+  // test that actually exercises it.
+  const reachable = [...ledgers].filter(f => CORPUS_ROOTS.some(r => f.startsWith(r)))
+  assert.deepEqual(
+    reachable,
+    [],
+    `historicalLedgers now names ${reachable.length} file(s) inside CORPUS_ROOTS, so the skip ` +
+      `branch in collectDangling() is live for the first time. It has never run before and has ` +
+      `no coverage — add a test that exercises it before relying on it.`,
+  )
 })
