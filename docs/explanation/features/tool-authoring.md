@@ -5,7 +5,7 @@
 **Owner:** solo
 **Last updated:** 2026-08-11
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs); plans/component-reference-integrity/graph-integrity/ (citation-shape coverage; graph invariants)
-**Related ADRs:** ADR-0013 (component-graph-invariants)
+**Related ADRs:** ADR-0013 (component-graph-invariants), ADR-0014 (namespace-convention)
 **Key files:**
   - `skills/creating-tools/SKILL.md` — the component-creation router
   - `skills/creating-tools/routing-table.md` — per-artifact routing details
@@ -138,7 +138,7 @@ Every policy exemption is keyed by the exempted thing and valued by the **reason
 |---|---|---|
 | `backtickEdgeName` | exact backtick span | `` `writing-plans` `` |
 | `pathEdgeName` | path form | `` `skills/writing-plans/SKILL.md` ``, `` `rules/doc-tools.md` `` |
-| `colonEdgeName` | colon dispatch | `` `<name>:<mode>` `` — notation retired; the rule is kept as a guard |
+| `colonEdgeName` | colon dispatch | `` `<name>:<mode>` `` — notation retired by [ADR-0014](../adr/0014-namespace-convention.md); the rule is kept as a guard |
 | `suffixedEdgeName` | trailing separator | `` `integration-test-constraints.md` `` |
 
 A span resolving under any of the four becomes a real `gate-map.json` edge, which is exactly what makes it invisible to the shape-coverage gate — coverage only ever examines spans none of the four already explained. What survives that filter is either a genuinely new citation shape (add a fifth rule) or a span that names a component without citing it (add a declared exemption to `SHAPE_COVERAGE_EXEMPTIONS`, with a reviewable reason, checked for staleness in both directions the same way the policy exemptions above are).
@@ -170,7 +170,7 @@ This is **local in-degree, not transitive reachability**, and the two are not th
 
 **Why detect-and-flag by similarity threshold does not work here — the principle, not just the outcome.** *Overlapping outputs are legitimate; overlapping triggers are not, because the trigger is where routing happens.* Two skills can produce similar-shaped artifacts without being confusable — what matters for the graph to gate is whether a reader would pick the wrong one **before either skill runs**, not whether their outputs later resemble each other. A pair earns a `boundary` verdict precisely *because* someone already noticed it was confusable and wrote a clause naming the sibling — and that clause adds shared vocabulary, raising the pair's similarity score in the same stroke that resolves it. Similarity therefore anti-correlates with "still needs disambiguation": the already-fixed pairs rank as the *most* similar, not the least, so no similarity threshold can separate a genuinely-confusable pair from an already-resolved one. See [ADR-0013](../adr/0013-component-graph-invariants.md) for the measured falsification. This is why the graph gates *routing ambiguity* — the trigger-selection moment — and never *output overlap*: gating on output similarity would flag correct designs, and a detector built on description similarity would flag the wrong pairs first.
 
-**Namespace notation** (`scripts/reference-integrity.test.mjs`) enforces ADR-0014: a local component name may never be the head of an `ns:name` token. `:` addresses the namespace axis and nothing else, so a component name in the head position is either a mode written as a namespace or a real foreign-namespace collision — both defects. Unlike the four checks above, its corpus is **repo-wide minus `plans/`**, not `CORPUS_ROOTS`: it asks a strictly narrower question (one membership test on the head, no resolution attempt), and 29 of the 70 sites the ADR retired lived in `docs/`, which `CORPUS_ROOTS` does not read at all. Measured 2026-08-11: 70 occurrences before the migration, 0 after; the only remaining component-headed tokens repo-wide are 2 in a committed leftover plan doc that records a past state. `colonEdgeName` (`scripts/lib/component-refs.mjs`) is deliberately **kept** even though nothing now feeds it — the check makes its input set *provably* empty, and the guard is what makes that emptiness *enforceable* if the check is ever relaxed. They are complements; do not remove one because the other exists.
+**Namespace notation** (`scripts/reference-integrity.test.mjs`) enforces [ADR-0014](../adr/0014-namespace-convention.md): a local component name may never be the head of an `ns:name` token. `:` addresses the namespace axis and nothing else, so a component name in the head position is either a mode written as a namespace or a real foreign-namespace collision — both defects. Unlike the four checks above, its corpus is **repo-wide minus `plans/`**, not `CORPUS_ROOTS`: it asks a strictly narrower question (one membership test on the head, no resolution attempt), and 29 of the 70 sites the ADR retired lived in `docs/`, which `CORPUS_ROOTS` does not read at all. Measured 2026-08-11: 70 occurrences before the migration, 0 after; the only remaining component-headed tokens repo-wide are 2 in a committed leftover plan doc that records a past state. `colonEdgeName` (`scripts/lib/component-refs.mjs`) is deliberately **kept** even though nothing now feeds it — the check makes its input set *provably* empty, and the guard is what makes that emptiness *enforceable* if the check is ever relaxed. They are complements; do not remove one because the other exists.
 
 ```mermaid
 flowchart TB
@@ -205,6 +205,7 @@ Edge-local checks (top) establish that the graph's edges are trustworthy one at 
 ## Decisions
 
 - [ADR-0013](../adr/0013-component-graph-invariants.md) — Component-graph invariants: declare-and-resolve over the citation graph, not detect-and-flag (Accepted)
+- [ADR-0014](../adr/0014-namespace-convention.md) — Namespace notation: `:` addresses namespaces, and a mode is an argument (Accepted)
 
 ## Known Issues & Gotchas
 
