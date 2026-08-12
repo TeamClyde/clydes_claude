@@ -72,11 +72,11 @@ Before doing any work on a task, assert all of the following. **If any check fai
 Before marking a task ✅ or transitioning its Jira ticket, assert all of the following. **If any check fails, stop and refuse to advance until the condition is met.**
 
 - [ ] **X1 — Task Reference row ✅:** The task's row in the plan's Task Reference table has been marked ✅. This is mandatory even for trivial changes.
-- [ ] **X2 — Divergence journaled (if applicable):** If any divergence occurred during the task — architecture change, file path moved, signature changed, scope shift, discovered bug, test-debt finding — a journal entry has been appended via `plan-management:divergence`. See trivial-change exception below.
+- [ ] **X2 — Divergence journaled (if applicable):** If any divergence occurred during the task — architecture change, file path moved, signature changed, scope shift, discovered bug, test-debt finding — a journal entry has been appended via `plan-management`'s `divergence` mode. See trivial-change exception below.
 - [ ] **X3 — Handoff refreshed:** The handoff's status table has been updated: Active task advanced to the next task, and any new gotchas relevant to the next session have been recorded.
 - [ ] **X4 — Test-mechanics divergence handled (if applicable):** If the task changed how tests run (new pytest flag, new fixture, new env var requirement, new skip group, changed test command, etc.), then:
-  - A journal entry tagged `[test-mechanics]` was written via `plan-management:divergence`, AND
-  - The relevant testing artifact (`.claude/testing-plan.md`, `scripts/run-tests.sh`, or repo equivalent) was updated **in the same `plan-management:divergence` call**.
+  - A journal entry tagged `[test-mechanics]` was written via `plan-management`'s `divergence` mode, AND
+  - The relevant testing artifact (`.claude/testing-plan.md`, `scripts/run-tests.sh`, or repo equivalent) was updated **in the same `plan-management` `divergence` call**.
   Test-mechanics changes always count as divergence regardless of how small they appear.
 
 **Exit gate failure message format:**

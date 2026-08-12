@@ -46,9 +46,8 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // marker below lines up with that table's `#` column — cross-check a pair
 // by row number there, not by hand-walking both lists.
 const EXPECTED_NEW_EDGES = new Set([
-  // rows 1-10 (row 1 has since moved to MIGRATED_TO_LEGACY_SHAPE below)
-  'executing-plans|plan-management',
-  'writing-plans|plan-management', 'architect|delivery-cadence',
+  // rows 1-10 (rows 1-3 have since moved to MIGRATED_TO_LEGACY_SHAPE below)
+  'architect|delivery-cadence',
   'architect|stack-hats', 'architecture-decision-records|doc-tools',
   'brainstorming|doc-tools', 'doc-author|doc-tools',
   'doc-tools|doc-backfill', 'doc-tools|docs-refresh',
@@ -98,8 +97,13 @@ const EXPECTED_NEW_EDGES = new Set([
 // effect of a notation change. The assertion below keeps that guarantee under a
 // claim that is still true: the pair must be in `modernPairs`. It says nothing
 // about legacy, because after the rewrite legacy resolves it too.
+// These are Blueprint rows 1-3 — the complete set of components that reached
+// plan-management ONLY through colonEdgeName, so the complete set that can
+// migrate. No further pair can join them from this migration.
 const MIGRATED_TO_LEGACY_SHAPE = new Set([
   'doc-author|plan-management',
+  'executing-plans|plan-management',
+  'writing-plans|plan-management',
 ])
 
 test('harvest finds skills, agents, rules, and hooks by type', async () => {

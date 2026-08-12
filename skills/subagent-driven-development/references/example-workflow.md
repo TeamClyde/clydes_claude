@@ -69,7 +69,7 @@ Code reviewer:    ✅ Approved
 
 [Mark Task 2 row ✅ in plan Task Reference]
 [Pulser n/a — no skill created in this task]
-[Assert exit gate: X1 ✅ row marked, X2 ✅ journal entry appended via plan-management:divergence (scope shift: removed --json flag, added progress reporting), X3 ✅ handoff refreshed, X4 n/a]
+[Assert exit gate: X1 ✅ row marked, X2 ✅ journal entry appended via plan-management (status: divergence) (scope shift: removed --json flag, added progress reporting), X3 ✅ handoff refreshed, X4 n/a]
 [Mark Task 2 complete in TodoWrite]
 
 ...

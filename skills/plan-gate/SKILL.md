@@ -179,9 +179,9 @@ Invoke the `plan-management` skill:
 
 ### Step 6 — Gate-Complete Divergence Record
 
-**Watchdog:** if `plan-management:divergence` does not complete within the stated bound, declare it ABANDONED — surface to the user that all prior gate steps completed but the final record was not written. The plan doc remains in its pre-gate state; re-running plan-gate is idempotent.
+**Watchdog:** if the `plan-management` `divergence` call does not complete within the stated bound, declare it ABANDONED — surface to the user that all prior gate steps completed but the final record was not written. The plan doc remains in its pre-gate state; re-running plan-gate is idempotent.
 
-After Step 5 completes, invoke `plan-management:divergence` to atomically tick the plan doc's gate-checkbox section, append a `[gate-complete]` journal entry, and refresh the handoff:
+After Step 5 completes, invoke `plan-management` to atomically tick the plan doc's gate-checkbox section, append a `[gate-complete]` journal entry, and refresh the handoff:
 
 ```
 Skill {
@@ -225,7 +225,7 @@ When plan-gate is invoked on a **Form-A sub-plan**, a reduced gate runs: the par
 | 3 — Test builder | run | **skip** |
 | 4 — Jira | run | **skip** — the parent Epic owns tickets |
 | 5 — TODO.md registration | run | **skip** — the parent is already registered |
-| 6 — Gate-complete record | run | **fold into the sub-plan close** (`plan-management:close-subplan`) rather than a separate `[gate-complete]` entry, to avoid top-level-journal noise |
+| 6 — Gate-complete record | run | **fold into the sub-plan close** (`plan-management`'s `close-subplan` mode) rather than a separate `[gate-complete]` entry, to avoid top-level-journal noise |
 
 **`mode: minimal`** (for trivial sub-plan refinements): run **architect only** — skip the adherence-audit soft-gate as well.
 
@@ -266,7 +266,7 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 - `test-builder` agent (subagent_type: test-builder) — Step 3 (skipped if tdd: false)
 - `jira-workflow-manager` agent (subagent_type: jira-workflow-manager) — Step 4 (skipped if jira.enabled: false)
 - `plan-management` skill — Step 5 (TODO.md registration)
-- `plan-management:divergence` skill — Step 6 (gate-complete record; fires once at end of successful path)
+- `plan-management` skill, `divergence` mode — Step 6 (gate-complete record; fires once at end of successful path)
 - `handoff` skill — Step 7 (planning-pause handoff; non-blocking)
 
 **Followed by:**
@@ -278,6 +278,6 @@ Never skip a gate step (unless explicitly disabled via `project.json`). If an ag
 2. If architect returns NEEDS REVISION, update the plan doc and re-invoke architect — do not proceed to test-strategy until APPROVED.
 3. The architect loop runs until a round yields zero surviving blockers — it does not stop on its own after a fixed count. After round 3 with blockers remaining, PAUSE and surface them to the user as a checkpoint (continue / intervene / accept); do not silently terminate.
 4. `jira.enabled: false` and `workflow.tdd: false` are silent skips — no user-facing warning or confirmation prompt.
-5. On the Jira-disabled path, omit `jira-key` from the `plan-management:created` call entirely — do not pass an empty string.
+5. On the Jira-disabled path, omit `jira-key` from the `plan-management` `status: created` call entirely — do not pass an empty string.
 6. Step 6 (`:divergence` call) fires exactly once at the end of the successful path — never per-stage. Mid-gate failures leave the plan doc in its pre-gate state; re-running plan-gate is idempotent.
 7. The `plan-section` value for the Step 6 `:divergence` call is always `Phase -1 Gate` — this is the gate-checkbox block at the top of the plan doc.

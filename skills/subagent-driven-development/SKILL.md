@@ -256,11 +256,11 @@ Before running this gate, the orchestrator performs three pre-exit actions:
 3. **If the task created or modified one or more skills:** invoke `pulser --strict --skill <name> --no-anim` (via Bash) before running the exit gate. Fix any warnings or errors first. This is a hard gate — do not skip even if pulser was not listed in the plan's testing section. The implementer subagent does not have the access required to run this; the orchestrator must invoke it.
 
 - [ ] **X1 — Task Reference row ✅:** The task's row in the plan's Task Reference table has been marked ✅. This is mandatory even for trivial changes.
-- [ ] **X2 — Divergence journaled (if applicable):** If any divergence occurred during the task — architecture change, file path moved, signature changed, scope shift, discovered bug, test-debt finding — a journal entry has been appended via `plan-management:divergence`. See trivial-change exception below.
+- [ ] **X2 — Divergence journaled (if applicable):** If any divergence occurred during the task — architecture change, file path moved, signature changed, scope shift, discovered bug, test-debt finding — a journal entry has been appended via `plan-management`'s `divergence` mode. See trivial-change exception below.
 - [ ] **X3 — Handoff refreshed:** The handoff's status table has been updated: Active task advanced to the next task, and any new gotchas relevant to the next session have been recorded.
 - [ ] **X4 — Test-mechanics divergence handled (if applicable):** If the task changed how tests run (new pytest flag, new fixture, new env var requirement, new skip group, changed test command, etc.), then:
-  - A journal entry tagged `[test-mechanics]` was written via `plan-management:divergence`, AND
-  - The relevant testing artifact (`.claude/testing-plan.md`, `scripts/run-tests.sh`, or repo equivalent) was updated **in the same `plan-management:divergence` call**.
+  - A journal entry tagged `[test-mechanics]` was written via `plan-management`'s `divergence` mode, AND
+  - The relevant testing artifact (`.claude/testing-plan.md`, `scripts/run-tests.sh`, or repo equivalent) was updated **in the same `plan-management` `divergence` call**.
   Test-mechanics changes always count as divergence regardless of how small they appear.
 
 #### Observed-state verification (X5–X8) — assert observed git state, not the implementer's claim
@@ -308,7 +308,7 @@ After the exit gate passes:
 
 1. **If Jira enabled:** transition the task's Jira ticket to **Done** (or **Testing** if AWS verification required) via `jira-workflow-manager`. **If Jira disabled:** skip.
 1a. **Verification-pause handoff (conditional):** If this task is code-complete but requires user verification/sign-off before being marked Done — the semantic condition above ("Testing if AWS verification required"), independent of whether Jira is enabled — invoke the `handoff` skill before pausing for that sign-off, so a fresh session can resume the wait cheaply. If no per-task verification pause applies (task went straight to Done), this step does not fire — the Completion-section execution-complete handoff already covers session end.
-2. **Invoke `plan-management:completed`:** with the plan-doc path, status `completed`, and a 1–2 sentence summary. **If Jira enabled:** include `jira-key`. **If Jira disabled:** omit `jira-key` entirely. This promotes the TODO.md entry from In Progress to History.
+2. **Invoke `plan-management` with `status: completed`:** with the plan-doc path and a 1–2 sentence summary. **If Jira enabled:** include `jira-key`. **If Jira disabled:** omit `jira-key` entirely. This promotes the TODO.md entry from In Progress to History.
 3. Mark the task complete in TodoWrite.
 
 Skipping step 2 leaves TODO.md In Progress entries stuck forever — the executor (this skill) is the only path that updates the TODO.md registry for the task.
