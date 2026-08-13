@@ -3,9 +3,9 @@
 **C4 Layer:** C3 Component
 **Status:** Active
 **Owner:** solo
-**Last updated:** 2026-06-18
+**Last updated:** 2026-08-13
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
-**Related ADRs:** _(none yet — completeness-oracle ADR is promoted at sub-plan close)_
+**Related ADRs:** ADR-0003 (generated inventory as completeness oracle — Accepted)
 **Key files:**
   - `skills/doc-author/SKILL.md` — feature/architecture doc kernel (wraps docs-architect)
   - `skills/docs-status/SKILL.md` — manifest + cross-link audit
@@ -20,7 +20,7 @@
 
 The documentation tooling subsystem provides every skill, rule, and convention the workflow uses to create, audit, and keep current the narrative documentation for a repo. It covers the full lifecycle from first-time bootstrap through per-plan synthesis to ongoing health monitoring.
 
-The subsystem has two complementary layers. The **Reference layer** (`docs/reference/component-inventory.md`, `docs/reference/gate-map.md`) is generated from the codebase and drift-checked on every run — it is complete by construction and is the backstop for "everything is listed somewhere." The **Explanation layer** (`docs/explanation/architecture.md` plus per-feature explainers under `docs/explanation/features/`) adds narrative depth and rationale, citing the generated artifacts rather than duplicating lists that would drift. A re-runnable coverage audit cross-references every component name in the inventory against the Explanation layer, making completeness a verifiable invariant rather than a judgement call. This design — using the generated inventory as the oracle for documentation completeness — is the architectural decision captured as ADR candidate #2 (promoted at sub-plan close).
+The subsystem has two complementary layers. The **Reference layer** (`docs/reference/component-inventory.md`, `docs/reference/gate-map.md`) is generated from the codebase and drift-checked on every run — it is complete by construction and is the backstop for "everything is listed somewhere." The **Explanation layer** (`docs/explanation/architecture.md` plus per-feature explainers under `docs/explanation/features/`) adds narrative depth and rationale, citing the generated artifacts rather than duplicating lists that would drift. A coverage check cross-references every component name in the inventory against the Explanation layer, making completeness a verifiable invariant rather than a judgement call. This design — using the generated inventory as the oracle for documentation completeness — is the architectural decision captured in [ADR-0003](../adr/0003-generated-inventory-completeness-oracle.md).
 
 **In scope:** `doc-author` (the authoring kernel), `docs-status` (manifest and cross-link audit), `docs-refresh` (on-demand content generation router), `doc-backfill` (whole-repo codegraph bootstrap), `architecture-decision-records` (ADR drafting), `changelog-automation` (release note generation), `openapi-spec-generation` (API contract documentation), and the rules and conventions that govern them all (`rules/doc-tools.md`).
 
@@ -55,7 +55,16 @@ Every repo declares its aspirational documentation inventory in `docs/manifest.m
 
 ### The Completeness Oracle
 
-Documentation completeness is enforced by cross-referencing the generated, drift-checked component inventory (`docs/reference/component-inventory.md`) rather than by manual review. The inventory is produced by `scripts/harvest-components.mjs` and committed on every run with a drift-check gate — it reflects the actual state of the repo at all times. The coverage audit (the closing task of a documentation plan) reads every component name from `docs/reference/component-inventory.json` and verifies that each name appears in at least one `docs/explanation/` file, or is explicitly marked as `catalog-only` with a stated reason. This makes the question "is the whole workflow documented?" a re-runnable automated check rather than a subjective review. The architectural choice to use the generated inventory as the oracle — rather than a hand-maintained list — is the decision captured by ADR candidate #2, which is promoted at sub-plan close and backlinked into this document's `## Decisions` section at that time.
+Documentation completeness is enforced by cross-referencing the generated, drift-checked component inventory (`docs/reference/component-inventory.md`) rather than by manual review. The inventory is produced by `scripts/harvest-components.mjs` and committed on every run with a drift-check gate — it reflects the actual state of the repo at all times.
+
+**The oracle is a test, not a plan-close task.** It was originally described as the closing task of a documentation plan; it now runs on every `npm test` as two paired invariants in `scripts/graph-integrity.test.mjs`:
+
+| Invariant | What fails |
+|---|---|
+| *every node is documented in `docs/explanation/` or declared catalog-only* | a component named in no explanation doc and carrying no exemption |
+| *every declared catalogOnly exemption is still accurate* | an exemption naming a component that no longer exists, or one that is now documented anyway |
+
+The second exists because a one-directional check lets the exemption list become the hiding place: without it, `catalogOnly` is only ever appended to. Exemptions live in `docs/reference/skill-surface-policy.json` and each requires a stated reason. The architectural choice to use the generated inventory as the oracle — rather than a hand-maintained list — is [ADR-0003](../adr/0003-generated-inventory-completeness-oracle.md), backlinked in this document's `## Decisions` section.
 
 ### Skills and Their Roles
 
