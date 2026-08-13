@@ -20,6 +20,7 @@
 - [x] `docs/reference/glossary.md` — alphabetical workflow term definitions
 - [x] `docs/reference/workflow-map.md` — Mermaid map of the primary skill chain
 - [x] `docs/reference/setup-workflow-acceptance.md` — per-skill acceptance criteria (platform/tier matrix)
+- [x] `docs/reference/authoring-layer-v1-archive.md` — swept companions from the retired v1 authoring skills
 
 ## Explanation
 <!-- Understanding-oriented. Hybrid C1+C2+C3 layout per rules/doc-tools.md. -->
