@@ -239,7 +239,7 @@ For each hypothesis:
 
 4. **Phase 4 Exit Gate — Record Root Cause (mandatory before declaring debugging complete)**
 
-   Once fix verification passes, invoke `plan-management:divergence` before closing out the debugging session:
+   Once fix verification passes, invoke `plan-management` before closing out the debugging session:
 
    ```
    Skill {
@@ -261,7 +261,7 @@ For each hypothesis:
    2. **No active plan** (`.claude/active-plan` does not exist) — debugging is occurring outside a plan execution context. Record the root cause in the commit message body instead. State explicitly: "No active plan — recording root cause in commit message only."
 
    **Exit gate failure message:**
-   > DEBUGGING EXIT GATE FAILED — plan-management:divergence not invoked. Cannot declare debugging complete until root cause and fix are journaled.
+   > DEBUGGING EXIT GATE FAILED — plan-management (status: divergence) not invoked. Cannot declare debugging complete until root cause and fix are journaled.
 
 5. **If Fix Doesn't Work**
    - STOP
@@ -338,7 +338,7 @@ If you catch yourself thinking:
 | **1. Root Cause** | Read errors, reproduce, check changes, gather evidence, enumerate ALL hypotheses as table | Complete hypothesis table before reading implementation files |
 | **2. Pattern** | Find working examples, compare working vs broken | Identify differences that map to hypotheses |
 | **3. Validation** | Confirm/deny each hypothesis (3-file limit per hypothesis), parallel dispatch for 3+ | Every hypothesis marked CONFIRMED / DENIED / UNRESOLVED |
-| **4. Implementation** | Create test, fix ALL confirmed hypotheses in one pass, verify with single re-run, invoke `plan-management:divergence` at exit | All confirmed root causes fixed, tests pass, root cause journaled with `[bug]` or `[debug-cascade]` tag |
+| **4. Implementation** | Create test, fix ALL confirmed hypotheses in one pass, verify with single re-run, invoke `plan-management` with `status: divergence` at exit | All confirmed root causes fixed, tests pass, root cause journaled with `[bug]` or `[debug-cascade]` tag |
 
 ## When Process Reveals "No Root Cause"
 

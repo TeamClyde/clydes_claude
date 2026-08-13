@@ -3,7 +3,7 @@
 **C4 Layer:** C3 Component
 **Status:** Active
 **Owner:** solo
-**Last updated:** 2026-06-25
+**Last updated:** 2026-08-13
 **Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs)
 **Related ADRs:** ADR-0005 (orchestration-regulation-standard), ADR-0006 (tiered-adversarial-verify-standard), ADR-0011 (librarian-durable-research-artifact-contract)
 **Key files:**
@@ -67,6 +67,23 @@ argument-hint: optional   # shown in autocomplete; describes expected args
 ```
 
 The `description` field is the primary discovery mechanism. At startup, Claude reads only `name` and `description`; the full SKILL.md body loads only when Claude determines the skill is relevant. The description must read as if it is the only text available when deciding whether to invoke the skill.
+
+#### The boundary clause — disambiguating confusable siblings
+
+Because every description competes in one flat space, two skills with adjacent purposes can both plausibly claim the same request. The repo resolves this **at the description layer** rather than in either skill's body: a confusable pair carries a **boundary clause** — a sentence in one or both descriptions that names the sibling and states which direction each owns.
+
+`requesting-code-review` and `receiving-code-review` are the clearest case. Each description ends by naming the other and the direction it owns — submit-for-review versus act-on-feedback. `git-manager` does the same against `using-git-worktrees` (isolates a workspace first) and `finishing-a-development-branch` (integrates after). A pair may also disambiguate by both naming a common **router** they route through, rather than naming each other.
+
+This is a gated convention, not a style preference. Confusable pairs are found by lexical similarity over the description corpus, and every pair above the band threshold must carry a recorded verdict in `docs/reference/skill-surface-policy.json`:
+
+| Verdict | Meaning | How it is checked |
+|---|---|---|
+| `boundary` | The pair is genuinely confusable and a clause resolves it. | **Re-verified against the description text.** The gate fails if neither description names the other and they name no common router — the text *is* the proof, so no separate evidence field is trusted. |
+| `distinct` | The overlap is lexical coincidence. | Accepted as declared; the reason must name the shared terms. There is nothing textual to re-verify about "these two are unrelated." |
+
+Two invariants hold it together. `scripts/skill-surface.test.mjs` validates the *shape* of every verdict — the enum, the sorted pair key, the non-empty reason — because a typo like `boundry` would silently downgrade a checked verdict to an unchecked one. `scripts/graph-integrity.overlap.test.mjs` then enforces that every `boundary` verdict is **textually true**.
+
+One counter-intuitive consequence is worth stating, since it shapes how the band is read: adding a boundary clause *raises* a pair's measured similarity, because the clause names the sibling and therefore adds shared vocabulary. Similarity anti-correlates with "still needs disambiguation." Band membership is therefore a **candidate set, not a defect list** — resolved pairs are expected to sit inside it and simply pass. What fails is a band member with no recorded verdict.
 
 **Invocation:**
 

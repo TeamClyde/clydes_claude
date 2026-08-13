@@ -39,7 +39,7 @@ Full descriptions, trigger conditions, and allowed tools for each skill are list
 
 **`systematic-debugging`** (`skills/systematic-debugging/SKILL.md`)
 
-A four-phase process skill: Phase 1 (root-cause investigation — reproduce, gather evidence, enumerate all hypotheses as a table), Phase 2 (pattern analysis — working vs. broken comparison), Phase 3 (hypothesis validation — confirm/deny each hypothesis before any fix), Phase 4 (implementation — fix all confirmed root causes in one pass, then invoke `plan-management:divergence` at the mandatory exit gate). The skill integrates with `dispatching-parallel-agents` when three or more hypotheses need simultaneous investigation. It integrates with `query_graph` / `trace_path` from the codebase-memory MCP for call-chain analysis when a codebase graph is present. Phase 4's exit gate requires a `plan-management:divergence` call tagged `[bug]` or `[debug-cascade]` before the session may declare debugging complete.
+A four-phase process skill: Phase 1 (root-cause investigation — reproduce, gather evidence, enumerate all hypotheses as a table), Phase 2 (pattern analysis — working vs. broken comparison), Phase 3 (hypothesis validation — confirm/deny each hypothesis before any fix), Phase 4 (implementation — fix all confirmed root causes in one pass, then invoke `plan-management`'s `divergence` mode at the mandatory exit gate). The skill integrates with `dispatching-parallel-agents` when three or more hypotheses need simultaneous investigation. It integrates with `query_graph` / `trace_path` from the codebase-memory MCP for call-chain analysis when a codebase graph is present. Phase 4's exit gate requires a `plan-management` `divergence` call tagged `[bug]` or `[debug-cascade]` before the session may declare debugging complete.
 
 **`verification-before-completion`** (`skills/verification-before-completion/SKILL.md`)
 
@@ -76,7 +76,7 @@ test-runner FAILURE (rule: rules/workflow-phases.md)
         → invoke test-runner again
           → PASS: invoke verification-before-completion
                     (run full test command, read output, confirm 0 failures)
-                  → invoke plan-management:divergence (exit gate, mandatory)
+                  → invoke plan-management, status: divergence (exit gate, mandatory)
                     (tag: [bug] or [debug-cascade])
           → FAIL: if < 3 attempts, return to Phase 1
                   if ≥ 3 attempts, surface to user — do not attempt fix #4
@@ -156,7 +156,7 @@ workflow-friction issues accumulate in GitHub (via feedback skill)
 
 **Internal — skills this feature invokes or is invoked by:**
 
-- `plan-management` (skill) — `systematic-debugging` Phase 4 exit gate requires `plan-management:divergence` before declaring debugging complete; also called by `review-workflow` after executing fixes.
+- `plan-management` (skill) — `systematic-debugging` Phase 4 exit gate requires `plan-management`'s `divergence` mode before declaring debugging complete; also called by `review-workflow` after executing fixes.
 - `dispatching-parallel-agents` (skill) — invoked by `systematic-debugging` when three or more hypotheses need simultaneous investigation; also the home of the canonical tiered-adversarial verify protocol (`references/verify-protocol.md`) consumed by all fan-out-bearing skills in this feature.
 - `test-driven-development` (skill) — `systematic-debugging` Phase 4 delegates failing-test creation to this skill.
 - `different-viewpoint` (skill) — invoked by `review-workflow` when a fix is M-sized.
@@ -176,7 +176,7 @@ workflow-friction issues accumulate in GitHub (via feedback skill)
 **Rules that govern this feature:**
 
 - `rules/workflow-phases.md` — mandates `systematic-debugging` before any fix when test-runner returns FAILURE.
-- `rules/plan-docs.md` — defines the `plan-management:divergence` requirement that `systematic-debugging`'s Phase 4 exit gate satisfies.
+- `rules/plan-docs.md` — defines the `plan-management` `divergence` requirement that `systematic-debugging`'s Phase 4 exit gate satisfies.
 - `rules/integration-test-constraints.md` — governs whether a root cause found during `systematic-debugging` qualifies as a persistent constraint to append to `.claude/integration-test-constraints.md`.
 
 ## Decisions
@@ -186,7 +186,7 @@ workflow-friction issues accumulate in GitHub (via feedback skill)
 
 ## Known Issues & Gotchas
 
-- **`systematic-debugging` exit gate is skipped outside a plan context.** When `.claude/active-plan` does not exist, `plan-management:divergence` cannot be called. The skill requires explicitly stating "No active plan — recording root cause in commit message only." Silently skipping without this declaration is a violation.
+- **`systematic-debugging` exit gate is skipped outside a plan context.** When `.claude/active-plan` does not exist, `plan-management`'s `divergence` mode cannot be called. The skill requires explicitly stating "No active plan — recording root cause in commit message only." Silently skipping without this declaration is a violation.
 
 - **`verification-before-completion` applies to agent success reports.** An agent returning "success" is not sufficient verification. The skill requires independently checking the VCS diff or re-running the relevant command. Trusting agent self-reports is a documented failure mode.
 
@@ -226,7 +226,7 @@ flowchart LR
 
 **Verify-protocol conformance** is enforced by the `verify:check` conformance guard wired into `npm test`. This guard asserts that `verify.mjs`'s `VERIFY_PROTOCOL` export deep-equals the canonical param block in `verify-protocol.md`, so the implementation and documentation cannot drift silently.
 
-**Debugging exit gate** — `plan-management:divergence` tagged `[bug]` or `[debug-cascade]` — produces a durable journal entry that is observable in the plan journal and in the commit message when no active plan exists.
+**Debugging exit gate** — `plan-management`'s `divergence` mode tagged `[bug]` or `[debug-cascade]` — produces a durable journal entry that is observable in the plan journal and in the commit message when no active plan exists.
 
 **Workflow improvement throughput** is observable via `review-workflow`'s summary step: N issues reviewed, M resolved (closed), K deferred. The GitHub issue count in `TeamClyde/clydes_claude` under the `workflow-friction` label is a lagging indicator of accumulated friction not yet acted on.
 
@@ -248,7 +248,7 @@ flowchart LR
 
 **Adversarial review** — The critical challenge pass after all fixes are executed in `review-workflow` that checks for fix drift, contradiction with the workflow map, unnecessary complexity, and whether `workflow-map.md` needs updating. Not optional.
 
-**Exit gate** — The mandatory `plan-management:divergence` call at the end of `systematic-debugging` Phase 4. Declaring debugging complete without invoking it is a protocol violation. The gate ensures root cause and fix are journaled with a `[bug]` or `[debug-cascade]` tag before the session moves on.
+**Exit gate** — The mandatory `plan-management` `divergence` call at the end of `systematic-debugging` Phase 4. Declaring debugging complete without invoking it is a protocol violation. The gate ensures root cause and fix are journaled with a `[bug]` or `[debug-cascade]` tag before the session moves on.
 
 **Severity** — Per-finding classification used by all review producers (`architect`, `adherence-audit`, code-reviewer): `error` (blocks gate — verdict goes RED), `warning` (advisory), `note` (informational). The prior per-tool vocabularies (`BLOCKING/MINOR/LOOKS-GOOD` for architect; `BLOCKING/WARNING/INFO` for adherence-audit) are retired in favor of this one shared vocabulary.
 

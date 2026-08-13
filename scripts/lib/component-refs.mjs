@@ -212,6 +212,13 @@ export function pathEdgeName(value, nameSet) {
  * Requires a non-empty tail after the colon: `superpowers:` (a real corpus
  * line — see NSREF's comment above) must stay a non-token, for the same
  * reason NSREF itself requires a name after the colon.
+ *
+ * RETIRED BY ADR-0014, DELIBERATELY KEPT. After the namespace migration nothing
+ * in the markdown corpus feeds this rule, and the ADR-0014 check in
+ * reference-integrity.test.mjs makes that input set PROVABLY empty rather than
+ * incidentally empty. Keep the rule anyway: it is what would resolve a colon form
+ * if one returned, so the check and the guard are complements, not duplicates.
+ * Do not delete either on the grounds that the other exists.
  */
 export function colonEdgeName(value, nameSet) {
   const i = value.indexOf(':')

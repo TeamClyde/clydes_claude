@@ -26,7 +26,7 @@ The subsystem serves the developer working in Claude Code. It applies whenever w
 - Enforces a research-first protocol before drafting begins, so that every file path, function name, env var, and resource name in a plan comes from a real lookup rather than a guess.
 - Produces a four-file plan tree (`design`, `plan`, `journal`, `handoff`) under `plans/<slug>/` in the repo, making plans durable across session boundaries and co-located with the code they describe.
 - Gates every plan through an independent `architect` review (soundness + self-containment check), a `test-strategy` validation checkpoint, and optionally a `test-builder` pass before execution begins.
-- Maintains the plan's accuracy during execution through atomic three-way writes (`plan-management:divergence`) and a single live entry-point (`handoff`) that any new session can open without loading the full plan.
+- Maintains the plan's accuracy during execution through atomic three-way writes (`plan-management`'s `divergence` mode) and a single live entry-point (`handoff`) that any new session can open without loading the full plan.
 - Manages sub-plan nesting (Form A for significant standalone sub-work; Form B for small additions appended to the parent) with a single `.claude/active-plan` pointer that is the authoritative "what is being worked on right now."
 - Maintains `TODO.md` as a lightweight navigation registry of active plans — it holds pointers to plan docs, not duplicate task rows.
 
@@ -150,7 +150,7 @@ After each task: mark the Task Reference row ✅ in `<slug>-plan.md` and refresh
 
 ### Phase 4 — Maintenance (plan-management)
 
-**Divergence** — When reality departs from the plan (architecture change, scope shift, discovered bug, test-mechanics change, debugging cascade), invoke `plan-management:divergence`. This is an atomic three-write:
+**Divergence** — When reality departs from the plan (architecture change, scope shift, discovered bug, test-mechanics change, debugging cascade), invoke `plan-management`'s `divergence` mode. This is an atomic three-write:
 1. Append a dated entry to `<slug>-journal.md` (append-only; never edit prior entries).
 2. Edit the relevant section of `<slug>-plan.md` surgically.
 3. Refresh `<slug>-handoff.md` to reflect current state.
@@ -163,9 +163,9 @@ All three writes go to the top-level plan tree, even when a sub-plan is active.
 
 When a task inside an L-sized plan grows into its own significant standalone effort:
 
-- **Form A (significant, standalone, L-sized)** — invoke `plan-management:spawn-subplan`. The skill scaffolds `plans/<parent>/<child>/` with `<child>-design.md` and `<child>-plan.md` only. Journal and handoff always roll up to the top-level tree. `.claude/active-plan` is updated to point at the child plan. The child plan passes through `plan-gate` in sub-plan mode: architect + adherence-audit run; test-strategy, test-builder, Jira, and TODO registration are skipped (the parent plan owns those). When all child tasks are complete, invoke `plan-management:close-subplan` with structured closeout content (summary, key decisions, gotchas). The skill runs the ADR Promotion Scan, appends the closeout entry to the top-level journal, marks the parent task ✅, refreshes the top-level handoff, and reverts `.claude/active-plan` to the parent.
+- **Form A (significant, standalone, L-sized)** — invoke `plan-management`'s `spawn-subplan` mode. The skill scaffolds `plans/<parent>/<child>/` with `<child>-design.md` and `<child>-plan.md` only. Journal and handoff always roll up to the top-level tree. `.claude/active-plan` is updated to point at the child plan. The child plan passes through `plan-gate` in sub-plan mode: architect + adherence-audit run; test-strategy, test-builder, Jira, and TODO registration are skipped (the parent plan owns those). When all child tasks are complete, invoke `plan-management`'s `close-subplan` mode with structured closeout content (summary, key decisions, gotchas). The skill runs the ADR Promotion Scan, appends the closeout entry to the top-level journal, marks the parent task ✅, refreshes the top-level handoff, and reverts `.claude/active-plan` to the parent.
 
-- **Form B (small addition)** — append a new dated and titled section to the parent plan doc. No new files. `plan-management:spawn-subplan` is not invoked; the parent journal and handoff continue to serve.
+- **Form B (small addition)** — append a new dated and titled section to the parent plan doc. No new files. `plan-management`'s `spawn-subplan` mode is not invoked; the parent journal and handoff continue to serve.
 
 Sizing rule: Form A when the sub-plan is itself L-sized; Form B otherwise.
 
@@ -173,7 +173,7 @@ Sizing rule: Form A when the sub-plan is itself L-sized; Form B otherwise.
 
 When all Task Reference rows in the top-level plan are ✅:
 
-1. Invoke `plan-management:close-subplan` with closeout-summary, closeout-decisions, and closeout-gotchas. The skill writes the final journal entry, refreshes the handoff to terminal status, and clears `.claude/active-plan`.
+1. Invoke `plan-management`'s `close-subplan` mode with closeout-summary, closeout-decisions, and closeout-gotchas. The skill writes the final journal entry, refreshes the handoff to terminal status, and clears `.claude/active-plan`.
 2. Run the `finishing-a-development-branch` flow.
 
 The ADR Promotion Scan runs at sub-plan (and top-level plan) close. Any `[adr-candidate]` journal tags are reviewed; promoted candidates become ADR files under `docs/explanation/adr/`; `doc-author` is then re-invoked in `backlink-only` mode to add accepted-ADR backlinks to the relevant feature-doc `## Decisions` sections.
@@ -190,7 +190,7 @@ The ADR Promotion Scan runs at sub-plan (and top-level plan) close. Any `[adr-ca
 - **`git-manager` skill** — all git operations (branch, commit, push, PR); invoked by `executing-plans` and `subagent-driven-development`; never bypassed with raw git commands.
 - **`systematic-debugging` skill** — required entry point on any test failure or unexpected behavior during execution; `executing-plans` hooks into it before any fix attempt.
 - **`finishing-a-development-branch` skill** — post-completion integration flow; invoked after the plan tree is marked complete.
-- **`doc-author` skill** — invoked by `plan-management:close-subplan` during the ADR Promotion Scan to add accepted-ADR backlinks to feature-doc `## Decisions` sections.
+- **`doc-author` skill** — invoked by `plan-management`'s `close-subplan` mode during the ADR Promotion Scan to add accepted-ADR backlinks to feature-doc `## Decisions` sections.
 - **`rules/plan-docs.md`** — the four-file tree structure, `.claude/active-plan` semantics, and the lifecycle event table that governs when each `plan-management` mode is invoked.
 - **`rules/planning.md`** — research-first protocol, sizing table, required plan-doc sections, architect gate invocation contract, test-strategy gate invocation contract.
 - **`docs/reference/component-inventory.md`** — the generated, drift-checked roster of all 76 workflow components; the authoritative source for "what skills and agents exist."
@@ -216,7 +216,7 @@ _(No accepted ADRs yet.)_
 
 - **`## Decisions` is set at close, not at authoring time.** During plan execution, ADR candidates are marked with `[adr-candidate]` journal tags. The ADR Promotion Scan at `close-subplan` decides which become actual ADRs. Do not hand-add ADR backlinks to a feature-doc's `## Decisions` section during execution — the `doc-author` `backlink-only` pass at close is the only correct mechanism. Hand-editing risks a format mismatch that `docs-status` will flag as an ERROR.
 
-- **`plan-management:divergence` is mandatory for scope changes during execution.** Silently overwriting plan sections without going through `divergence` breaks the journal's append-only history. The atomic three-write (journal + plan + handoff) is how the plan remains trustworthy across sessions. A plan whose journal does not match its `plan.md` sections is unreliable as a session-resumption artifact.
+- **`plan-management`'s `divergence` mode is mandatory for scope changes during execution.** Silently overwriting plan sections without going through `divergence` breaks the journal's append-only history. The atomic three-write (journal + plan + handoff) is how the plan remains trustworthy across sessions. A plan whose journal does not match its `plan.md` sections is unreliable as a session-resumption artifact.
 
 - **The Task Reference table is the durable progress record — not Jira.** When Jira is enabled, the Jira ticket being Done and the Task Reference row being ✅ are two records of the same fact. The plan doc row is canonical; Jira is the external notification. When Jira is disabled (`jira.enabled: false`), ✅ rows are the only record.
 
@@ -242,13 +242,13 @@ To assess the current state of an in-flight plan without reading the full plan d
 
 ## Glossary
 
-**Active plan** — The plan currently being executed, identified by the relative path in `.claude/active-plan`. A single pointer; never more than one plan active at a time. Updated by `plan-management:spawn-subplan` (child) and `plan-management:close-subplan` (reverted to parent or cleared).
+**Active plan** — The plan currently being executed, identified by the relative path in `.claude/active-plan`. A single pointer; never more than one plan active at a time. Updated by `plan-management`'s `spawn-subplan` mode (child) and `close-subplan` (reverted to parent or cleared).
 
 **Architecture Blueprint** — The factual, graph-derived section of a plan doc recording every file path, function signature, env var, and external resource name involved in the work. All values must come from real lookups; uncertain values are Open Questions.
 
 **Design doc (`<slug>-design.md`)** — The pre-execution rationale produced by `brainstorming`. Captures the option space, the chosen approach, and the why. Frozen after `writing-plans` runs; loaded only when "why did we choose this" questions arise.
 
-**Divergence** — Any departure from the plan during execution: an architecture change, scope shift, discovered bug, test-mechanics change, or debugging cascade. Must be recorded via `plan-management:divergence`, which atomically writes a journal entry, edits the plan, and refreshes the handoff.
+**Divergence** — Any departure from the plan during execution: an architecture change, scope shift, discovered bug, test-mechanics change, or debugging cascade. Must be recorded via `plan-management`'s `divergence` mode, which atomically writes a journal entry, edits the plan, and refreshes the handoff.
 
 **Form A sub-plan** — A significant standalone child plan housed in `plans/<parent>/<child>/` with `<child>-design.md` and `<child>-plan.md` only. Journal and handoff roll up to the top-level tree. Used when the sub-plan is itself L-sized.
 
@@ -270,6 +270,6 @@ To assess the current state of an in-flight plan without reading the full plan d
 
 **Self-containment test** — The readiness criterion for a plan doc: a model with an empty context window, receiving the plan with "execute this plan," should be able to proceed without additional research. If not, the plan is not done.
 
-**Task Reference table** — The authoritative durable progress record inside `<slug>-plan.md`. Columns: #, Task, Size, Complexity, Scope, Jira Key. Rows are marked ✅ as tasks complete. The mechanism that keeps it current is `plan-management:divergence`.
+**Task Reference table** — The authoritative durable progress record inside `<slug>-plan.md`. Columns: #, Task, Size, Complexity, Scope, Jira Key. Rows are marked ✅ as tasks complete. The mechanism that keeps it current is `plan-management`'s `divergence` mode.
 
 **TODO.md** — The repo-level navigation registry of active plans. Holds pointer entries (plan doc path + Epic key); does not duplicate task rows. Updated by `plan-management` skill modes; never manually maintained.

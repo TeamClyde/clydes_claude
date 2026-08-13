@@ -159,7 +159,7 @@ When scaffolding a **sub-plan** (separate subdirectory under a parent plan), cre
 - `plans/<parent>/<child>/<child>-design.md`
 - `plans/<parent>/<child>/<child>-plan.md`
 
-Do **not** create a journal or handoff for sub-plans. The top-level journal and handoff continue to serve. Do **not** update `.claude/active-plan` — that is handled by `plan-management:spawn-subplan`.
+Do **not** create a journal or handoff for sub-plans. The top-level journal and handoff continue to serve. Do **not** update `.claude/active-plan` — that is handled by `plan-management`'s `spawn-subplan` mode.
 
 ## Scope Check
 
