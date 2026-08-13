@@ -514,7 +514,7 @@ Pulser eval phase (Phase 3). Structural conventions are owned locally in
 ## writing-skills/SKILL.md
 
 **Original path:** `skills/writing-skills/SKILL.md` — 415 lines.
-> `name: writing-skills` — `description: Use when creating new skills, editing existing skills, or verifying skills work before deployment — requires TDD baseline testing before writing skill content. Route through creating-tools, not directly.`
+> `name: writing-skills` — `description: Use when creating new skills, editing existing skills, or verifying skills work before deployment — requires TDD baseline testing before writing skill content. Route through creating-tools, not directly.` — `allowed-tools: Read, Write, Edit, Bash, Agent, Skill`
 
 ## Writing Skills
 
@@ -2406,7 +2406,7 @@ main();
 ## writing-agents/SKILL.md
 
 **Original path:** `skills/writing-agents/SKILL.md` — 154 lines.
-> `name: writing-agents` — `description: Applies TDD to agent system prompts — baseline invocation first, then a prompt targeting the observed failures. Use when creating a new agent, editing an existing agent's system prompt, or determining agent frontmatter conventions and testing approach. Route through creating-tools, not directly.`
+> `name: writing-agents` — `description: Applies TDD to agent system prompts — baseline invocation first, then a prompt targeting the observed failures. Use when creating a new agent, editing an existing agent's system prompt, or determining agent frontmatter conventions and testing approach. Route through creating-tools, not directly.` — `allowed-tools: Agent, Read`
 
 ## Writing Agents
 
@@ -2708,7 +2708,7 @@ Re-run the failing scenario after each addition. Stop when the scenario passes.
 ## writing-rules/SKILL.md
 
 **Original path:** `skills/writing-rules/SKILL.md` — 120 lines.
-> `name: writing-rules` — `description: Authors rules files and decides their scope. Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped. Route through creating-tools, not directly.`
+> `name: writing-rules` — `description: Authors rules files and decides their scope. Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped. Route through creating-tools, not directly.` — `allowed-tools: Read, Write`
 
 ## Writing Rules
 
