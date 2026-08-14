@@ -268,13 +268,11 @@ table — would describe a cycle that cannot happen to a `.mjs` file. Put plainl
 cycles wearing one name, not one cycle with three targets.**
 
 **What the RED-phase test should assert**, in place of a pressure scenario, is adversarial input —
-the closest hook analog to "a scenario designed to break compliance." At minimum, before a hook is
-considered done: the positive case (the decision fires with the exact expected JSON shape), the
-negative case (silent pass, exit 0, empty stdout), a bypass marker matched only as a prefix and
-never as a substring, the disable-flag escape hatch, malformed stdin, and a wrong-tool payload.
-`references/hook-conventions.md`'s House Pattern and its cover-at-minimum table are the
-authoritative list of what a hook's implementation must satisfy; this section only answers the
-RED-phase question of *when* that test gets written — before the hook, not after.
+the closest hook analog to "a scenario designed to break compliance." `references/hook-conventions.md`'s
+House Pattern and its cover-at-minimum table are the authoritative list of what a hook's
+implementation must satisfy — this section does not restate it. What this section owns is narrower:
+the RED-phase question of *when* that test gets written — before the hook exists, not after, so it
+fails for the right reason rather than merely re-describing branches the hook already has.
 
 A minimal worked shape:
 

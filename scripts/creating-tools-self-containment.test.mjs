@@ -31,6 +31,7 @@ const OUTSIDE_PATH_EXEMPTIONS = {
   '.claude/commands/<name>': 'Output path template — the legacy command location, named only to explain that a command IS a skill.',
   '.claude/skills/<name>': 'Output path template — the user-level skill location, paired with the line above.',
   '.claude/settings.json': 'Output path — the single concrete file a new hook must be wired into.',
+  'docs/reference/skill-surface-policy.json': 'Output path — the single concrete file a new component\'s entryPoints declaration must be written into. Parallel to the .claude/settings.json entry above: a registration target the author edits, not a guidance file the skill reads.',
 }
 
 // TARGET-STATE SURFACE. The gate scans SKILL.md + references/** — what this directory

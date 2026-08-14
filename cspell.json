@@ -91,6 +91,7 @@
     "fakebin",
     "fastapi",
     "fastify",
+    "fd",
     "Ferndesk",
     "followups",
     "forksCount",

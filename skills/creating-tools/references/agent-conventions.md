@@ -6,6 +6,10 @@ A subagent is not the main conversation running a different prompt: it gets its 
 silently override. Frontmatter alone doesn't predict any of that — most of what surprises authors
 here is platform *behavior*, not a field they forgot to set.
 
+Deciding whether the behavior you want is an agent at all — versus a skill, a rule, or a hook —
+happens before this file is relevant. See `skills/creating-tools/SKILL.md`'s artifact-selection
+guidance first; everything below assumes that call has already been made.
+
 ## Contents
 
 - [Frontmatter](#frontmatter)

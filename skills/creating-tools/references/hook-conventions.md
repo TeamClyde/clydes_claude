@@ -21,8 +21,10 @@ the user's work until someone notices. Both failures are quiet, which is why tes
 the most space below.
 
 Deciding whether the behavior you want is a hook at all — versus a skill, an agent, or a rule —
-happens before this file is relevant. See `skills/creating-tools/SKILL.md`'s artifact-selection
-guidance first; everything here assumes that call is made and covers only the hook-specific half.
+happens upstream, in `skills/creating-tools/SKILL.md`'s artifact-selection guidance. This file
+assumes the spine has already routed you here; the checklist that opens the next section is a
+confirmation check against that routing, not a fresh decision, and everything after it covers only
+the hook-specific half.
 
 ## Contents
 
@@ -40,6 +42,10 @@ Sections run in the order the decisions get made.
 
 ## Is a Hook the Right Answer?
 
+Confirm the upstream call rather than re-litigate it: the three conditions below should agree with
+the routing that sent you here. If they don't, that disagreement is the signal — take it back to
+the spine's artifact-selection guidance rather than resolving it in this file.
+
 Three conditions, all required:
 
 1. **It must happen without the model choosing it.** A skill or a rule asks for compliance; a hook
@@ -52,8 +58,8 @@ Three conditions, all required:
 The near-miss worth naming: a hook that only *nudges* (emits advisory context, never blocks) is
 competing with a rule for the same job. Choose the hook only when the nudge must attach to a
 specific event rather than being always-on. The advisory install-vetting hook here fires on a
-`Bash` install command; as a rule it would have paid for itself in every session that never
-installs anything.
+`Bash` install command; written as an always-on rule instead, it would have cost context in every
+session that never installs anything — which is exactly why it is a hook.
 
 ## Which Event
 
@@ -134,9 +140,10 @@ before you rely on it — `allow` and `deny` are stable, anything beyond them is
    interception is trivially evadable and that evasion is out of scope. Someone will otherwise
    mistake it for one.
 2. **`CLAUDE_DISABLE_WORKFLOW_HOOKS` checked first**, before any I/O, as a full emergency rollback.
-3. **Fail open.** Malformed stdin, a missing field, an unexpected tool name — every one of these
-   exits 0 and passes through. A hook that throws on unexpected input blocks real work over a bug
-   in the hook. Deviating is allowed but must be argued in the docblock along with the recovery
+3. **Fail open.** Bad input takes several shapes — malformed stdin, a missing field, a tool name
+   the hook doesn't recognize — and every one of them should exit 0 and fall through untouched. A
+   hook that throws on unexpected input blocks real work over a bug in the hook. Deviating is
+   allowed but must be argued in the docblock along with the recovery
    path: the prefix-prepend hook denies when its prefix file is unreadable, because a silent pass
    there would emit a malformed dispatch, and it says so in its header.
 4. **Narrow before matching.** Filter on `tool_name`, then extract, then run detectors. Cheapest
@@ -182,10 +189,10 @@ parent.
 Two things break silently on Windows, and both are platform-asymmetric: the code passes review on
 macOS or Linux and fails only here.
 
-**1. `/dev/stdin` is not reliable.** `readFileSync('/dev/stdin')` throws or reads nothing. Every
-hook here falls back to a synchronous `readSync(0, ...)` loop on fd 0. Without the fallback the
-hook reads an empty payload, fails open, and passes everything — a hook that appears installed and
-enforces nothing. Copy this verbatim:
+**1. `/dev/stdin` is not reliable.** `readFileSync('/dev/stdin')` throws or reads nothing on
+Windows. Every hook in this repo's `.claude/hooks/` tree works around it the same way: a
+synchronous `readSync(0, ...)` loop on fd 0. Skip the fallback and the hook reads an empty payload,
+fails open, and passes everything through — installed, and enforcing nothing. Copy this verbatim:
 
 ```js
 let rawInput = '';
@@ -238,7 +245,9 @@ Drive it by piping a JSON payload and asserting on stdout and the exit code:
 echo '{"tool_name":"Bash","tool_input":{"command":"git add -A"}}' | node <path-to-hook>
 ```
 
-Every hook should have a sibling `<name>.test.mjs`. The repo's test runner discovers `*.test.mjs`
+Every hook should have a sibling `<name>.test.mjs` — 8 of the 10 production hooks here do;
+`session-start.mjs` and `graph-tools-directive.mjs` are the two still without one. The repo's test
+runner discovers `*.test.mjs`
 recursively and roots at the `.claude/hooks` directory among others, so a correctly-named sibling
 is picked up with no registration step. The established harness spawns the real script —
 `spawnSync('node', [HOOK], { input, env })` — rather than importing it, because the contract under
@@ -340,14 +349,15 @@ the citation extractor reads Markdown and a hook is JavaScript. Writing prose th
 does not produce an edge. Seven of the ten hooks here are in exactly this position.
 
 The correct resolution is a declaration, not a reference: add the hook under
-`entryPoints.harnessInvoked` in `skill-surface-policy.json`, keyed by the hook's bare name, valued
-by the reason it has no inbound edge. An empty or missing reason fails the schema check, and the
-invariant is bidirectional — a stale declaration for a hook that later *does* gain an inbound edge
-fails exactly like a missing one.
+`entryPoints.harnessInvoked` in `docs/reference/skill-surface-policy.json`, keyed by the hook's
+bare name, valued by the reason it has no inbound edge. An empty or missing reason fails the schema
+check, and the invariant is bidirectional — a stale declaration for a hook that later *does* gain
+an inbound edge fails exactly like a missing one.
 
-An inbound edge to a hook is not impossible in general; three of the ten have one, via
-`gate-map.json`. It just never arrives by citation. If your hook is genuinely referenced by a gate
-or another structured map, declare nothing — the edge already exists.
+An inbound edge to a hook is not impossible in general; three of the ten have one, via the
+generated gate map under `docs/reference/`. It just never arrives by citation. If your hook is
+genuinely referenced by a gate or another structured map, declare nothing — the edge already
+exists.
 
 The spine's authoring checklist in `skills/creating-tools/SKILL.md` mirrors this step. It is the
 last thing to do, after the hook is tested and wired, and it is the step most often forgotten

@@ -5,6 +5,10 @@ files it points to. A **command** is not a separate artifact: it is a skill carr
 `disable-model-invocation: true`, invoked only via `/name` instead of automatically by the model.
 Everything below applies equally to both.
 
+Deciding whether the behavior you want is a skill at all — versus an agent, a rule, or a hook —
+happens before this file is relevant. See `skills/creating-tools/SKILL.md`'s artifact-selection
+guidance first; everything below assumes that call has already been made.
+
 ## Contents
 
 - [Frontmatter](#frontmatter)
@@ -34,6 +38,7 @@ whether to load the skill at all. `name` defaults to the directory name if omitt
 | `effort` | `low`, `medium`, `high`, `xhigh`, or `max` — overrides session effort while the skill is active. |
 | `context` | `fork` runs the skill in a forked subagent context instead of inline. |
 | `agent` | Which subagent type to fork into, when `context: fork` is set. |
+| `background` | Only meaningful with `context: fork`. `false` waits for the forked result inline; default `true`. |
 | `hooks` | Hooks scoped to this skill's own lifecycle. |
 
 **The trap to know about:** `allowed-tools` sounds like a restriction and is not one. A skill that
@@ -131,8 +136,9 @@ description: Executes an implementation plan in isolated per-task contexts. Use 
 
 Write in third person — the text is injected into a system prompt, not spoken by the skill itself.
 Front-load the primary use case: the listing truncates a skill's combined `description` and
-`when_to_use` at **1,536 characters** (the `perSkillMaxChars` figure in `skill-surface-policy.json`),
-and anything past that cutoff — including trigger keywords stacked at the very end — is simply lost.
+`when_to_use` at **1,536 characters** (the `perSkillMaxChars` figure in
+`docs/reference/skill-surface-policy.json`), and anything past that cutoff — including trigger
+keywords stacked at the very end — is simply lost.
 
 **Keyword coverage.** Use the words a future search would actually use: literal error messages
 ("Hook timed out"), symptoms ("flaky", "hanging", "race condition"), and the real tool or command
