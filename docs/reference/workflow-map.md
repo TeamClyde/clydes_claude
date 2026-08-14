@@ -53,21 +53,26 @@ When creating new workflow components (skills, agents, rules, hooks):
 
 ~~~mermaid
 flowchart TD
-    Intent([Create a workflow component]) --> CT[creating-tools\nRoutes by artifact type]
-    CT -->|skill| WS[writing-skills\nTDD: baseline test first]
-    CT -->|agent| WA[writing-agents\nTDD: baseline invocation test first]
-    CT -->|rule| WR[writing-rules\nRule vs skill decision first]
-    CT -->|hook| Hook[hook implementation]
-    WS --> Pulser[pulser\nStructural quality check]
-    WA --> Pulser
-    WR --> Pulser
+    Intent([Create a workflow component]) --> CT[creating-tools SKILL.md\nthe shared spine]
+    CT --> Sel{Which artifact type?\nby load time + enforcer}
+    Sel -->|skill or /name command| RS[references/skill-conventions.md]
+    Sel -->|agent| RA[references/agent-conventions.md]
+    Sel -->|rule| RR[references/rule-conventions.md]
+    Sel -->|hook| RH[references/hook-conventions.md]
+    RS --> PT[references/pressure-testing.md\nRED-GREEN-REFACTOR]
+    RA --> PT
+    RH --> PT
+    RR -.->|no eval loop| Obs[observational\n2-3 live sessions]
+    PT --> Gates[SKILL.md section 4\nthe six registration gates]
+    Obs --> Gates
+    Gates --> Pulser[pulser\nstructural check, skills only]
 ~~~
 
-**Routing rule:** `creating-tools` must be the entry point for all component creation.
-Do not invoke `writing-skills`, `writing-agents`, or `writing-rules` directly.
-Each of those three carries "Route through creating-tools, not directly" in its own description —
-that is where the constraint lives. See `skills/creating-tools/routing-table.md` for the
-per-artifact detail.
+**Routing rule:** `creating-tools` is the single authoring skill for every component type.
+It is no longer a router — there are no per-type skills left to route to. The type-specific
+mechanics live in `skills/creating-tools/references/`, one file per artifact type, and the
+spine's own §5 names which one to load. The three `writing-*` skills that used to sit
+downstream of it were retired 2026-08-14.
 
 ---
 
@@ -107,10 +112,7 @@ All skills invoked via: `Skill { skill: "<name>", args: "..." }`
 
 | Skill | When it fires | Invoked via |
 |-------|--------------|-------------|
-| `creating-tools` | Any component creation intent | Direct; routes to sub-skills |
-| `writing-skills` | Creating a new skill | `creating-tools` only |
-| `writing-agents` | Creating a new agent | `creating-tools` only |
-| `writing-rules` | Creating a new rule | `creating-tools` only |
+| `creating-tools` | Any component creation intent | Direct; authors in place, dispatches to no sub-skill |
 
 ### Infrastructure & quality
 

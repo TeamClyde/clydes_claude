@@ -126,7 +126,7 @@ The loading model is a budget-conservation mechanism: a flat cap of roughly 150â
 Skills are on-demand invokable procedures, each defined in `~/.claude/skills/<name>/SKILL.md`. The main context invokes them via the `Skill` tool; their definitions load only on invocation. The workflow has approximately 40 skills across several functional groups:
 
 - **Orchestration:** `brainstorming`, `writing-plans`, `plan-gate`, `executing-plans`, `subagent-driven-development`, `finishing-a-development-branch`
-- **Component creation:** `creating-tools` (router), `writing-skills`, `writing-agents`, `writing-rules`
+- **Component creation:** `creating-tools` (the single authoring skill)
 - **Infrastructure and quality:** `infra-init`, `e2e-init`, `project-setup`, `adherence-audit`, `pulser`
 - **Git, plan, and tracking:** `git-manager`, `plan-management`
 - **Thinking and debugging:** `different-viewpoint`, `different-viewpoints-lite`, `dispatching-parallel-agents`, `verification-before-completion`, `systematic-debugging`, `test-driven-development`, `feedback`
