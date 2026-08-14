@@ -135,11 +135,13 @@ function jaccard(a, b) {
 // THE "RESOLVED" RULE — a band pair is resolved when either description NAMES
 // the other skill, or both name a common THIRD skill.
 //
-// The router form is load-bearing, not a convenience: `writing-agents`,
-// `writing-skills` and `writing-rules` each say "Route through `creating-tools`,
-// not directly" — a real disambiguation that points at a PARENT rather than at
-// a sibling. Without the router rule those three pairs would read as violations
-// while carrying the better of the two available clauses.
+// The router form is load-bearing, not a convenience. Its original worked example was the
+// three `writing-*` authoring skills, each of which closed with "Route through
+// `creating-tools`, not directly" — a real disambiguation pointing at a PARENT rather than
+// at a sibling. Those three were retired 2026-08-14 and their overlapVerdicts entries went
+// with them, so the example is historical; the rule is not. The surviving `vet-*` gate
+// skills carry the same shape, all naming `vet-install`, and would read as violations
+// without it despite carrying the better of the two available clauses.
 //
 // Matching is WORD-BOUNDARY, `(?<![\w-])name(?![\w-])`, the same matcher
 // graph-integrity.test.mjs uses for documentation coverage. Plain substring

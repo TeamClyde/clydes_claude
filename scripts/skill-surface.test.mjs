@@ -188,7 +188,7 @@ test('every entryPoints exemption carries a non-empty reason', async () => {
   const groups = Object.keys(entryPoints).filter(k => !isMeta(k))
   assert.deepEqual(
     groups.sort(),
-    ['harnessInvoked', 'userInvoked'],
+    ['alwaysOnRules', 'harnessInvoked', 'userInvoked'],
     'entryPoints top-level groups changed. A new or deleted group is not a bug, but it is not ' +
       'covered automatically either: update the expected group list in ' +
       'scripts/skill-surface.test.mjs as a deliberate act so its entries get checked for a ' +

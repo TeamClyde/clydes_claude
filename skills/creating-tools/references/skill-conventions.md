@@ -147,7 +147,7 @@ symptoms that motivate reaching for it, is harder to match against a real questi
 
 **Naming.** Verb-first, active voice: `condition-based-waiting` reads better than
 `async-test-helpers`; `root-cause-tracing` reads better than `debugging-techniques`. A gerund
-(`-ing`) form fits a process skill naturally — `writing-skills`, `debugging-with-logs`.
+(`-ing`) form fits a process skill naturally — `creating-tools`, `debugging-with-logs`.
 
 ## Portability — the Six-Field Packaging Spec
 

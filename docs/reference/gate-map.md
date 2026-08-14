@@ -17,10 +17,8 @@ flowchart LR
   brainstorming --> researcher
   brainstorming --> using_git_worktrees
   brainstorming --> writing_plans
+  creating_tools --> git_manager
   creating_tools --> test_driven_development
-  creating_tools --> writing_agents
-  creating_tools --> writing_rules
-  creating_tools --> writing_skills
   delivery_cadence --> architect
   delivery_cadence --> git_manager
   delivery_cadence --> plan_gate
@@ -104,8 +102,6 @@ flowchart LR
   new_repo_setup --> stack_hat_directive
   new_repo_setup --> test_builder
   new_repo_setup --> test_strategy
-  new_repo_setup --> writing_agents
-  new_repo_setup --> writing_rules
   operating_model --> dispatching_parallel_agents
   plan_docs --> brainstorming
   plan_docs --> finishing_a_development_branch
@@ -157,7 +153,6 @@ flowchart LR
   review_workflow --> different_viewpoint
   review_workflow --> dispatching_parallel_agents
   review_workflow --> git_manager
-  review_workflow --> writing_skills
   stack_hats --> architect
   stack_hats --> executing_plans
   stack_hats --> project_setup
@@ -212,11 +207,10 @@ flowchart LR
   workflow_phases --> git_manager
   workflow_phases --> jira_workflow_manager
   workflow_phases --> plan_management
-  writing_agents --> architect
-  writing_agents --> researcher
-  writing_agents --> test_driven_development
   writing_plans --> architect
+  writing_plans --> creating_tools
   writing_plans --> delivery_cadence
+  writing_plans --> doc_author
   writing_plans --> doc_tools
   writing_plans --> executing_plans
   writing_plans --> finishing_a_development_branch
@@ -225,17 +219,6 @@ flowchart LR
   writing_plans --> plan_management
   writing_plans --> researcher
   writing_plans --> subagent_driven_development
-  writing_plans --> writing_agents
-  writing_plans --> writing_rules
-  writing_plans --> writing_skills
-  writing_rules --> cspell
-  writing_rules --> mcp_governance
-  writing_rules --> new_repo_setup
-  writing_rules --> secrets_handling
-  writing_rules --> writing_agents
-  writing_rules --> writing_skills
-  writing_skills --> creating_tools
-  writing_skills --> test_driven_development
 ```
 
 ## Edges
@@ -255,10 +238,8 @@ flowchart LR
 | brainstorming | researcher |
 | brainstorming | using-git-worktrees |
 | brainstorming | writing-plans |
+| creating-tools | git-manager |
 | creating-tools | test-driven-development |
-| creating-tools | writing-agents |
-| creating-tools | writing-rules |
-| creating-tools | writing-skills |
 | delivery-cadence | architect |
 | delivery-cadence | git-manager |
 | delivery-cadence | plan-gate |
@@ -342,8 +323,6 @@ flowchart LR
 | new-repo-setup | stack-hat-directive |
 | new-repo-setup | test-builder |
 | new-repo-setup | test-strategy |
-| new-repo-setup | writing-agents |
-| new-repo-setup | writing-rules |
 | operating-model | dispatching-parallel-agents |
 | plan-docs | brainstorming |
 | plan-docs | finishing-a-development-branch |
@@ -395,7 +374,6 @@ flowchart LR
 | review-workflow | different-viewpoint |
 | review-workflow | dispatching-parallel-agents |
 | review-workflow | git-manager |
-| review-workflow | writing-skills |
 | stack-hats | architect |
 | stack-hats | executing-plans |
 | stack-hats | project-setup |
@@ -450,11 +428,10 @@ flowchart LR
 | workflow-phases | git-manager |
 | workflow-phases | jira-workflow-manager |
 | workflow-phases | plan-management |
-| writing-agents | architect |
-| writing-agents | researcher |
-| writing-agents | test-driven-development |
 | writing-plans | architect |
+| writing-plans | creating-tools |
 | writing-plans | delivery-cadence |
+| writing-plans | doc-author |
 | writing-plans | doc-tools |
 | writing-plans | executing-plans |
 | writing-plans | finishing-a-development-branch |
@@ -463,14 +440,3 @@ flowchart LR
 | writing-plans | plan-management |
 | writing-plans | researcher |
 | writing-plans | subagent-driven-development |
-| writing-plans | writing-agents |
-| writing-plans | writing-rules |
-| writing-plans | writing-skills |
-| writing-rules | cspell |
-| writing-rules | mcp-governance |
-| writing-rules | new-repo-setup |
-| writing-rules | secrets-handling |
-| writing-rules | writing-agents |
-| writing-rules | writing-skills |
-| writing-skills | creating-tools |
-| writing-skills | test-driven-development |

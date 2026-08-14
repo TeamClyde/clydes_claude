@@ -50,11 +50,13 @@ const OUTSIDE_PATH_EXEMPTIONS = {
 // listed file stops existing, so Task 8 must empty this list in the same commit that deletes
 // them — and when it is empty, "SKILL.md + references/**" and "the whole directory" are the
 // same set, which is the end state this gate is really asserting.
-const PENDING_DELETION = {
-  'skills/creating-tools/frontmatter-reference.md': 'Swept to the archive in Task 1, deleted in Task 8. Re-authored into references/skill-conventions.md and references/agent-conventions.md.',
-  'skills/creating-tools/hooks-reference.md': 'Swept in Task 1, deleted in Task 8. Re-authored into references/hook-conventions.md. Cites .claude/settings.local.json and rules/filesystem/path-portability.md — both genuine outside reads, and both reasons this file is rewritten rather than moved.',
-  'skills/creating-tools/routing-table.md': 'Swept in Task 1, deleted in Task 8. The routing it describes ceases to exist. Also names its own siblings without the skills/ prefix, so those spans read as outside-directory even though they are not — a defect that dies with the file.',
-}
+//
+// EMPTIED 2026-08-14, in the same commit that deleted the three legacy companions it named.
+// The bridge is closed: "SKILL.md + references/**" and "the whole directory" are now the same
+// set, which is the end state this gate was always asserting toward. The empty map and this
+// comment are kept deliberately — they are the record that the narrowing was time-boxed and
+// that it actually expired, which a deleted declaration would not preserve.
+const PENDING_DELETION = {}
 
 // THE GIT INDEX — staged state, not the working tree and not HEAD. The distinction matters
 // in both directions and is load-bearing twice in this epic: a file deleted with `git rm` is

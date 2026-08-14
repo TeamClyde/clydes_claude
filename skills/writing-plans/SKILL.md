@@ -313,7 +313,7 @@ git commit -m "feat: add specific feature"
 
 ### Dispatch-style (specialist-skill invocation)
 
-Use this style when a task's execution is delegating to a specialist skill rather than direct code authoring (e.g., `writing-skills`, `writing-rules`, `writing-agents`).
+Use this style when a task's execution is delegating to a specialist skill rather than direct code authoring (e.g., `creating-tools`, `doc-author`).
 
 ````markdown
 ### Task N: [Component Name]

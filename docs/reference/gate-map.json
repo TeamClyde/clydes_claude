@@ -276,7 +276,7 @@
     {
       "type": "skill",
       "name": "creating-tools",
-      "description": "Use when creating any workflow component — skill, agent, rule, hook, command, or plugin. Routes to the correct specialist skill based on artifact type.",
+      "description": "Use when creating or editing any workflow component — a skill, agent, rule, hook, or command. Covers artifact selection, the evaluation-first authoring cycle, type-specific conventions, and the registration gates a new component must satisfy.",
       "file": "skills/creating-tools/SKILL.md"
     },
     {
@@ -479,27 +479,9 @@
     },
     {
       "type": "skill",
-      "name": "writing-agents",
-      "description": "Applies TDD to agent system prompts — baseline invocation first, then a prompt targeting the observed failures. Use when creating a new agent, editing an existing agent's system prompt, or determining agent frontmatter conventions and testing approach. Route through creating-tools, not directly.",
-      "file": "skills/writing-agents/SKILL.md"
-    },
-    {
-      "type": "skill",
       "name": "writing-plans",
       "description": "Use when you have a spec or requirements for a multi-step task, before touching code — produces a plan doc with concrete file paths, task breakdown, and architecture blueprint. Hands off to plan-gate automatically.",
       "file": "skills/writing-plans/SKILL.md"
-    },
-    {
-      "type": "skill",
-      "name": "writing-rules",
-      "description": "Authors rules files and decides their scope. Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped. Route through creating-tools, not directly.",
-      "file": "skills/writing-rules/SKILL.md"
-    },
-    {
-      "type": "skill",
-      "name": "writing-skills",
-      "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment — requires TDD baseline testing before writing skill content. Route through creating-tools, not directly.",
-      "file": "skills/writing-skills/SKILL.md"
     }
   ],
   "edges": [
@@ -557,19 +539,11 @@
     },
     {
       "from": "creating-tools",
+      "to": "git-manager"
+    },
+    {
+      "from": "creating-tools",
       "to": "test-driven-development"
-    },
-    {
-      "from": "creating-tools",
-      "to": "writing-agents"
-    },
-    {
-      "from": "creating-tools",
-      "to": "writing-rules"
-    },
-    {
-      "from": "creating-tools",
-      "to": "writing-skills"
     },
     {
       "from": "delivery-cadence",
@@ -904,14 +878,6 @@
       "to": "test-strategy"
     },
     {
-      "from": "new-repo-setup",
-      "to": "writing-agents"
-    },
-    {
-      "from": "new-repo-setup",
-      "to": "writing-rules"
-    },
-    {
       "from": "operating-model",
       "to": "dispatching-parallel-agents"
     },
@@ -1114,10 +1080,6 @@
     {
       "from": "review-workflow",
       "to": "git-manager"
-    },
-    {
-      "from": "review-workflow",
-      "to": "writing-skills"
     },
     {
       "from": "stack-hats",
@@ -1336,24 +1298,20 @@
       "to": "plan-management"
     },
     {
-      "from": "writing-agents",
+      "from": "writing-plans",
       "to": "architect"
-    },
-    {
-      "from": "writing-agents",
-      "to": "researcher"
-    },
-    {
-      "from": "writing-agents",
-      "to": "test-driven-development"
     },
     {
       "from": "writing-plans",
-      "to": "architect"
+      "to": "creating-tools"
     },
     {
       "from": "writing-plans",
       "to": "delivery-cadence"
+    },
+    {
+      "from": "writing-plans",
+      "to": "doc-author"
     },
     {
       "from": "writing-plans",
@@ -1386,50 +1344,6 @@
     {
       "from": "writing-plans",
       "to": "subagent-driven-development"
-    },
-    {
-      "from": "writing-plans",
-      "to": "writing-agents"
-    },
-    {
-      "from": "writing-plans",
-      "to": "writing-rules"
-    },
-    {
-      "from": "writing-plans",
-      "to": "writing-skills"
-    },
-    {
-      "from": "writing-rules",
-      "to": "cspell"
-    },
-    {
-      "from": "writing-rules",
-      "to": "mcp-governance"
-    },
-    {
-      "from": "writing-rules",
-      "to": "new-repo-setup"
-    },
-    {
-      "from": "writing-rules",
-      "to": "secrets-handling"
-    },
-    {
-      "from": "writing-rules",
-      "to": "writing-agents"
-    },
-    {
-      "from": "writing-rules",
-      "to": "writing-skills"
-    },
-    {
-      "from": "writing-skills",
-      "to": "creating-tools"
-    },
-    {
-      "from": "writing-skills",
-      "to": "test-driven-development"
     }
   ]
 }

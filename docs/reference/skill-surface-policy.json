@@ -111,9 +111,19 @@
       "only frontmatter site carrying it; the compact parenthetical form (`plan-management",
       "(close-subplan, after ADR Promotion Scan)`) is the shortest rewrite that names the mode without",
       "the colon. Raised deliberately in the same commit as the edit rather than shipping on the",
-      "remaining 4-char margin -- headroom stays 4, so the next unplanned growth still fails at once."
+      "remaining 4-char margin -- headroom stays 4, so the next unplanned growth still fails at once.",
+      "",
+      "LOWERED 2026-08-14 -- the first lowering since this ratchet was introduced: ceiling 13442 ->",
+      "12793, measured baseline 13438 -> 12789 (-649). The authoring-layer collapse retired",
+      "writing-skills (203 chars), writing-agents (296) and writing-rules (241), removing 740 chars",
+      "of description surface, and rewrote creating-tools' own description from 151 chars to 242 as",
+      "it stopped being a router and became the single authoring skill (+91). Net -649 across three",
+      "fewer skills: 42 -> 39. Lowering is the same deliberate act as raising and belongs in the same",
+      "commit as the deletion -- a ceiling left at 13442 would have silently granted 653 chars of",
+      "unearned slack, which is exactly the drift this number exists to catch. Headroom stays 4 on",
+      "purpose, so the next unplanned growth still fails at once."
     ],
-    "totalDescriptionChars": 13442,
+    "totalDescriptionChars": 12793,
     "perSkillMaxChars": 1536
   },
 
@@ -193,7 +203,14 @@
       "receiving-code-review": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in skills/requesting-code-review/SKILL.md, which 2a deliberately does not extract as a citation.",
       "requesting-code-review": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in skills/receiving-code-review/SKILL.md, skills/review-workflow/SKILL.md, and skills/subagent-driven-development/SKILL.md, and as a path-form mention in the aux file skills/subagent-driven-development/code-quality-reviewer-prompt.md, which scanSkills() does not read -- none of these shapes is extracted as a citation.",
       "using-superpowers": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in skills/brainstorming/SKILL.md, which 2a deliberately does not extract as a citation.",
-      "verification-before-completion": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in agents/test-runner.md, skills/systematic-debugging/SKILL.md, and skills/writing-skills/eval-methodology.md, which 2a deliberately does not extract as a citation."
+      "verification-before-completion": "Invoked by the user directly; nothing in the corpus dispatches or invokes it. No component cites it in a shape the extractor resolves: named as bare, unbackticked prose in agents/test-runner.md and skills/systematic-debugging/SKILL.md, which 2a deliberately does not extract as a citation. A third bare-prose mention lived in skills/writing-skills/eval-methodology.md until 2026-08-14, when the authoring-layer collapse retired that skill; the mention produced no edge either way."
+    },
+
+    "alwaysOnRules": {
+      "$comment": "Rules that no component cites. A rule is an always-on context injection -- nothing dispatches it, so zero inbound edges is its correct steady state, not a missing citation. Added 2026-08-14 when the retirement of writing-rules removed the sole inbound edge of each. Manufacturing a citation from creating-tools purely to satisfy the orphan gate was considered and declined: aux files under references/ produce no edge (scanSkills reads SKILL.md only), and a citation written to keep a gate quiet is the prose-level enforcement this epic exists to end.",
+      "cspell": "Always-on tooling-hygiene rule (spellcheck word-list maintenance). Its only inbound edge came from writing-rules, which cited it as an example of a global rule; that skill is retired. No component dispatches a rule.",
+      "mcp-governance": "Always-on rule constraining direct MCP calls in CLI sessions. Sole inbound edge came from writing-rules as a global-rule example; that skill is retired.",
+      "new-repo-setup": "Always-on rule listing the components a new repo installs. Sole inbound edge came from writing-rules; that skill is retired. It has outbound edges of its own, including to creating-tools."
     }
   },
 
@@ -292,18 +309,6 @@
     "vet-reputation|vet-security": {
       "verdict": "boundary",
       "reason": "Same shared router as the other two vet-* pairs: both name `vet-install`. The highest-scoring pair in the band -- three sibling gates written to one template will always read alike -- and prefix-namespacing plus the router clause is the appropriate answer, not divergent prose."
-    },
-    "writing-agents|writing-rules": {
-      "verdict": "boundary",
-      "reason": "Both close with `Route through creating-tools, not directly`, so both name the same router. This is the router form the gate exists to accept: the right disambiguation points at the PARENT that dispatches by artifact type, not at a sibling authoring skill."
-    },
-    "writing-agents|writing-skills": {
-      "verdict": "boundary",
-      "reason": "Same `Route through creating-tools, not directly` clause in both. Highest-scoring of the three writing-* pairs; the family is prefix-namespaced, so a reader has a structural cue before reading either description."
-    },
-    "writing-rules|writing-skills": {
-      "verdict": "boundary",
-      "reason": "Same `Route through creating-tools, not directly` clause in both."
     }
   }
 }

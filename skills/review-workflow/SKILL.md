@@ -223,7 +223,7 @@ Report: N issues reviewed, M resolved (closed), K deferred (and why). Include th
 
 1. Run only when multiple issues have accumulated — single-issue reviews are too narrow.
 2. Angle 3 (structural fix) only when Explore or Phoenix found a systemic pattern.
-3. New skill creation routes through `creating-tools`, not direct `writing-skills`.
+3. `creating-tools` is the single authoring skill for every component type — skill, agent, rule, or hook. There is no per-type skill to route to instead.
 4. The adversarial review in Step 6 is not optional — even for obviously correct fixes.
 5. "No frame shifts detected" from `/different-viewpoint` is valid — proceed with original
    direction, not a reason to keep re-running.
