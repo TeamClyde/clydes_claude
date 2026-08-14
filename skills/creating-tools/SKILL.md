@@ -156,7 +156,20 @@ Work in this order. Each step is cheaper than discovering it from a red suite la
    git index, not the working tree. An unstaged new file is *invisible* to the gates, so the
    suite goes green without ever having checked it — and an unstaged deletion crashes a gate
    outright. Stage first, always, in both directions.
-2. **Give the component an inbound edge, or declare that it should not have one.** A component
+2. **Budget the description, and raise the ceiling in the same commit if it does not fit.** Every
+   skill description is loaded into every session, so their combined length is capped by a
+   ratchet held deliberately a few characters above the current total — meaning **a new skill
+   almost always fails this gate on its first run.** That is the ratchet working, not a defect
+   in your description. Two branches:
+   - **The description can be shorter without losing a trigger** → shorten it. Preferred: the
+     cost is permanent and paid every session.
+   - **It is already minimal** → raise the ceiling to the newly measured total plus the same
+     small headroom, and record what was added and why alongside the existing entries. The gate
+     compares total against ceiling and passes either way, so it cannot tell a deliberate raise
+     from an unnoticed one — the written record is the only thing that can.
+
+   Only a skill's description counts. Agents, rules and hooks do not load into this budget.
+3. **Give the component an inbound edge, or declare that it should not have one.** A component
    nothing cites is an orphan, and the orphan gate fails on it. Two branches, and you must pick
    deliberately:
    - **It should be reachable** → add a citation from whatever component should reach it, in a
@@ -167,23 +180,25 @@ Work in this order. Each step is cheaper than discovering it from a red suite la
    Never manufacture a citation purely to quiet the gate. A citation that no reader would follow
    is a dead reference the moment it ships, and the orphan gate exists to surface exactly the
    question you would be suppressing.
-3. **Know which files produce edges.** Only a component's own primary body is scanned — a
+4. **Know which files produce edges.** Only a component's own primary body is scanned — a
    skill's `SKILL.md`, an agent's or rule's file. Material in a sibling reference file produces
-   **no** edge. Citing something from a reference file will not satisfy step 2, and discovering
+   **no** edge. Citing something from a reference file will not satisfy step 3, and discovering
    that after the fact is the most common way this step is repeated.
-4. **Check the paired invariant.** If you declared an entry point, that declaration asserts the
+5. **Check the paired invariant.** If you declared an entry point, that declaration asserts the
    component has *zero* inbound edges. Adding a citation to it later breaks the declaration
    rather than the orphan check, and the failure message names the component now citing it.
-5. **Document it in the explanation layer.** Every component must be named in an explanation
+6. **Document it in the explanation layer.** Every component must be named in an explanation
    doc or declared catalog-only, with a reason. A one-line mention in the most fitting explainer
    satisfies this; nothing about it is onerous, and skipping it is a guaranteed red suite.
-6. **Regenerate the derived artifacts and re-run.** The inventory and gate-map files are
+7. **Regenerate the derived artifacts and re-run.** The inventory and gate-map files are
    generated, never hand-edited. Regenerate them in the same commit; a drift guard compares
    them against a fresh harvest.
 
-**Hooks branch differently at step 2.** A hook has no outbound edges and nothing dispatches it —
+**Hooks branch differently at step 3, and skip step 2 entirely.** A hook has no outbound edges and nothing dispatches it —
 the harness fires it on an event. Zero inbound edges is its correct steady state, so a hook
-normally takes the entry-point declaration branch rather than the citation branch. A hook also
+normally takes the entry-point declaration branch rather than the citation branch. It carries no
+description into the skill listing either, so the budget step does not apply to it — nor to an
+agent or a rule. A hook also
 has a registration step the other three types do not: it must be wired into `.claude/settings.json`
 against the event that triggers it, or it is a file that never runs. `references/hook-conventions.md`
 covers the wiring shape.
