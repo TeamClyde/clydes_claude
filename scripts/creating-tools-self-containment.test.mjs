@@ -18,11 +18,19 @@ const SKILL_DIR = 'skills/creating-tools/'
 // not a read dependency. Kept here rather than in skill-surface-policy.json: that file
 // is parsed as one document by four test files, so a malformed edit anywhere fails all
 // four (see its own $comment). This gate does not need that blast radius.
-// Keys are matched as literal prefixes. Every OUTPUT-path key ends in a placeholder segment
-// (`<name>`), never a bare directory prefix: `skills/` alone would also exempt a concrete
-// read-citation to a sibling skill (`skills/writing-plans/SKILL.md`) — exactly the dependency
-// this gate exists to catch — so the exemption must be narrow enough that only a template
-// path passes.
+// Keys are matched as literal prefixes, and come in exactly two shapes:
+//
+//   1. TEMPLATE keys, which must end in a placeholder segment (`<name>`, `<event>`) and never a
+//      bare directory prefix. `skills/` alone would also exempt a concrete read-citation to a
+//      sibling skill (`skills/writing-plans/SKILL.md`) — exactly the dependency this gate exists
+//      to catch — so a template exemption must be narrow enough that only a template path passes.
+//   2. CONCRETE single-file REGISTRATION TARGETS, named in full. These are files the author
+//      EDITS to register the component they just built, not files the skill reads for guidance.
+//      Naming one in full is safe precisely because it is one exact file, so it cannot widen to
+//      cover a directory of read-citations the way a bare prefix would.
+//
+// Do not add a concrete key for anything the skill READS. That is the dependency the gate exists
+// to catch, and an exemption is not the remedy — re-authoring the content inside the directory is.
 const OUTSIDE_PATH_EXEMPTIONS = {
   'rules/<name>': 'Output path template — where a rule the author is creating gets written.',
   'agents/<name>': 'Output path template — where an agent the author is creating gets written.',
