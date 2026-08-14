@@ -38,14 +38,14 @@ Do not pick a route unilaterally under time pressure or convenience. The gate ho
 
 For full details on what each route covers, see `routing-table.md` in this directory.
 
-**Commands are skills.** The platform merged custom commands into skills: `.claude/commands/deploy.md`
-and `.claude/skills/deploy/SKILL.md` both produce `/deploy`. Author one as a skill with
+**Commands are skills.** The platform merged custom commands into skills: `.claude/commands/<name>.md`
+and `.claude/skills/<name>/SKILL.md` both produce `/<name>`. Author one as a skill with
 `disable-model-invocation: true` (manual `/name` only) — both fields are documented in
 `frontmatter-reference.md`. There is no separate command route.
 
-**This repo authors no plugins.** It consumes them; see `plugins/registry.md`. If that ever
-changes, the official plugin docs are the reference — do not reinstate a delegation to
-`plugin-dev`, which was removed 2026-08-06 for the reasons in `hooks-reference.md`.
+**This repo authors no plugins.** It consumes them. If that ever changes, the official
+plugin docs are the reference — do not reinstate a delegation to `plugin-dev`, which was
+removed 2026-08-06 for the reasons in `hooks-reference.md`.
 
 ## Coordinator Constraint
 
