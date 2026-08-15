@@ -1742,9 +1742,20 @@ const sectionPrompt = (section) =>
   `research or web search.\n` +
   // Compression is the failure mode, not length. The dossier is SUPPOSED to be long: it is a map
   // of where the answers live, and a digest of a map is not a smaller map, it is a worse one.
-  `Explain what was found in depth: the mechanism, the caveats, contradictions between sources, ` +
-  `and a date on every time-sensitive fact. Length is NOT a problem — do NOT summarize, compress, ` +
-  `abbreviate, or produce a digest.\n` +
+  //
+  // Depth and traceability were in DIRECT CONFLICT here. The old text demanded the mechanism and
+  // the caveats "in depth" from findings that are one-line claims — which cannot be done without
+  // inventing, and measurably was not: 16 of 16 rejected section retries on run wf_cd105af0-fab
+  // were untraceable-claim rejections, none were URL violations. The resolution is to name the
+  // SOURCE of depth (the findings' own `detail` and verbatim `excerpt`) and to make "the evidence
+  // is thin here" an acceptable, expected outcome rather than a gap the writer must paper over.
+  `Explain what was found in depth, drawing that depth ONLY from each finding's own detail and its ` +
+  `verbatim excerpt: the mechanism as the sources describe it, the caveats they state, ` +
+  `contradictions between them, and a date on every time-sensitive fact. Length is NOT a problem — ` +
+  `do NOT summarize, compress, abbreviate, or produce a digest.\n` +
+  `Where the findings are thin, SAY the evidence is thin and stop there. Writing "the sources do ` +
+  `not establish the mechanism" is a correct and valuable result; supplying the mechanism from your ` +
+  `own knowledge is not, and will be removed by the traceability audit.\n` +
   // Provenance is rendered by CODE from the findings themselves (see the Evidence table), so the
   // prose must not carry any. An agent that types a URL can type one that is not in its slice, and
   // a confidence word it invents cannot be reconciled against the verify labels. (#80)

@@ -303,6 +303,20 @@ test('the excise repairs the object the caller already holds', () => {
   assert.match(BODY.slice(start, end), /v\.markdown = excised\.value\.markdown;/);
 });
 
+// ── Task 12 — depth vs traceability ─────────────────────────────────────────
+
+test('the section prompt resolves depth against the findings, not against model knowledge', () => {
+  const spStart = BODY.indexOf('const sectionPrompt');
+  const spEnd   = BODY.indexOf('const SECTION_VALIDATION_RETRIES');
+  assert.ok(spStart !== -1 && spEnd > spStart, 'sectionPrompt block markers must resolve');
+  const block = BODY.slice(spStart, spEnd);
+  // NOT a bare /thin/i — "nothing" contains "thin", so any future prose mentioning it would
+  // satisfy that and the assertion would stop testing the instruction it was written for.
+  assert.match(block, /evidence is thin/,
+    'the prompt must tell the writer what to do when findings are thin');
+  assert.match(block, /excerpt/i, 'depth must be sourced from carried excerpts');
+});
+
 // ── Task 9 — supersession pass ──────────────────────────────────────────────
 
 test('the supersession pass is skipped entirely on a new topic', () => {
