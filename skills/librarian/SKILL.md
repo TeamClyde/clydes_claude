@@ -46,7 +46,16 @@ Use when the user asks for:
 
 1. **Seed** — user supplies a brief or points to a local file.
 2. **Extract (if `.docx`)** — main-context runs the Python snippet above via Bash and captures the plain text.
-3. **Derive sub-questions** — main-context turns the brief/seed into 4–~12 *independent* research sub-questions and agrees the list with the user. Default 4–6; cap at 20.
+3. **Derive sub-questions, then STOP and confirm.** Turn the brief/seed into 4–~12 *independent*
+   research sub-questions. Default 4–6; cap at 20.
+
+   **This is a hard gate, not a courtesy.** Present the numbered list and obtain explicit
+   go-ahead — via `AskUserQuestion` or a plain confirm — BEFORE invoking the Workflow tool. Do not
+   derive and fire in the same turn.
+
+   Each sub-question costs roughly 9 agents: a research unit, a share of triage, its own re-check
+   cluster, consensus frames, a section writer, and at least one audit. Adding one after launch is
+   not a small edit — and it cannot be applied to a run already in flight (see Gotcha 11).
 4. **Prepare the run.** Derive a kebab-case `<slug>` from the brief → `research/<slug>/`.
    **A new topic is the default.** Append to an existing topic ONLY when the user explicitly asks
    to expand prior research, or names an existing slug — never infer a match. A wrong merge
@@ -143,6 +152,14 @@ If `fanoutDegraded: true` on return, the research fan-out fell below quorum — 
 9. **Appending to the wrong topic.** `dossier.md` is append-only and cannot be edited afterwards, so a wrong merge is not recoverable by a later run. Default to a NEW slug unless the user explicitly asked to extend an existing one.
 
 10. **Reading `coverage.missing` as the whole gap.** It lists sub-questions with no findings. A sub-question whose research succeeded but whose section writer was abandoned appears in `missingSections` instead, and the dossier names it under `### Sections not written`. Report both.
+
+11. **`resumeFromRunId` does not recover in-flight work.** The resume cache keys on completed
+    `result` lines in `journal.jsonl`. An agent killed mid-flight never writes one, so killing a run
+    to change its args abandons every agent currently running and re-runs them from scratch — the
+    abandoned agents are still paid for in full. It is a script-editing tool, not a
+    mid-flight-edit tool. If the sub-question list needs to change while a run is in flight, **let
+    the run finish and append a second pass to the same slug** (step 4, `priorFindings`) — appending
+    is supported and costs nothing extra. Never kill-and-relaunch to edit args.
 
 ## Related
 
