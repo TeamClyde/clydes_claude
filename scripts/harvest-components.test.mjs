@@ -63,15 +63,20 @@ const EXPECTED_NEW_EDGES = new Set([
   'stack-hats|stack-hat-directive', 'subagent-driven-development|agent-model-pinning',
   'subagent-driven-development|stack-hats', 'subagent-driven-development|subagent-prefix-prepend',
   'systematic-debugging|filesystem/efficiency', 'vet-capability-fit|install-vetting',
-  // rows 31-40
+  // rows 31-40 — now SPARSE. Six pairs were deleted 2026-08-14 when the authoring-layer
+  // collapse retired writing-agents and writing-rules: their `from` component ceased to
+  // exist, so the edge cannot be gained by any extractor. Deleted one per line, per the
+  // MAINTENANCE CONTRACT below: writing-agents|architect (row 34),
+  // writing-agents|researcher (35), writing-rules|cspell (40),
+  // writing-rules|mcp-governance (41), writing-rules|new-repo-setup (42),
+  // writing-rules|secrets-handling (43). This is the deletion branch of the contract, not
+  // the MIGRATED_TO_LEGACY_SHAPE branch — the citation was removed, not reshaped.
   'vet-install|install-vetting', 'vet-reputation|install-vetting',
-  'vet-security|install-vetting', 'writing-agents|architect',
-  'writing-agents|researcher', 'writing-plans|architect',
+  'vet-security|install-vetting', 'writing-plans|architect',
   'writing-plans|delivery-cadence', 'writing-plans|doc-tools',
-  'writing-plans|plan-gate', 'writing-rules|cspell',
-  // rows 41-44 — end of the plan's original 44-row enumeration
-  'writing-rules|mcp-governance', 'writing-rules|new-repo-setup',
-  'writing-rules|secrets-handling', 'plan-docs|integration-test-constraints',
+  'writing-plans|plan-gate',
+  // rows 41-44 — end of the plan's original 44-row enumeration, likewise sparse
+  'plan-docs|integration-test-constraints',
   // rows 45-50 — start of the 2026-08-10 correction (see comment above)
   'different-viewpoints-lite|different-viewpoint', 'doc-author|doc-backfill',
   'doc-backfill|infra-init', 'docs-refresh|docs-status',
@@ -150,10 +155,15 @@ test('gate-map extracts known explicit edges', async () => {
   const { edges } = buildGateMap(inv)
   const has = (a, b) => edges.some(e => e.from === a && e.to === b)
 
-  // Both edges are confirmed detectable in the actual files (architect-verified):
-  // plan-gate references `subagent_type: architect`; creating-tools references `writing-skills`.
+  // Both edges are confirmed detectable in the actual files:
+  // plan-gate references `subagent_type: architect`; creating-tools names
+  // `test-driven-development` as required background for its evaluation cycle.
+  // The second assertion previously read creating-tools -> writing-skills, which was a
+  // routing edge from the router era; that skill was retired 2026-08-14, so the pair is
+  // replaced with a citation the rewritten spine actually makes rather than dropped —
+  // the point of the assertion is that gate-map extracts a real explicit edge at all.
   assert.ok(has('plan-gate', 'architect'), 'plan-gate invokes the architect agent')
-  assert.ok(has('creating-tools', 'writing-skills'), 'creating-tools routes to writing-skills')
+  assert.ok(has('creating-tools', 'test-driven-development'), 'creating-tools names test-driven-development as required background')
 })
 
 test('reverse-dependency lookup returns dependents of a component', async () => {

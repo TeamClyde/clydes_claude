@@ -194,16 +194,22 @@ const SHAPE_COVERAGE_EXEMPTIONS = [
   // decision is ever reversed, these are the entries to delete first.
   { from: 'requesting-code-review', to: 'subagent-driven-development',
     reason: 'aux-file citation (known real, out of corpus by Open Question 3): names subagent-driven-development/code-quality-reviewer-prompt.md, a file the component owns, not the component' },
-  { from: 'writing-agents', to: 'creating-tools',
-    reason: 'aux-file citation (known real, out of corpus by Open Question 3): names creating-tools/frontmatter-reference.md, a file the component owns, not the component' },
+  // A third entry, writing-agents -> creating-tools, lived here until 2026-08-14. It named
+  // creating-tools/frontmatter-reference.md, and both endpoints of that citation are gone:
+  // writing-agents was retired by the authoring-layer collapse and the aux file it named was
+  // deleted in the same commit. Removed rather than kept, because a `from` that is no longer
+  // a component makes the entry stale, which direction 2 below fails on.
 
   // ── Class 5: shapes the plan deliberately declined to resolve ─────────────
   // Not false positives and not out-of-corpus — real citations in shapes the
   // extractor was deliberately not widened to read. Candidates for a future
   // rule, recorded here so that choice stays visible instead of dissolving into
   // "the graph just doesn't have that edge".
-  { from: 'writing-skills', to: 'systematic-debugging',
-    reason: 'bare-name-in-prose shape, deliberately not widened (Blueprint: "Not widened: the bare-name shape") — and the span is itself a quoted authoring EXAMPLE of correct cross-skill reference syntax, not writing-skills depending on systematic-debugging' },
+  // writing-skills -> systematic-debugging was the worked example of this class until
+  // 2026-08-14, when the authoring-layer collapse retired writing-skills. The span it
+  // described — a quoted authoring EXAMPLE of correct cross-skill reference syntax, not a
+  // real dependency — went with the file. Removed for the same reason as the Class 4 entry
+  // above: a `from` that is no longer a component is stale, not exempt.
   { from: 'doc-author', to: 'docs-refresh',
     reason: 'slash-command + argument (`/docs-refresh feature|architecture`): a real citation whose trailing argument defeats pathEdgeName\'s bare-`/<n>` form — a candidate for a future rule, not a false positive' },
 ]

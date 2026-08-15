@@ -39,9 +39,7 @@ All agents and skills are global — they live in `~/.claude/` and are available
 | `infra-init` | Codebase graph generation — orchestrates the 3-phase infra-init agent workflow |
 | `e2e-init` | Per-repo testing backbone setup — produces `testing-plan.md`, `e2e-plan.md`, and `run-tests.sh` |
 | `plan-management` | TODO.md maintenance and plan doc status tracking |
-| `creating-tools` | Orchestration entry point for all component creation — routes to correct skill by artifact type |
-| `writing-agents` | TDD methodology for agent creation — baseline invocation required before writing system prompt |
-| `writing-rules` | Guidance for creating rules files — rule vs skill decision, global vs path-scoped, observational testing |
+| `creating-tools` | The single authoring skill for every component type — artifact selection, the evaluation-first cycle, per-type conventions, and the registration gates |
 
 ---
 

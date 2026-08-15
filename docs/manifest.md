@@ -16,10 +16,11 @@
 ## Reference
 <!-- Information-oriented. Generated artifacts + durable lookup material. -->
 - [x] `docs/reference/component-inventory.md` — generated roster of all 76 components (drift-checked)
-- [x] `docs/reference/gate-map.md` — generated dependency/gate map (140 edges)
+- [x] `docs/reference/gate-map.md` — generated dependency/gate map (215 edges)
 - [x] `docs/reference/glossary.md` — alphabetical workflow term definitions
 - [x] `docs/reference/workflow-map.md` — Mermaid map of the primary skill chain
 - [x] `docs/reference/setup-workflow-acceptance.md` — per-skill acceptance criteria (platform/tier matrix)
+- [x] `docs/reference/authoring-layer-v1-archive.md` — swept companions from the retired v1 authoring skills
 
 ## Explanation
 <!-- Understanding-oriented. Hybrid C1+C2+C3 layout per rules/doc-tools.md. -->
@@ -37,7 +38,7 @@
 - [x] `docs/explanation/features/stack-hats.md` — per-stack best-practice layer
 - [x] `docs/explanation/features/testing-system.md` — the six-pillar testing system
 - [x] `docs/explanation/features/quality-and-review.md` — debugging + review + verification
-- [x] `docs/explanation/features/tool-authoring.md` — creating-tools + authoring skills
+- [x] `docs/explanation/features/tool-authoring.md` — the single authoring skill and its references
 - [x] `docs/explanation/features/thinking-and-session-tools.md` — thinking + session one-offs
 
 ### Architecture Decision Records

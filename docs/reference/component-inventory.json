@@ -275,7 +275,7 @@
   {
     "type": "skill",
     "name": "creating-tools",
-    "description": "Use when creating any workflow component — skill, agent, rule, hook, command, or plugin. Routes to the correct specialist skill based on artifact type.",
+    "description": "Use when creating, editing, or debugging anything that steers Claude itself — a skill, subagent, rule, hook, or /command. Also fires on indirect asks: making an instruction stick that Claude keeps ignoring, running a check automatically before every commit, a hook or SessionStart script that will not fire, deciding whether something belongs in CLAUDE.md or its own file, moving work into an isolated context, or a new component failing the orphan or description-budget gates.",
     "file": "skills/creating-tools/SKILL.md"
   },
   {
@@ -478,26 +478,8 @@
   },
   {
     "type": "skill",
-    "name": "writing-agents",
-    "description": "Applies TDD to agent system prompts — baseline invocation first, then a prompt targeting the observed failures. Use when creating a new agent, editing an existing agent's system prompt, or determining agent frontmatter conventions and testing approach. Route through creating-tools, not directly.",
-    "file": "skills/writing-agents/SKILL.md"
-  },
-  {
-    "type": "skill",
     "name": "writing-plans",
     "description": "Use when you have a spec or requirements for a multi-step task, before touching code — produces a plan doc with concrete file paths, task breakdown, and architecture blueprint. Hands off to plan-gate automatically.",
     "file": "skills/writing-plans/SKILL.md"
-  },
-  {
-    "type": "skill",
-    "name": "writing-rules",
-    "description": "Authors rules files and decides their scope. Use when creating a new rules file, deciding whether a constraint should be a rule or a skill, or determining if a rule should be global or path-scoped. Route through creating-tools, not directly.",
-    "file": "skills/writing-rules/SKILL.md"
-  },
-  {
-    "type": "skill",
-    "name": "writing-skills",
-    "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment — requires TDD baseline testing before writing skill content. Route through creating-tools, not directly.",
-    "file": "skills/writing-skills/SKILL.md"
   }
 ]

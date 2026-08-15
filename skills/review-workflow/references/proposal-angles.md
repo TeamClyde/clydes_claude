@@ -29,7 +29,7 @@ Execute each approved fix using this routing table:
 
 | Fix type | Action |
 |----------|--------|
-| Skill update | Invoke `writing-skills` skill with the proposed change |
+| Skill update | Invoke `creating-tools` with the proposed change |
 | New skill | Route through `creating-tools` skill |
 | CLAUDE.md edit | Edit directly using Edit tool |
 | Memory entry | Write to memory using Write tool |

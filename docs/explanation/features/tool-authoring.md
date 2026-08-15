@@ -3,15 +3,15 @@
 **C4 Layer:** C3 Component
 **Status:** Active
 **Owner:** solo
-**Last updated:** 2026-08-11
-**Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs); plans/component-reference-integrity/graph-integrity/ (citation-shape coverage; graph invariants)
+**Last updated:** 2026-08-14
+**Related plans:** plans/orchestration-layer-foundation/ (Phase 1B docs); plans/component-reference-integrity/graph-integrity/ (citation-shape coverage; graph invariants); plans/authoring-layer-rewrite/ (the 2026-08-14 collapse to one skill)
 **Related ADRs:** ADR-0013 (component-graph-invariants), ADR-0014 (namespace-convention)
 **Key files:**
-  - `skills/creating-tools/SKILL.md` — the component-creation router
-  - `skills/creating-tools/routing-table.md` — per-artifact routing details
-  - `skills/writing-skills/SKILL.md`, `skills/writing-agents/SKILL.md`, `skills/writing-rules/SKILL.md` — the specialist authoring skills
+  - `skills/creating-tools/SKILL.md` — the authoring spine: artifact selection, the evaluation cycle, degrees of freedom, context discipline, the six registration gates, type routing
+  - `skills/creating-tools/references/skill-conventions.md`, `agent-conventions.md`, `rule-conventions.md`, `hook-conventions.md` — per-type authoring mechanics, one file each
+  - `skills/creating-tools/references/pressure-testing.md` — the shared RED-GREEN-REFACTOR technique, with skill / agent / hook branches
   - `skills/pulser/SKILL.md`, `skills/adherence-audit/SKILL.md` — structural + semantic quality checks
-  - `skills/creating-tools/routing-table.md` — per-artifact routing, all references owned locally
+  - `scripts/creating-tools-self-containment.test.mjs` — the gate that keeps the directory copy-able
 ---
 
 # Tool Authoring
@@ -20,9 +20,11 @@
 
 Tool Authoring covers the creation, testing, and quality-gating of every workflow component in this repo: skills, agents, rules, hooks, commands, and plugins. "Tool" here means any artifact that shapes Claude's behavior — not application code.
 
-The entry point for all component creation is the `creating-tools` skill. It acts as a pure router: it identifies the artifact type, applies a hard gate to resolve any ambiguity, then dispatches to the correct specialist. No artifact content is written by `creating-tools` itself.
+The entry point for all component creation is the `creating-tools` skill, and since 2026-08-14 it is also the *only* one: it authors in place rather than dispatching. Its `SKILL.md` is a spine carrying what is true of every artifact type — how to pick the type, the evaluation-first cycle, how specific to make the instructions, what the always-on cost of a line is, and the six graph gates a new component has to satisfy. What differs by type lives in `references/`, one file each, loaded on demand.
 
-After a component is authored by the appropriate specialist skill, two quality checks run in sequence: `pulser` for structural correctness (frontmatter validity, CSO compliance, description quality, token budget) and `adherence-audit` for semantic consistency (cross-references, invocation mismatches, convention conflicts, orphaned components).
+The shape before this was a router plus three named specialists (`writing-skills`, `writing-agents`, `writing-rules`). It was collapsed for three measured reasons: the artifact-selection criteria lived *inside* `writing-rules`, so an author only met them after already deciding it was a rule; hooks had no authoring guidance at all despite being the enforcement mechanism this repo increasingly reaches for; and the router's own descriptions were the largest single cluster in the skill-overlap candidate band. One skill removes the routing decision rather than documenting it better.
+
+After a component is authored, two quality checks run in sequence: `pulser` for structural correctness (frontmatter validity, CSO compliance, description quality, token budget) and `adherence-audit` for semantic consistency (cross-references, invocation mismatches, convention conflicts, orphaned components).
 
 This feature does **not** cover:
 
@@ -32,19 +34,22 @@ This feature does **not** cover:
 
 ## Building Block View
 
-Five components participate, grouped into two layers.
+Three components participate, plus five reference files owned by the first of them.
 
-**Orchestration layer (one component)**
+**Authoring layer (one skill, six files)**
 
-`creating-tools` (`skills/creating-tools/SKILL.md`) — the sole entry point for any component-creation intent. Reads the user's request, determines artifact type via a mandatory clarification gate, and delegates to exactly one specialist per request. It produces zero content itself.
+`creating-tools` (`skills/creating-tools/SKILL.md`) — the sole entry point for any component-creation intent, and the only component the graph sees. Under 500 lines by constraint, because a skill whose own body violates the progressive-disclosure section it teaches is self-refuting — which is precisely how the previous version failed. Six sections:
 
-**Specialist authoring layer (three skills)**
+- **§0 Artifact selection.** A four-row table keyed on the two things that actually distinguish the types: *when it loads* and *what enforces it*. Subject matter is not a signal. The hook row is the one this repo has direct evidence for — a 37% front-door bypass rate and 28 accumulated dead references were both correctly-written prose failing to hold.
+- **§1 The Iron Law and the evaluation cycle.** No component without an observed failure first; baseline, three targeted pressure scenarios, minimal instructions, re-run. Claude A (the author) and Claude B (a cold instance) must be different, or the run is not evidence.
+- **§2 Degrees of freedom.** High / medium / low, chosen by how fragile the task is rather than by house style. Absent from the previous version entirely.
+- **§3 Context discipline.** Every line is a recurring cost, paid on every load. State what to do rather than why; write standing instructions rather than narrative; push anything consulted-not-followed one level down.
+- **§4 Registration.** The six graph gates in the order that satisfies them, carrying **no paths** — the gates' own failure messages name their exact remediation, so a path written here could go stale and one read out of a failing assertion cannot.
+- **§5 Type routing.** One line each into the five reference files.
 
-`writing-skills` (`skills/writing-skills/SKILL.md`) — handles skill creation. Applies TDD adapted to process documentation: baseline pressure test (RED), write the skill (GREEN), close loopholes (REFACTOR), then Pulser structural eval. Structural conventions come from `skills/creating-tools/frontmatter-reference.md` and the bundled `anthropic-best-practices.md`.
+The five reference files (`skills/creating-tools/references/`) carry what the spine deliberately does not. `skill-conventions.md` — frontmatter, size discipline, progressive disclosure, description and discoverability, the six-field packaging spec (a command is a skill with `disable-model-invocation: true`, not a separate type). `agent-conventions.md` — frontmatter plus the platform behaviors frontmatter alone does not predict: the two independent tool filters, what a subagent does *not* inherit, and a `permissionMode` the parent can silently override. `rule-conventions.md` — the always-on cost model, global vs. path-scoped, and why rule testing is observational with no eval loop. `hook-conventions.md` — the only non-Markdown artifact type, and new capability: event taxonomy, the stdin/exit-code contract, the house pattern, Windows specifics, testing, and `.claude/settings.json` wiring. `pressure-testing.md` — the shared RED-GREEN-REFACTOR mechanism with three branches, the hooks branch being a genuine unit test rather than a prose baseline.
 
-`writing-agents` (`skills/writing-agents/SKILL.md`) — handles agent creation. Requires a bare baseline invocation (no system prompt) before any content is written. Documents actual failures verbatim, then writes the system prompt to address them. Structural field conventions come from `skills/creating-tools/frontmatter-reference.md`, which is owned locally rather than delegated — the plugin that previously held them was uninstalled 2026-08-06. Requires explicit `model:` selection as repo policy (the platform defaults to `inherit`); agent descriptions state what the agent is for and when Claude should delegate to it.
-
-`writing-rules` (`skills/writing-rules/SKILL.md`) — handles rule creation. Rules are always-on context injections, not on-demand skills. Authoring principle: short, scannable, single-concern, with decision tables over prose. No Pulser eval; testing is observational (2–3 live sessions). Supports two rule types: global (no frontmatter) and path-scoped (`paths:` frontmatter).
+A dedicated gate, `scripts/creating-tools-self-containment.test.mjs`, asserts that every path the directory reads resolves inside itself, so the skill survives being copied out of this repo. Outside paths are allowed only as declared *output* targets (where a new component gets written, plus the two concrete registration files an author edits), each carrying a written reason.
 
 **Quality gate layer (two skills)**
 
@@ -54,34 +59,46 @@ Five components participate, grouped into two layers.
 
 ```mermaid
 graph TD
-    U[User intent: create a component] --> CT[creating-tools]
-    CT -->|artifact = skill| WS[writing-skills]
-    CT -->|artifact = agent| WA[writing-agents]
-    CT -->|artifact = rule| WR[writing-rules]
-    CT -->|artifact = hook| HD[test-driven-development<br/>+ hooks-reference.md]
-    CT -->|artifact = command| WS
-    WS --> PL[pulser]
-    PL --> AA[adherence-audit]
-    WA --> AA
-    WR --> AA
+    U[User intent: create a component] --> S0["creating-tools SKILL.md<br/>§0 artifact selection<br/><i>when does it load · what enforces it</i>"]
+    S0 --> S1["§1 Iron Law + evaluation cycle<br/>§2 degrees of freedom<br/>§3 context discipline"]
+    S1 --> S5{"§5 type routing<br/>load exactly one"}
+    S5 -->|skill or /name command| RS["references/<br/>skill-conventions.md"]
+    S5 -->|agent| RA["references/<br/>agent-conventions.md"]
+    S5 -->|rule| RR["references/<br/>rule-conventions.md"]
+    S5 -->|hook| RH["references/<br/>hook-conventions.md"]
+    RS -.-> PT["references/pressure-testing.md<br/>skill · agent · hook branches"]
+    RA -.-> PT
+    RH -.-> PT
+    RR ==>|no eval loop —<br/>observational only| S4
+    PT --> S4["§4 registration<br/>the six graph gates"]
+    S4 --> PL[pulser<br/><i>skills only</i>]
+    S4 --> AA[adherence-audit]
+    PL --> AA
+
+    style S0 fill:#ddeeff,stroke:#6699cc
+    style S4 fill:#ddeeff,stroke:#6699cc
 ```
+
+Everything above the §5 diamond is shared. Everything below it is the part that genuinely differs by artifact type — which is the whole argument for one skill instead of four: the previous shape put the selection criteria *downstream* of the routing decision they were supposed to inform.
 
 ## Runtime View
 
 The typical flow for creating a new skill (the most common case):
 
-1. User expresses component-creation intent. `creating-tools` fires via its broad trigger description.
-2. `creating-tools` identifies the artifact type. If ambiguous, it asks exactly one clarifying question and waits for the answer. It never guesses and never routes to two destinations simultaneously.
-3. `creating-tools` invokes `writing-skills` via the Skill tool.
-4. `writing-skills` runs the RED phase: dispatches a subagent without the new skill loaded to document baseline failures verbatim. The Iron Law prohibits writing any skill content before this baseline is complete.
-5. `writing-skills` runs the GREEN phase: writes `SKILL.md` targeting the documented failures.
-6. `writing-skills` runs the REFACTOR phase: pressure scenarios via subagent close remaining loopholes.
-7. `writing-skills` invokes `pulser`. Pulser checks frontmatter validity, description format, CSO compliance, token budget, and naming. Any structural finding must be resolved before the skill ships.
-8. Optionally, `adherence-audit` is run across the full component corpus. It detects drift the new component introduces: dead references it would create, convention conflicts, or orphan status.
+1. User expresses component-creation intent. `creating-tools` fires via its broad trigger description, which now has to cover skill, agent, rule *and* hook intent from one string.
+2. §0 fixes the artifact type on when it loads and what enforces it. If that genuinely cannot be determined, the skill asks one question rather than guessing — a wrong type costs a full rewrite and the question costs a turn.
+3. §1's RED phase: dispatch a cold instance without the new skill loaded and record baseline failures verbatim. The Iron Law prohibits writing any content before this is done, and it binds edits as well as new files.
+4. §1's GREEN phase: write the minimum guidance addressing the documented failures — not generic hardening for cases nobody observed, which is untested by construction and pure recurring cost.
+5. §1's REFACTOR phase: three pressure scenarios aimed at the observed gaps, each new rationalization closed and re-verified. Technique in `references/pressure-testing.md`.
+6. §4's registration walk: stage first (every gate enumerates through the git index, so an unstaged file is invisible rather than exempt), then give the component an inbound edge *or* declare it an entry point with a reason, then document it in the explanation layer, then regenerate the derived artifacts.
+7. `pulser` checks frontmatter validity, description format, CSO compliance, token budget, and naming. Any structural finding is resolved before the skill ships.
+8. Optionally, `adherence-audit` runs across the full component corpus, detecting drift the new component introduces: dead references, convention conflicts, orphan status.
 
-For agents, step 4 is a bare `Agent` tool dispatch (no agent definition file loaded). For rules, steps 4–6 are replaced by direct authoring (no TDD loop); testing is deferred to live observational sessions.
+For agents, step 3 is a bare `Agent` tool dispatch with no definition file loaded. For rules, steps 3–5 collapse into direct authoring against the always-on cost model; validation is observational — 2–3 live sessions that should trigger the rule — because there is no eval loop for a rule and inventing one is a documented mistake.
 
-**Routing constraint.** No route delegates to a plugin. A hook routes to `test-driven-development` against `skills/creating-tools/hooks-reference.md`; a command routes to `writing-skills`, because the platform merged custom commands into skills (a command is a skill carrying `disable-model-invocation: true`); full-plugin authoring has no route, because this repo consumes plugins rather than authoring them.
+**Hooks take a different path at step 6, and the checklist branches for them explicitly.** A hook has no outbound edges and nothing dispatches it, so zero inbound edges is its correct steady state and it takes the entry-point-declaration branch rather than the citation branch. It also carries a registration step no other type has: it must be wired into `.claude/settings.json` against its triggering event, or it is a file that never runs.
+
+**Two things deliberately have no route.** A command is not a separate artifact — the platform merged custom commands into skills, so it is authored as a skill carrying `disable-model-invocation: true`. Full-plugin authoring has no route at all, because this repo consumes plugins rather than authoring them.
 
 ## Reference Integrity
 
@@ -121,7 +138,7 @@ flowchart LR
 | Category | Mechanism | Scope | Why |
 |---|---|---|---|
 | Historical ledger | `references.historicalLedgers` in policy | File | `plugins/registry.md` exists to name removed plugins, so its citations *must* stay dead. |
-| Provenance | inline `<!-- ref-ok: reason -->` | Line (its own, or the next) | `hooks-reference.md` and `frontmatter-reference.md` open by recording what they were derived from. Blanket-exempting the file would stop checking two documents that should be fully checked. |
+| Provenance | inline `<!-- ref-ok: reason -->` | Line (its own, or the next) | A doc that opens by recording what it was derived from cites the source by name. Blanket-exempting the whole file would stop checking a document that should be fully checked, so the exemption is line-scoped. **No live users as of 2026-08-14** — the two that had them (`hooks-reference.md`, `frontmatter-reference.md`) were deleted by the authoring-layer collapse and their content re-authored. The mechanism is retained: it is line-scoped and self-documenting, and deleting a working exemption tier because its last user went away would only mean re-inventing it under pressure. |
 | Negative example | none — the citation is **fixed** | — | A ✅-Good example teaching a dead prefix keeps minting new dead references while the gate stays green. Exempting it would preserve the defect it teaches. |
 
 Every policy exemption is keyed by the exempted thing and valued by the **reason** it is exempt, and a missing or empty reason fails `scripts/skill-surface.test.mjs`. That requirement is the entire mechanism preventing the exemption block from becoming the new place dead references hide.
@@ -158,15 +175,15 @@ flowchart LR
 
 Precision and citation-shape coverage, above, each answer a question about one edge at a time: does this citation resolve, and is every component citable in a shape the tokenizer can read. Three further checks — two in `scripts/graph-integrity.test.mjs`, one in `scripts/graph-integrity.overlap.test.mjs` — ask about properties that only exist across the *whole* graph: is every unreached node an entry point on purpose, is every component actually documented, and is every lexically-similar skill pair either disambiguated or flagged for triage. All three follow the shape the `references` exemption block above already established: a declared list in `docs/reference/skill-surface-policy.json`, keyed by the exempted thing and valued by a reason, checked in **both directions** so a stale declaration fails exactly as loudly as a missing one.
 
-**Inbound degree** (`scripts/graph-integrity.test.mjs`). A node with no inbound edge is either a defect — something should cite it and doesn't — or an entry point by design: a hook the harness dispatches, a skill the user types directly. The graph cannot tell those apart on its own, so `skill-surface-policy.json` → `entryPoints` declares the second set, grouped by invocation source (`harnessInvoked`, `userInvoked`). Measured 2026-08-11: 14 nodes with zero inbound edges, 14 declared across the two groups — 7 harness-dispatched hooks, 7 user-invoked skills. The forward direction alone would let the declaration rot into a hiding place: wire up a citation to a declared entry point and the exemption would silently outlive the fact it described. The reverse direction — every declared name must *still* have zero inbound edges, and must still name a real node — is what keeps `entryPoints` a live declaration rather than an append-only graveyard.
+**Inbound degree** (`scripts/graph-integrity.test.mjs`). A node with no inbound edge is either a defect — something should cite it and doesn't — or an entry point by design: a hook the harness dispatches, a skill the user types directly. The graph cannot tell those apart on its own, so `skill-surface-policy.json` → `entryPoints` declares the second set, grouped by invocation source (`harnessInvoked`, `userInvoked`). Re-measured 2026-08-14: 17 nodes with zero inbound edges, 17 declared across **three** groups — 7 harness-dispatched hooks, 7 user-invoked skills, and 3 always-on rules. The third group, `alwaysOnRules`, was added when the authoring-layer collapse retired the skill that had been citing three always-on rules as worked examples, removing the sole inbound edge of each. (They are enumerated with individual reasons in the policy file, not here — one of the three is also the sole `catalogOnly` entry described below, and naming it in this prose would silently invalidate that exemption. That is not a hypothetical: this paragraph named all three on its first draft and the coverage gate failed on exactly that.) Nothing dispatches a rule, so zero inbound edges is a rule's correct steady state rather than a missing citation; manufacturing a citation from the surviving authoring skill purely to quiet the gate was considered and declined, since aux files under `references/` produce no edge anyway and a citation written to keep a gate quiet is the prose-level enforcement this repo is moving away from. The forward direction alone would let the declaration rot into a hiding place: wire up a citation to a declared entry point and the exemption would silently outlive the fact it described. The reverse direction — every declared name must *still* have zero inbound edges, and must still name a real node — is what keeps `entryPoints` a live declaration rather than an append-only graveyard.
 
-This is **local in-degree, not transitive reachability**, and the two are not the same property. A cluster of components citing only each other, with no path in from any real entry point, has in-degree ≥ 1 throughout and would pass silently — reciprocal citation is common in this corpus: 35 two-cycle pairs exist in the live edge set (measured 2026-08-11), one of them `install-vetting` ↔ `vet-security`. A true traversal is the stronger invariant, and its absence is a **known, deliberate deferral**, not an oversight: a BFS seeded from (declared entry points ∪ zero-in-degree nodes) reaches all 79 of 79 nodes today, so no island exists yet — but only one two-cycle pair needs to lose its last inbound edge from outside to open one. It stays deferred because `entryPoints` is keyed to in-degree semantics — its entries *are* the zero-in-degree set — and the staleness half of the check above is inherently an in-degree property too; upgrading only the forward direction to "reachable from an entry point" would leave the two halves of one policy block asserting different things about what an entry point means. Redefining a declared entry point from "nothing cites it" to "root of a reachable region" is a plan change, not a review fix.
+This is **local in-degree, not transitive reachability**, and the two are not the same property. A cluster of components citing only each other, with no path in from any real entry point, has in-degree ≥ 1 throughout and would pass silently — reciprocal citation is common in this corpus: 33 two-cycle pairs exist in the live edge set (re-measured 2026-08-14), one of them `install-vetting` ↔ `vet-security`. A true traversal is the stronger invariant, and its absence is a **known, deliberate deferral**, not an oversight: a BFS seeded from (declared entry points ∪ zero-in-degree nodes) reaches all 76 of 76 nodes today (re-run 2026-08-14, after the collapse), so no island exists yet — but only one two-cycle pair needs to lose its last inbound edge from outside to open one. It stays deferred because `entryPoints` is keyed to in-degree semantics — its entries *are* the zero-in-degree set — and the staleness half of the check above is inherently an in-degree property too; upgrading only the forward direction to "reachable from an entry point" would leave the two halves of one policy block asserting different things about what an entry point means. Redefining a declared entry point from "nothing cites it" to "root of a reachable region" is a plan change, not a review fix.
 
-**Documentation coverage** (`scripts/graph-integrity.test.mjs`) implements the already-Accepted [ADR-0003](../adr/0003-generated-inventory-completeness-oracle.md), previously a point-in-time narrative audit (`docs/_coverage-audit.md`, written at 76 components); this makes the same check re-runnable and blocking. Every node must be named (word-boundary matched) in at least one committed `docs/explanation/**/*.md` file, or declared `catalogOnly` with a reason. Measured 2026-08-11: 78 of 79 nodes documented; the sole `catalogOnly` entry is a self-contained spellcheck-hygiene rule with no subsystem narrative to belong to — named in `skill-surface-policy.json` rather than here, since spelling it out in this prose would itself satisfy the coverage matcher and silently invalidate its own exemption. Checked bidirectionally, same as `entryPoints`: a `catalogOnly` entry naming a node that has since gained a documentation mention is stale and fails, exactly like one naming a node no longer in the graph.
+**Documentation coverage** (`scripts/graph-integrity.test.mjs`) implements the already-Accepted [ADR-0003](../adr/0003-generated-inventory-completeness-oracle.md), previously a point-in-time narrative audit (`docs/_coverage-audit.md`, written at 76 components); this makes the same check re-runnable and blocking. Every node must be named (word-boundary matched) in at least one committed `docs/explanation/**/*.md` file, or declared `catalogOnly` with a reason. Re-measured 2026-08-14: 75 of 76 nodes documented; the sole `catalogOnly` entry is a self-contained spellcheck-hygiene rule with no subsystem narrative to belong to — named in `skill-surface-policy.json` rather than here, since spelling it out in this prose would itself satisfy the coverage matcher and silently invalidate its own exemption. Checked bidirectionally, same as `entryPoints`: a `catalogOnly` entry naming a node that has since gained a documentation mention is stale and fails, exactly like one naming a node no longer in the graph.
 
 `entryPoints` and `catalogOnly` answer two different questions about the same node and are not interchangeable: `entryPoints` says *nothing cites this in the graph, by design*; `catalogOnly` says *no `docs/explanation/` doc describes this, by design*. A component can legitimately sit in one, both, or neither.
 
-**Overlap triage** (`scripts/graph-integrity.overlap.test.mjs`) is **declare-and-resolve, not detect-and-flag**. Every skill pair whose deduped, stop-worded description tokens exceed a declared Jaccard threshold (0.125) forms a *candidate band* — band membership is not itself a defect, it means two descriptions are lexically similar enough that a reader could plausibly confuse them. What fails is a band member carrying no recorded verdict in `skill-surface-policy.json` → `overlapVerdicts`. Measured 2026-08-11: 14 pairs in the band, all 14 carrying a recorded verdict — 13 `boundary` (one description names the other skill, or both name a common router; the gate **re-verifies this against the description text**, so the text is the proof and there is no separate evidence field to trust) and 1 `distinct` (lexical coincidence, resolved by no textual clause). A verdict for a pair that has since fallen out of the band is stale and fails, the same staleness discipline as the two invariants above.
+**Overlap triage** (`scripts/graph-integrity.overlap.test.mjs`) is **declare-and-resolve, not detect-and-flag**. Every skill pair whose deduped, stop-worded description tokens exceed a declared Jaccard threshold (0.125) forms a *candidate band* — band membership is not itself a defect, it means two descriptions are lexically similar enough that a reader could plausibly confuse them. What fails is a band member carrying no recorded verdict in `skill-surface-policy.json` → `overlapVerdicts`. Re-measured 2026-08-14: 11 pairs in the band, all 11 carrying a recorded verdict — 10 `boundary` (one description names the other skill, or both name a common router; the gate **re-verifies this against the description text**, so the text is the proof and there is no separate evidence field to trust) and 1 `distinct`. The band shrank by exactly the three `writing-*` pairs, which is the clearest single measurement of what the collapse bought: those three were the largest resolved cluster in the band, and they are now gone rather than disambiguated (lexical coincidence, resolved by no textual clause). A verdict for a pair that has since fallen out of the band is stale and fails, the same staleness discipline as the two invariants above.
 
 **Why detect-and-flag by similarity threshold does not work here — the principle, not just the outcome.** *Overlapping outputs are legitimate; overlapping triggers are not, because the trigger is where routing happens.* Two skills can produce similar-shaped artifacts without being confusable — what matters for the graph to gate is whether a reader would pick the wrong one **before either skill runs**, not whether their outputs later resemble each other. A pair earns a `boundary` verdict precisely *because* someone already noticed it was confusable and wrote a clause naming the sibling — and that clause adds shared vocabulary, raising the pair's similarity score in the same stroke that resolves it. Similarity therefore anti-correlates with "still needs disambiguation": the already-fixed pairs rank as the *most* similar, not the least, so no similarity threshold can separate a genuinely-confusable pair from an already-resolved one. See [ADR-0013](../adr/0013-component-graph-invariants.md) for the measured falsification. This is why the graph gates *routing ambiguity* — the trigger-selection moment — and never *output overlap*: gating on output similarity would flag correct designs, and a detector built on description similarity would flag the wrong pairs first.
 
@@ -197,10 +214,10 @@ Edge-local checks (top) establish that the graph's edges are trustworthy one at 
 - `scripts/graph-integrity.overlap.test.mjs` — the skill-overlap triage gate. Reads only skill descriptions (no edges) and `skill-surface-policy.json` → `overlapVerdicts`; split into its own file because the band computation shares no data with the two invariants above.
 - `scripts/harvest-components.shape-coverage.test.mjs` — the citation-shape coverage gate, the recall counterpart to `scripts/reference-integrity.test.mjs`. Declares its exemptions in `SHAPE_COVERAGE_EXEMPTIONS`, guarded against a silently-duplicated `from`/`to` pair by an array-length-vs-derived-Set-size assertion.
 - `docs/reference/skill-surface-policy.json` → `references` — the declared resolution set and exemptions the gate reads. Adding a machine-local skill or a known namespace is an edit here, with a reason string, in the same commit.
-- `skills/creating-tools/frontmatter-reference.md` — the repo's own verified frontmatter inventory for both agents and skills, including the packaging-spec field limit that governs cloud and routine uploads.
-- `skills/creating-tools/hooks-reference.md` — the repo's own hook reference: event taxonomy, exit-code and deny contract, settings.json wiring, and house pattern. Written from the official hooks documentation and the repo's nine working hooks.
-- `pulser` CLI — external tool for static structural evaluation of skill files. Invoked by `writing-skills`. Requires `pulser` to be installed and accessible on `$PATH`.
-- `skills/creating-tools/routing-table.md` — the per-artifact detail table consumed by `creating-tools` at decision time. Lists process skill, structure skill, eval mechanism, and notes for each artifact type.
+- `skills/creating-tools/references/*.md` — the five per-type authoring references the spine routes into. Owned locally rather than delegated: the plugin that once held frontmatter guidance was uninstalled 2026-08-06, and a cached plugin snapshot goes stale silently.
+- `scripts/creating-tools-self-containment.test.mjs` — asserts every path the skill directory reads resolves inside itself, so the directory survives being copied out of this repo. Outside paths are permitted only as declared output/registration targets, each with a written reason.
+- `pulser` CLI — external tool for static structural evaluation of skill files. Run after any skill is authored or edited. Requires `pulser` to be installed and accessible on `$PATH`.
+- `docs/reference/authoring-layer-v1-archive.md` — the consolidated pre-collapse content of the three retired skills and their companions. The durable historical record; never read by the skill.
 
 ## Decisions
 
@@ -209,8 +226,9 @@ Edge-local checks (top) establish that the graph's edges are trustworthy one at 
 
 ## Known Issues & Gotchas
 
-- **The coordinator constraint has no exceptions.** `creating-tools` must never write artifact content itself — not frontmatter, not a rule sentence, not a draft system prompt. The moment any content is written before delegating, the skill has been violated. The check is: "Did I invoke the delegated skill first?" If no, stop and invoke it.
-- **Ambiguous compound requests ("I need a skill and a hook for it") are handled sequentially, not in parallel.** `creating-tools` processes one artifact type at a time. Two routing decisions are two sequential invocations of `creating-tools`, not a simultaneous fan-out.
+- **The coordinator constraint is gone, and that is the point.** Until 2026-08-14 the hard rule was that `creating-tools` produced zero artifact content — it routed only, and writing so much as a frontmatter line before delegating was a violation. The collapse deleted the routing step, so there is nothing left to violate: the skill now authors in place. Do not reintroduce a "delegate first" check; there is no destination.
+- **Compound requests are still handled one artifact at a time.** "I need a skill and a hook for it" is two components, each with its own baseline, its own reference file, and its own trip through the registration checklist — the hook branch in particular differs at §4. Sequentially, not as a fan-out. This survives the collapse because it was never about routing.
+- **The trigger now has to carry four intents from one description.** One string must fire for skill, agent, rule *and* hook authoring, where four strings used to share the load. This is the single largest open risk of the collapse and it is being monitored rather than assumed away — a per-intent rollback is available if any one of the four stops firing reliably.
 - **The Iron Law applies to edits as well as new files.** Modifying an existing skill still requires a failing baseline test first. Adding a section, updating a description, or closing a loophole all require observing the failure before writing the fix.
 - **Pulser is structural; `adherence-audit` is semantic.** A skill that passes Pulser may still introduce a dead reference, a convention conflict, or an invocation mismatch. Run `adherence-audit` after adding or modifying any component to catch cross-corpus drift.
 - **Agent and skill frontmatter differ in ways that fail silently.** Agents restrict tools with `tools:` and deny with `disallowedTools:` (camelCase); skills grant with `allowed-tools:` and restrict with `disallowed-tools:` (kebab-case). A key written for the wrong surface is dropped without an error, so the declaration reads as correct and does nothing — this is how an agent ships unrestricted. Diff declared frontmatter against what the runtime renders. Both surfaces want the same description shape: what the component is for, plus when to use it — never its internal steps.
@@ -241,17 +259,17 @@ Authoring quality is observed through five signals:
 
 **Citation** — A reference to a component by name in prose or in a dispatch. What counts as one is defined in exactly one place, `scripts/lib/component-refs.mjs`: a namespaced `ns:name` pair whose `ns` is declared, or a *quoted* `skill:` / `subagent_type:` invocation slot. A bare backticked name is not a citation for gate purposes — see **Decidability boundary**.
 
-**Coordinator constraint** — The hard rule that `creating-tools` produces zero artifact content. It routes only. Any content written before the delegated skill is invoked is a violation.
+**Coordinator constraint** — *Retired 2026-08-14.* The former hard rule that `creating-tools` produced zero artifact content and routed only. It existed because authoring lived in three downstream skills; with those retired there is no delegation step and the constraint has no referent. Kept in the glossary so a reader meeting the phrase in an older document knows it is historical.
 
 **Decidability boundary** — The permanent line between the deterministic and semantic layers. Shapes whose intent is unambiguous (declared namespaces, quoted dispatch slots) are checked by a blocking test; shapes that are not (a bare backticked name, which may be a citation, a role, a filename, or ordinary English) stay with `adherence-audit` forever. Widening the deterministic layer past this line trades real findings for false positives, and a gate that emits false positives teaches its readers to ignore it.
 
 **CSO (Claude Search Optimization)** — A set of conventions for making skills discoverable by future Claude instances: `description:` field limited to triggering conditions only (no workflow summary), rich keyword coverage, active-voice verb-first naming, and token-efficient bodies.
 
-**Hard gate** — The mandatory ambiguity check in `creating-tools` before any routing decision is made. If the artifact type cannot be determined from the user's message, `creating-tools` asks exactly one clarifying question and waits. It does not guess.
+**Hard gate** — The ambiguity check in `creating-tools` §0, before any authoring begins. If the artifact type cannot be determined from the user's message, the skill asks exactly one clarifying question and waits. It does not guess: a wrong type costs the author a full rewrite, and the question costs one turn. Unchanged by the collapse — what it gates is now the choice of reference file rather than the choice of skill to dispatch.
 
 **Integrated (plugin state)** — A plugin whose sub-skills are suppressed from direct invocation and must be accessed exclusively through `creating-tools`. **No plugin currently holds this state**, and the always-on rule that enforced it was deleted with the last one. Retained in the lifecycle vocabulary (`plugins/registry.md`) as a legal transition, not a current fact.
 
-**Iron Law** — The inviolable constraint shared by `writing-skills` and `writing-agents`: no skill content before a failing baseline test; no system prompt before a bare baseline invocation. Applies to edits as well as new files.
+**Iron Law** — The inviolable constraint in `creating-tools` §1: no component content before an observed failure. For a skill that means a failing baseline pressure run; for an agent, a bare baseline invocation with no system prompt loaded. Applies to edits as well as new files, and has no size exemption — "it is only a small addition" is where it is broken most often.
 
 **Pulser** — The structural quality CLI for skills. Evaluates a skill against Anthropic's 7 authoring principles. Pulser is a floor, not a ceiling: a passing result means the skill is structurally sound, not that it produces correct agent behavior.
 

@@ -45,7 +45,7 @@
 | skill | architecture-decision-records |  | Write and maintain Architecture Decision Records (ADRs) following best practices for technical decis |
 | skill | brainstorming |  | Use when designing a new feature, planning a significant refactor, or exploring solution approaches  |
 | skill | changelog-automation |  | Automate changelog generation from commits, PRs, and releases following Keep a Changelog format. Use |
-| skill | creating-tools |  | Use when creating any workflow component — skill, agent, rule, hook, command, or plugin. Routes to t |
+| skill | creating-tools |  | Use when creating, editing, or debugging anything that steers Claude itself — a skill, subagent, rul |
 | skill | different-viewpoint |  | Thinking tool — full CIA Phoenix Checklist sweep on a problem. Takes a problem statement and an opti |
 | skill | different-viewpoints-lite |  | Thinking tool — adversarial 5-question Phoenix Checklist challenge against a problem and optional hy |
 | skill | dispatching-parallel-agents |  | Use when dispatching 2+ agent tasks as a regulated fan-out — parallel independent work, a sequential |
@@ -79,7 +79,4 @@
 | skill | vet-install |  | Use when the workflow or Claude is about to install a tool and needs to vet it before proceeding. En |
 | skill | vet-reputation |  | Use when you need to assess whether an open-source tool is reputable, well-maintained, and trustwort |
 | skill | vet-security |  | Use when you need to scan a finalist tool for malware or known CVEs before installing it. Gate 3 of  |
-| skill | writing-agents |  | Applies TDD to agent system prompts — baseline invocation first, then a prompt targeting the observe |
 | skill | writing-plans |  | Use when you have a spec or requirements for a multi-step task, before touching code — produces a pl |
-| skill | writing-rules |  | Authors rules files and decides their scope. Use when creating a new rules file, deciding whether a  |
-| skill | writing-skills |  | Use when creating new skills, editing existing skills, or verifying skills work before deployment —  |

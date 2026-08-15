@@ -55,7 +55,7 @@ Governs the response pattern once review feedback arrives: read completely befor
 
 **`review-workflow`** (`skills/review-workflow/SKILL.md`)
 
-Periodic meta-skill that operates on accumulated `workflow-friction` GitHub issues in `TeamClyde/clydes_claude`. Multi-step process: load issues, group and surface merge candidates, run Explore scans per high-signal item (capped at three dispatches), size the fix (M-sized triggers `different-viewpoint`, minor tweaks do not), propose three angles (targeted / root-cause / structural), execute approved fixes via the correct routing table, run an adversarial review, commit via `git-manager`. Fixes are routed to `writing-skills`, `creating-tools`, or direct edits depending on the component type.
+Periodic meta-skill that operates on accumulated `workflow-friction` GitHub issues in `TeamClyde/clydes_claude`. Multi-step process: load issues, group and surface merge candidates, run Explore scans per high-signal item (capped at three dispatches), size the fix (M-sized triggers `different-viewpoint`, minor tweaks do not), propose three angles (targeted / root-cause / structural), execute approved fixes via the correct routing table, run an adversarial review, commit via `git-manager`. Fixes are routed to `creating-tools` or to direct edits depending on the component type.
 
 ## Runtime View
 
@@ -160,7 +160,7 @@ workflow-friction issues accumulate in GitHub (via feedback skill)
 - `dispatching-parallel-agents` (skill) — invoked by `systematic-debugging` when three or more hypotheses need simultaneous investigation; also the home of the canonical tiered-adversarial verify protocol (`references/verify-protocol.md`) consumed by all fan-out-bearing skills in this feature.
 - `test-driven-development` (skill) — `systematic-debugging` Phase 4 delegates failing-test creation to this skill.
 - `different-viewpoint` (skill) — invoked by `review-workflow` when a fix is M-sized.
-- `writing-skills` / `creating-tools` (skills) — invoked by `review-workflow` when a skill update or new skill is approved.
+- `creating-tools` (skill) — invoked by `review-workflow` when a skill update or new skill is approved.
 - `git-manager` (skill) — invoked by `review-workflow` to commit workflow improvements.
 - `feedback` (skill) — upstream producer of `workflow-friction` GitHub issues that `review-workflow` consumes.
 

@@ -9,7 +9,7 @@
 **Key files:**
   - `docs/reference/component-inventory.md` — generated roster of all skills + agents
   - `rules/new-repo-setup.md` — agent/skill registry + invocation conventions
-  - `skills/writing-skills/SKILL.md`, `skills/writing-agents/SKILL.md` — authoring contracts
+  - `skills/creating-tools/SKILL.md` and its `references/` — the authoring contract for every component type
 ---
 
 # Agents & Skills

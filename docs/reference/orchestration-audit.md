@@ -5,6 +5,17 @@
 > **Diagnose + triage only** — every fix flows out as a scoped follow-on plan.
 > Run: `wf_e1556a7c-cbe`, 2026-06-19. **Partial run** — see *Run & coverage* below.
 
+> **Snapshot notice, added 2026-08-14.** This document is a dated measurement, not a maintained
+> view of the current graph. The authoring-layer collapse retired `writing-skills`,
+> `writing-agents` and `writing-rules` and folded their content into a single self-contained
+> `creating-tools`; the graph it was measured against has since gone from 140 edges / 76
+> components to **215 edges / 76 components**. Every row and bullet naming one of the three
+> carries a `[retired 2026-08-14]` marker and is kept deliberately — deleting a measurement
+> because its subject no longer exists would falsify the run, and the finding it recorded (a
+> router whose enforcement labels disagreed across finders) is part of why the collapse
+> happened. Read a marked row as *"this was true of the graph on 2026-06-19"*, never as a
+> current fact or an action item.
+
 ## Run & coverage (read first)
 
 The audit ran as a skill/main-context-orchestrated Workflow fan-out wrapped in the
@@ -128,7 +139,7 @@ flowchart TD
 
 ### Edges with conflicting finder enforcement labels (56)
 
-- `creating-tools->writing-skills` — hard / soft
+- `creating-tools->writing-skills` — hard / soft  **[retired 2026-08-14]**
 - `doc-author->architecture-decision-records` — soft / none-yet
 - `doc-backfill->architecture-decision-records` — soft / none-yet
 - `doc-backfill->git-manager` — hard / soft
@@ -146,8 +157,8 @@ flowchart TD
 - `new-repo-setup->researcher` — soft / none-yet
 - `new-repo-setup->test-builder` — soft / none-yet
 - `new-repo-setup->test-strategy` — soft / none-yet
-- `new-repo-setup->writing-agents` — soft / none-yet
-- `new-repo-setup->writing-rules` — soft / none-yet
+- `new-repo-setup->writing-agents` — soft / none-yet  **[retired 2026-08-14]**
+- `new-repo-setup->writing-rules` — soft / none-yet  **[retired 2026-08-14]**
 - `plan-gate->executing-plans` — hard / soft
 - `plan-gate->test-strategy` — soft / hard
 - `plan-management->doc-author` — soft / hard
@@ -158,7 +169,7 @@ flowchart TD
 - `planning->test-strategy` — soft / hard
 - `project-setup->infra-init` — hard / soft
 - `review-workflow->creating-tools` — hard / soft
-- `review-workflow->writing-skills` — hard / soft
+- `review-workflow->writing-skills` — hard / soft  **[retired 2026-08-14]**
 - `stack-hats->project-setup` — soft / none-yet
 - `subagent-driven-development->researcher` — soft / none-yet
 - `subagent-driven-development->systematic-debugging` — soft / hard
@@ -182,8 +193,8 @@ flowchart TD
 - `writing-plans->executing-plans` — none-yet / soft
 - `writing-plans->finishing-a-development-branch` — soft / none-yet
 - `writing-plans->subagent-driven-development` — soft / none-yet
-- `writing-plans->writing-agents` — soft / none-yet
-- `writing-plans->writing-skills` — soft / none-yet
+- `writing-plans->writing-agents` — soft / none-yet  **[retired 2026-08-14]**
+- `writing-plans->writing-skills` — soft / none-yet  **[retired 2026-08-14]**
 
 ## Confirmed findings (15, 3-vote quorum)
 
@@ -240,7 +251,12 @@ Each skill prescribes a `Skill{}`/`Agent{}` call its frontmatter `allowed-tools`
 
 **6 of 40 skills use lowercase `skill.md`**; the other 34 use `SKILL.md`:
 `adherence-audit`, `creating-tools`, `different-viewpoint`, `different-viewpoints-lite`,
-`writing-agents`, `writing-rules`. On the case-insensitive Windows FS this is invisible, but on a
+`writing-agents`, `writing-rules`. **[Snapshot — no longer true as of 2026-08-14.** Two of the
+six named here (`writing-agents`, `writing-rules`) were retired with the authoring-layer
+collapse, and re-measuring the index today (`git ls-files skills/`) returns **39 of 39 skills on
+`SKILL.md`, zero lowercase** — so this finding is closed, by some combination of fixes landed
+between the run and now and the two deletions. Kept as the measurement that motivated the fix,
+not as an open item.**] On the case-insensitive Windows FS this is invisible, but on a
 case-sensitive CI (Linux/macOS) a reference with the wrong casing is a **broken path** — and
 several findings above cite lowercase `…/skill.md` for skills git tracks as `SKILL.md`
 (e.g. `review-workflow`), so the inconsistency compounds the dead-reference risk. Standardize to
@@ -289,9 +305,9 @@ flowchart LR
 | architect | researcher | soft | matured | no | high |  |
 | brainstorming | researcher | soft | matured | no | high |  |
 | brainstorming | writing-plans | hard | matured | already | high |  |
-| creating-tools | writing-agents | soft | matured | yes | high |  |
-| creating-tools | writing-rules | soft | matured | yes | high |  |
-| creating-tools | writing-skills | soft | matured | already | high | conflict: hard/soft |
+| creating-tools | writing-agents | soft | matured | yes | high | retired 2026-08-14 |
+| creating-tools | writing-rules | soft | matured | yes | high | retired 2026-08-14 |
+| creating-tools | writing-skills | soft | matured | already | high | conflict: hard/soft; retired 2026-08-14 |
 | doc-author | architecture-decision-records | none-yet | matured | no | high | conflict: soft/none-yet |
 | doc-author | docs-architect | soft | matured | no | high |  |
 | doc-author | git-manager | none-yet | matured | no | high |  |
@@ -337,8 +353,8 @@ flowchart LR
 | new-repo-setup | researcher | soft | matured | no | high | conflict: soft/none-yet |
 | new-repo-setup | test-builder | soft | matured | already | high | conflict: soft/none-yet |
 | new-repo-setup | test-strategy | soft | matured | no | high | conflict: soft/none-yet |
-| new-repo-setup | writing-agents | soft | matured | no | high | conflict: soft/none-yet |
-| new-repo-setup | writing-rules | soft | matured | already | high | conflict: soft/none-yet |
+| new-repo-setup | writing-agents | soft | matured | no | high | conflict: soft/none-yet; retired 2026-08-14 |
+| new-repo-setup | writing-rules | soft | matured | already | high | conflict: soft/none-yet; retired 2026-08-14 |
 | plan-docs | brainstorming | none-yet | matured | no | high |  |
 | plan-docs | finishing-a-development-branch | soft | matured | no | high |  |
 | plan-docs | plan-gate | soft | matured | already | high |  |
@@ -375,7 +391,7 @@ flowchart LR
 | review-workflow | creating-tools | hard | matured | already | high | conflict: hard/soft |
 | review-workflow | different-viewpoint | soft | settling | yes | high |  |
 | review-workflow | git-manager | soft | matured | already | high |  |
-| review-workflow | writing-skills | hard | matured | already | high | conflict: hard/soft |
+| review-workflow | writing-skills | hard | matured | already | high | conflict: hard/soft; retired 2026-08-14 |
 | stack-hats | architect | soft | matured | no | high |  |
 | stack-hats | executing-plans | soft | matured | no | high |  |
 | stack-hats | project-setup | soft | matured | no | high | conflict: soft/none-yet |
@@ -419,9 +435,9 @@ flowchart LR
 | writing-plans | git-manager | soft | matured | yes | high |  |
 | writing-plans | researcher | soft | matured | no | high |  |
 | writing-plans | subagent-driven-development | soft | matured | no | high | conflict: soft/none-yet |
-| writing-plans | writing-agents | none-yet | settling | no | medium | conflict: soft/none-yet |
-| writing-plans | writing-rules | none-yet | settling | no | medium |  |
-| writing-plans | writing-skills | none-yet | settling | no | medium | conflict: soft/none-yet |
-| writing-rules | writing-agents | soft | matured | no | high |  |
-| writing-rules | writing-skills | soft | matured | no | high |  |
-| writing-skills | creating-tools | soft | matured | no | high |  |
+| writing-plans | writing-agents | none-yet | settling | no | medium | conflict: soft/none-yet; retired 2026-08-14 |
+| writing-plans | writing-rules | none-yet | settling | no | medium | retired 2026-08-14 |
+| writing-plans | writing-skills | none-yet | settling | no | medium | conflict: soft/none-yet; retired 2026-08-14 |
+| writing-rules | writing-agents | soft | matured | no | high | retired 2026-08-14 |
+| writing-rules | writing-skills | soft | matured | no | high | retired 2026-08-14 |
+| writing-skills | creating-tools | soft | matured | no | high | retired 2026-08-14 |

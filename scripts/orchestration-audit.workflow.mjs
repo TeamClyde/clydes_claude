@@ -877,7 +877,7 @@ const CLUSTERS = {
   planning: ['brainstorming','writing-plans','plan-gate','plan-management','planning','executing-plans','subagent-driven-development','architect','test-strategy','test-builder','test-runner'],
   vetting:  ['install-vetting','vet-install','vet-reputation','vet-capability-fit','vet-security','ai-tool-security-reviewer'],
   gitjira:  ['git-manager','jira-workflow-manager','workflow-phases','mcp-governance','secrets-handling','finishing-a-development-branch'],
-  setup:    ['new-repo-setup','project-setup','infra-init','e2e-init','using-superpowers','creating-tools','writing-skills','writing-agents','writing-rules','stack-hats'],
+  setup:    ['new-repo-setup','project-setup','infra-init','e2e-init','using-superpowers','creating-tools','stack-hats'],
   debug:    ['systematic-debugging','integration-test-constraints','dispatching-parallel-agents'],
 };
 function finderJobs() {
