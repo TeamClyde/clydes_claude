@@ -1361,10 +1361,19 @@ const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf = 6, now, c
 // Floor because a fractional cap reaches parallelFanout's chunk() as a fractional slice size.
 const MAX_CONCURRENT = (cap && cap > 0) ? Math.min(Math.floor(cap), 16) : 8;
 // maxSearchesPerLeaf: appends a "search at most N times then synthesize" instruction to the
-// research-leaf prompt. DEFAULTED, not optional. Measured on run wf_cd105af0-fab with the value
-// unset: research leaves averaged 33 turns and 29 tool calls, re-reading 1.52M tokens of context
-// per 6k of output — a 250:1 ratio, and 68% of the entire run's cache reads. A caller may raise it
-// for an unusually broad topic; leaving it unset is what cost that run ~24M tokens.
+// research-leaf prompt. DEFAULTED, not optional.
+//
+// Measured on run wf_cd105af0-fab with the value unset, via scripts/measure-workflow-run.mjs:
+// 15 research leaves ran 214 turns and 448 tool calls between them — ~14 turns and ~30 tool calls
+// EACH — re-reading 9.84M tokens of context to produce 85K of output. That is a 116:1 read-to-write
+// ratio and 73% of the entire run's cache reads, from 16% of its agents.
+//
+// (Figures corrected 2026-08-14. Earlier comments here cited 1.52M per leaf, 250:1, 68% and ~24M
+// run-wide. Those came from a transcript reader that summed each message's usage once per content
+// block, inflating every token figure ~2.7x. The argument was never in doubt; the numbers were.)
+//
+// A caller may raise it for an unusually broad topic. Leaving it unset is what made research the
+// single most expensive phase of that run.
 if (!Array.isArray(subQuestions) || subQuestions.length === 0) {
   throw new TypeError('librarian: args.subQuestions must be a non-empty string[]');
 }
