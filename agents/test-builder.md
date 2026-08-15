@@ -93,6 +93,10 @@ Per platform:
 
 Each test must be traceable to a specific checklist item in the Testing section. Use the checklist item text as the test description or test name when the framework allows it.
 
+### Source-text assertions
+
+When a module genuinely cannot be imported and the only available test is an assertion against its source text, follow `rules/source-text-assertions.md`. Bound every region at both ends and assert both markers resolve before slicing — an unguarded `indexOf` reaching `slice()` or a `<` comparison produces a false PASS, not a failure, which is the one outcome this agent must never ship.
+
 ### Untestable scenarios
 
 If a scenario from the Testing section cannot be implemented as a runnable test with the available framework and conventions, do not approximate. Flag it as a gap in your status summary. Do not write a test that partially covers the scenario and report it as covered. Fail loudly, not silently.

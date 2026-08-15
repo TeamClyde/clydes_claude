@@ -236,6 +236,13 @@
   },
   {
     "type": "rule",
+    "name": "source-text-assertions",
+    "description": "Tests that assert against a file's own source text (rather than importing it) are legitimate when the module cannot be imported — e.g. a Workflow bundle that reads top-level globals and ends in a top-level `return`. They fail silently in th",
+    "title": "Source-Text Assertions — Guarding `indexOf`",
+    "file": "rules/source-text-assertions.md"
+  },
+  {
+    "type": "rule",
     "name": "stack-hats",
     "description": "A **stack hat** is specialist best-practice + tooling guidance for a technology (Python, React, C/C++, …), layered on top of SE-fundamentals — never replacing them. Hats compose: a Python+React repo wears both.",
     "title": "Stack Hats — Per-Stack Best-Practice Layer",

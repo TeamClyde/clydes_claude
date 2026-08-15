@@ -11,7 +11,9 @@ import { fileURLToPath } from 'node:url';
 const SRC = readFileSync(fileURLToPath(new URL('./librarian.workflow.mjs', import.meta.url)), 'utf8');
 // Consumer body only — everything after the generated blocks. Asserting against the whole file
 // would match text inside the inlined librarian-core copy and pass vacuously.
-const BODY = SRC.slice(SRC.indexOf('// <LIBRARIAN-CORE:end>'));
+const bodyStart = SRC.indexOf('// <LIBRARIAN-CORE:end>');
+if (bodyStart === -1) throw new Error('LIBRARIAN-CORE end marker missing — run `npm run build:engine`');
+const BODY = SRC.slice(bodyStart);
 
 test('the LIBRARIAN-CORE marker pair is present and non-empty', () => {
   const start = SRC.indexOf('// <LIBRARIAN-CORE:start>');
@@ -49,7 +51,7 @@ test('the coverage gate early-returns rather than falling through', () => {
 test('the evidence floor runs after verify and before the synthesis phase', () => {
   const floorIdx = BODY.indexOf("stoppedAt: 'evidence-floor'");
   const synthIdx = BODY.indexOf("phase('Synthesize')");
-  assert.ok(floorIdx !== -1, 'evidence floor must exist');
+  assert.ok(floorIdx !== -1 && synthIdx !== -1, 'both the evidence floor and the synthesis phase must exist');
   assert.ok(floorIdx < synthIdx, 'nothing may reach synthesis over an empty vetted set');
 });
 
@@ -123,7 +125,10 @@ test('the section validation budget is 2, read from one named constant', () => {
 });
 
 test('the no-publish constraint is on the SECTION prompt, not only the assembly stage (#152.3)', () => {
-  const sectionPromptBlock = BODY.slice(BODY.indexOf('const sectionPrompt'), BODY.indexOf('const SECTION_VALIDATION_RETRIES'));
+  const spStart = BODY.indexOf('const sectionPrompt');
+  const spEnd   = BODY.indexOf('const SECTION_VALIDATION_RETRIES');
+  assert.ok(spStart !== -1 && spEnd > spStart, 'sectionPrompt block markers must resolve');
+  const sectionPromptBlock = BODY.slice(spStart, spEnd);
   // Matched within a single template literal. The plan asserted the full sentence
   // "Do NOT publish it, do NOT create or update an Artifact", which spans a concatenation
   // boundary (`…do NOT create or ` + `update an Artifact…`) and therefore never appears
@@ -167,8 +172,10 @@ test('BOTH gap classes reach the dossier entry — coverage.missing is not enoug
   // "### Unanswered" from coverage.missing, which is computed from FINDINGS — so a sub-question
   // whose research succeeded but whose section writer was abandoned is absent from it. Passing only
   // coverage would drop that sub-question from the entry while the coverage line still claims it.
-  const call = BODY.slice(BODY.indexOf('const dossierEntry = renderDossierEntry({'), BODY.indexOf('const findingsDoc ='));
-  assert.ok(call.length > 0, 'the renderDossierEntry call must resolve');
+  const callStart = BODY.indexOf('const dossierEntry = renderDossierEntry({');
+  const callEnd   = BODY.indexOf('const findingsDoc =');
+  assert.ok(callStart !== -1 && callEnd > callStart, 'the renderDossierEntry call markers must resolve');
+  const call = BODY.slice(callStart, callEnd);
   assert.match(call, /^\s*coverage,$/m, 'coverage carries the no-findings gaps');
   assert.match(call, /^\s*missingSections,$/m, 'missingSections carries the failed-write-up gaps');
 });
@@ -258,7 +265,10 @@ test('the supersession pass is skipped entirely on a new topic', () => {
 });
 
 test('supersession compares claims to claims, so its input does not grow with dossier length', () => {
-  const block = BODY.slice(BODY.indexOf('const priorDigest'), BODY.indexOf("label: 'synth:supersede'"));
+  const pdStart = BODY.indexOf('const priorDigest');
+  const pdEnd   = BODY.indexOf("label: 'synth:supersede'");
+  assert.ok(pdStart !== -1 && pdEnd > pdStart, 'the supersession block markers must resolve');
+  const block = BODY.slice(pdStart, pdEnd);
   assert.match(block, /\.map\(\(f\) => \(\{ runDate: f\.runDate, claim: f\.claim \}\)\)/);
   assert.doesNotMatch(block, /markdown/);
 });
@@ -574,4 +584,13 @@ test('findings.json and the Evidence table keep the FULL reframe stamp — the p
   assert.match(BODY, /findings: vetted, supersedes, integrity/, 'findings.json is built from `vetted`');
   assert.match(BODY, /findings: sectionMap\.get\(sec\.subQuestion\) \?\? \[\]/,
     'the Evidence table renders from `sectionMap`, not from the projected `sections`');
+});
+
+test('every source-text region in this file is guarded before slicing', () => {
+  const SELF = readFileSync(fileURLToPath(new URL('./librarian.workflow.test.mjs', import.meta.url)), 'utf8');
+  // A `.slice(` whose first argument is an inline `.indexOf(` call has no room for a guard between
+  // the lookup and the use — that is exactly the unguarded shape rules/source-text-assertions.md bans.
+  const inlineSliceIndexOf = SELF.match(/\.slice\(\s*\w+\.indexOf\(/g) ?? [];
+  assert.deepEqual(inlineSliceIndexOf, [],
+    'slice(x.indexOf(...)) is unguarded — hoist the index, assert it resolves, then slice');
 });

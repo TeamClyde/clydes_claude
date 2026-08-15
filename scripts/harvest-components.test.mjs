@@ -85,6 +85,11 @@ const EXPECTED_NEW_EDGES = new Set([
   'filesystem/path-portability|infra-init', 'finishing-a-development-branch|docs-status',
   'install-vetting|ai-tool-security-reviewer', 'integration-engineer|infra-init',
   'vet-install|project-setup',
+  // row 56 — added 2026-08-14 with rules/source-text-assertions.md. test-builder cites the
+  // rule in prose ("follow `rules/source-text-assertions.md`"), which the tokenizer reads and
+  // the legacy explicit-only extractor does not — so the pair is a genuine gain, enumerated
+  // here per the MAINTENANCE CONTRACT rather than absorbed by loosening `unexpected`.
+  'test-builder|source-text-assertions',
 ])
 
 // ADR-0014 MIGRATION. Pairs that were in EXPECTED_NEW_EDGES until the namespace

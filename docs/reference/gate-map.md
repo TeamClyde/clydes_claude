@@ -175,6 +175,7 @@ flowchart LR
   systematic_debugging --> plan_management
   systematic_debugging --> test_driven_development
   test_builder --> git_manager
+  test_builder --> source_text_assertions
   test_runner --> e2e_init
   test_runner --> systematic_debugging
   using_git_worktrees --> finishing_a_development_branch
@@ -396,6 +397,7 @@ flowchart LR
 | systematic-debugging | plan-management |
 | systematic-debugging | test-driven-development |
 | test-builder | git-manager |
+| test-builder | source-text-assertions |
 | test-runner | e2e-init |
 | test-runner | systematic-debugging |
 | using-git-worktrees | finishing-a-development-branch |

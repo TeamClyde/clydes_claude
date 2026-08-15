@@ -39,6 +39,7 @@
 | rule | plan-docs |  | Every top-level plan consists of exactly four files under `plans/<slug>/`: |
 | rule | planning |  | Complete all four phases in order. Do not draft until Phase 3 is resolved. |
 | rule | secrets-handling |  | Never ask the user to paste a secret, token, or password into the chat. A pasted secret enters the t |
+| rule | source-text-assertions |  | Tests that assert against a file's own source text (rather than importing it) are legitimate when th |
 | rule | stack-hats |  | A **stack hat** is specialist best-practice + tooling guidance for a technology (Python, React, C/C+ |
 | rule | workflow-phases |  | This workflow applies to all repositories. Project-specific settings override global defaults. |
 | skill | adherence-audit |  | Use when adding new workflow components, after modifying rules or skills, or periodically to check f |
