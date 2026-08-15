@@ -415,6 +415,11 @@ test('the re-research leaf keeps the anti-memory contract AND the caller-set sea
   assert.match(block, /\(maxSearchesPerLeaf != null \? `Search budget: perform at most \$\{maxSearchesPerLeaf\} WebSearch calls/);
 });
 
+test('maxSearchesPerLeaf defaults in the script, not only in SKILL.md prose', () => {
+  assert.match(BODY, /maxSearchesPerLeaf = 6/,
+    'a caller that omits the arg must still get a bounded search budget');
+});
+
 test('the reframe stage runs before the evidence floor, so a rescue is counted', () => {
   // PRE-FLIGHTED 2026-08-06. Both indices are asserted present BEFORE they are compared. The plan's
   // form was the bare ordering comparison, which passes vacuously: `indexOf` returns -1 when the

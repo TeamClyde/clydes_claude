@@ -1248,7 +1248,7 @@ if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing
 // robust to both object and stringified delivery — the front-door exemplar must not
 // assume the happy path.
 const input = typeof args === 'string' ? JSON.parse(args) : args;
-const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf, now, cap } = input;
+const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf = 6, now, cap } = input;
 // `now` (ISO string) is the ONLY time source: Date.now(), Math.random(), and an argless `new Date()`
 // all THROW in the Workflow sandbox — they would break run resumption, so the sandbox forbids them.
 // Main context computes the timestamp and passes it in.
@@ -1263,9 +1263,11 @@ const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf, now, cap }
 // queue them while their watchdogs already tick, which is the failure the note above describes.
 // Floor because a fractional cap reaches parallelFanout's chunk() as a fractional slice size.
 const MAX_CONCURRENT = (cap && cap > 0) ? Math.min(Math.floor(cap), 16) : 8;
-// maxSearchesPerLeaf: when set, appends a "search at most N times then synthesize" instruction to the
-// research-leaf prompt. Measure actual token spend before lowering — a tight cap can cut recall on
-// deep sub-questions. Default: unset (no cap); generous is better than aggressive for quality.
+// maxSearchesPerLeaf: appends a "search at most N times then synthesize" instruction to the
+// research-leaf prompt. DEFAULTED, not optional. Measured on run wf_cd105af0-fab with the value
+// unset: research leaves averaged 33 turns and 29 tool calls, re-reading 1.52M tokens of context
+// per 6k of output — a 250:1 ratio, and 68% of the entire run's cache reads. A caller may raise it
+// for an unusually broad topic; leaving it unset is what cost that run ~24M tokens.
 if (!Array.isArray(subQuestions) || subQuestions.length === 0) {
   throw new TypeError('librarian: args.subQuestions must be a non-empty string[]');
 }

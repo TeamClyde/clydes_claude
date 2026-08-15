@@ -55,9 +55,14 @@ Use when the user asks for:
    - Compute `args.now` (ISO date, e.g. `2026-08-05`) and `args.cap` = `min(16, cores − 2)`.
      The sandbox cannot compute either: `Date.now()` throws, and `os.cpus()` is unavailable.
 5. **Workflow tool** — invoke the script via the Workflow tool (requires user opt-in), passing
-   `{ brief, subQuestions, now, cap, priorFindings?, seedText? }` as `args`. Set `scriptPath` to an
+   `{ brief, subQuestions, now, cap, maxSearchesPerLeaf?, leafModel?, priorFindings?, seedText? }`
+   as `args`. Set `scriptPath` to an
    **absolute** path: the *Base directory for this skill* joined with `librarian.workflow.mjs`.
    Never a cwd-relative `scripts/...` path — that resolves only inside the workflow repo.
+
+   > `maxSearchesPerLeaf` defaults to `6` in the script. Raise it only for an unusually broad topic.
+   > Unbounded searching is the run's single largest cost — measured at ~250 tokens of re-read context
+   > per token of output.
 6. **Adversarial verify + synthesis** happen inside the workflow. Section writers produce prose
    only; every URL, support label, and flag is rendered by CODE from the findings.
 7. **Write the artifacts.** The workflow writes nothing — the sandbox has no filesystem. Write
