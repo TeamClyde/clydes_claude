@@ -303,6 +303,27 @@ test('the excise repairs the object the caller already holds', () => {
   assert.match(BODY.slice(start, end), /v\.markdown = excised\.value\.markdown;/);
 });
 
+// ── Task 13 — Haiku auditor + output cap ────────────────────────────────────
+
+test('the Haiku auditor pin is never present without the excise loop that contains it', () => {
+  // Safe to match `exciseGuard(` HERE, unlike Task 13's Step 0 shell gate: BODY is sliced FROM the
+  // `// <LIBRARIAN-CORE:end>` marker, so the inlined librarian-core definitions sit before it and
+  // are excluded. Only the consumer body is searched, where `exciseGuard(` appears solely as
+  // Task 11's call site. Do not "fix" this to match the shell guard — they search different text.
+  assert.match(BODY, /exciseGuard\(/,
+    'Task 11 must land first — an over-flagging Haiku auditor without excision is worse than today');
+});
+
+test('the traceability auditor is pinned to Haiku and its output is capped', () => {
+  const start = BODY.indexOf('You are auditing a research section');
+  assert.ok(start !== -1, 'audit prompt must resolve');
+  const end = BODY.indexOf('const bad =', start);
+  assert.ok(end > start, 'audit block end must resolve');
+  const block = BODY.slice(start, end);
+  assert.match(block, /claude-haiku/, 'closed text comparison does not need Sonnet');
+  assert.match(block, /at most 5/, 'the auditor must be capped — 5.7k output per call measured');
+});
+
 // ── Task 12 — depth vs traceability ─────────────────────────────────────────
 
 test('the section prompt resolves depth against the findings, not against model knowledge', () => {

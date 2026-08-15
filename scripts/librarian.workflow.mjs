@@ -1889,9 +1889,13 @@ const sectionUnits = sections.map((section) => {
           `You are auditing a research section for traceability. For EVERY factual claim in the PROSE, ` +
           `decide whether it is supported by the FINDINGS below. Return ONLY the claims that are NOT ` +
           `traceable — an empty array means every claim traces. Do NOT research, do NOT judge whether ` +
-          `a claim is TRUE in the world; judge only whether these findings say it. Terse.\n\n` +
+          `a claim is TRUE in the world; judge only whether these findings say it. Return at most 5 ` +
+          `claims, the least traceable first. One short sentence per reason.\n\n` +
           `PROSE:\n${v.markdown}\n\nFINDINGS: ${JSON.stringify(section.findings)}`,
-          { label: `audit:${section.subQuestion.slice(0, 40)}`, phase: 'Synthesize', schema: AUDIT_SCHEMA, model: 'claude-sonnet-4-6' }),
+          // Haiku: this is closed text comparison against material already in hand, not judgment
+          // about the world. Over-flagging is contained by the excise loop (Task 11), which repairs
+          // a false flag with one cheap edit instead of a full-section rewrite.
+          { label: `audit:${section.subQuestion.slice(0, 40)}`, phase: 'Synthesize', schema: AUDIT_SCHEMA, model: 'claude-haiku-4-5-20251001' }),
         AUDIT_TIMEOUT_MS);
 
       // Fail OPEN, and say so. The audit is an ADDITIONAL check on prose that already passed L1;
