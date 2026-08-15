@@ -45,7 +45,7 @@
 | skill | architecture-decision-records |  | Write and maintain Architecture Decision Records (ADRs) following best practices for technical decis |
 | skill | brainstorming |  | Use when designing a new feature, planning a significant refactor, or exploring solution approaches  |
 | skill | changelog-automation |  | Automate changelog generation from commits, PRs, and releases following Keep a Changelog format. Use |
-| skill | creating-tools |  | Use when creating or editing any workflow component — a skill, agent, rule, hook, or command. Covers |
+| skill | creating-tools |  | Use when creating, editing, or debugging anything that steers Claude itself — a skill, subagent, rul |
 | skill | different-viewpoint |  | Thinking tool — full CIA Phoenix Checklist sweep on a problem. Takes a problem statement and an opti |
 | skill | different-viewpoints-lite |  | Thinking tool — adversarial 5-question Phoenix Checklist challenge against a problem and optional hy |
 | skill | dispatching-parallel-agents |  | Use when dispatching 2+ agent tasks as a regulated fan-out — parallel independent work, a sequential |

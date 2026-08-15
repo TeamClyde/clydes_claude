@@ -1,6 +1,6 @@
 ---
 name: creating-tools
-description: Use when creating or editing any workflow component — a skill, agent, rule, hook, or command. Covers artifact selection, the evaluation-first authoring cycle, type-specific conventions, and the registration gates a new component must satisfy.
+description: Use when creating, editing, or debugging anything that steers Claude itself — a skill, subagent, rule, hook, or /command. Also fires on indirect asks: making an instruction stick that Claude keeps ignoring, running a check automatically before every commit, a hook or SessionStart script that will not fire, deciding whether something belongs in CLAUDE.md or its own file, moving work into an isolated context, or a new component failing the orphan or description-budget gates.
 allowed-tools: Read, Write, Edit, Bash, Agent, Skill
 ---
 
@@ -100,6 +100,13 @@ Skip the cycle only for pure-reference material with no behavior to violate — 
 field inventory. Anything that enforces a discipline or costs the model effort to follow gets
 the full cycle.
 
+**Rules are the one carve-out, and it is not laziness.** A rule enforces a discipline, so the
+sentence above would send you into the cycle — but there is nothing to dispatch a rule *into*.
+It has no trigger and no invocation, so there is no "run it without the guidance" baseline to
+observe: the rule is either in the session or it is not. Rule validation is observational
+instead, and `references/rule-conventions.md` owns what that means. Do not build a pressure
+scenario for a rule; you would be testing the prompt you wrote around it.
+
 Full technique, per artifact type, including the hooks branch (which runs a genuine unit test
 rather than a prose baseline): `references/pressure-testing.md`.
 
@@ -112,7 +119,7 @@ and the component obstructs good judgement; under-specify a fragile one and it f
 | Freedom | Shape of the instruction | Use when |
 |---|---|---|
 | **High** | Goals and heuristics in prose | several approaches are valid and the right one depends on context |
-| **Medium** | A pattern or parameterised template to adapt | a preferred approach exists but variation is acceptable |
+| **Medium** | A pattern or parameterized template to adapt | a preferred approach exists but variation is acceptable |
 | **Low** | One exact command, stated as such | the operation is fragile, order-dependent, or destructive |
 
 At low freedom, say so explicitly — *"run exactly this; do not add flags"* — because an
@@ -147,10 +154,15 @@ does, is spend with no return.
 A new component is not finished when its file is written. Six graph invariants run in the test
 suite, and each one has a specific remediation. **The gates name their own remediation in their
 failure messages, including the exact files to edit** — so work from the failure text, not from
-a path memorised here. That is deliberate: a path written into this file goes stale silently,
+a path memorized here. That is deliberate: a path written into this file goes stale silently,
 and a path read out of the failing assertion cannot.
 
 Work in this order. Each step is cheaper than discovering it from a red suite later.
+
+**Seven steps, six gates** — the counts differ on purpose, so checking off "all six" against a
+seven-item list does not need reconciling. Steps 2, 3, 5 and 6 clear one gate each; step 7 clears
+two (drift and node counts); steps 1 and 4 clear none — step 1 is the mechanic every gate depends
+on, and step 4 explains why step 3 is the one authors most often have to redo.
 
 1. **Stage the file before running the suite.** Every gate enumerates the corpus through the
    git index, not the working tree. An unstaged new file is *invisible* to the gates, so the
@@ -218,6 +230,12 @@ Read the spine above first — all of it applies. Then load exactly one of these
 
 `references/pressure-testing.md` is loaded alongside whichever of the four you picked, at the
 point §1's cycle begins. It carries the skill, agent, and hook branches of the technique.
+
+`references/evaluating.md` is the quantitative counterpart, and is optional — reach for it when
+reading transcripts has stopped settling the question. It covers two measurements with tooling
+under `scripts/`: a paired A/B against a baseline run, for whether the component improves the
+work at all, and a trigger-rate loop, for whether a description actually fires. The second one
+matters most after any description change, and its result usually needs §4 step 2.
 
 ## Common mistakes
 

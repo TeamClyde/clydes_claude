@@ -6,7 +6,7 @@ files it points to. A **command** is not a separate artifact: it is a skill carr
 Everything below applies equally to both.
 
 Deciding whether the behavior you want is a skill at all — versus an agent, a rule, or a hook —
-happens before this file is relevant. See `skills/creating-tools/SKILL.md`'s artifact-selection
+happens before this file is relevant. See `../SKILL.md`'s artifact-selection
 guidance first; everything below assumes that call has already been made.
 
 ## Contents

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve, join } from 'node:path'
+import { dirname, resolve, join, posix } from 'node:path'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SKILL_DIR = 'skills/creating-tools/'
@@ -38,6 +38,7 @@ const OUTSIDE_PATH_EXEMPTIONS = {
   '.claude/hooks/<event>': 'Output path template — where a hook the author is creating gets written.',
   '.claude/commands/<name>': 'Output path template — the legacy command location, named only to explain that a command IS a skill.',
   '.claude/skills/<name>': 'Output path template — the user-level skill location, paired with the line above.',
+  '<workspace>': 'Output path template — the scratch directory the evaluation suites write runs, gradings and benchmarks into. Every span under it is a file the tooling CREATES, never one the skill reads. Safe as a leading placeholder even though the template rule above asks for a trailing one: nothing concrete can begin with `<workspace>`, so unlike a bare directory prefix this key cannot widen to cover a real read-citation.',
   '.claude/settings.json': 'Output path — the single concrete file a new hook must be wired into.',
   'docs/reference/skill-surface-policy.json': 'Output path — the single concrete file a new component\'s entryPoints declaration must be written into. Parallel to the .claude/settings.json entry above: a registration target the author edits, not a guidance file the skill reads.',
 }
@@ -88,9 +89,38 @@ test('every path skills/creating-tools/ reads resolves inside its own directory'
     src.split('\n').forEach((text, i) => {
       for (const m of text.matchAll(PATH_SPAN)) {
         const p = m[1]
-        // Relative sibling reference — resolves inside the directory by construction.
-        if (!p.includes('/') || p.startsWith('references/')) continue
-        if (p.startsWith(SKILL_DIR)) continue
+        // Explicitly relative — resolve against the CITING FILE's directory, which is the
+        // only reading that survives the directory being copied somewhere else. A `../`
+        // that climbs out of SKILL_DIR is a real escape and is reported as one.
+        if (p.startsWith('./') || p.startsWith('../')) {
+          const resolved = posix.normalize(posix.join(posix.dirname(file), p))
+          if (resolved.startsWith(SKILL_DIR)) continue
+          violations.push(`${file}:${i + 1}  \`${p}\` — relative path escapes the directory (resolves to ${resolved})`)
+          continue
+        }
+        // Sibling directories of SKILL.md. THE CONVENTION: a path naming something inside this
+        // skill is written relative to the SKILL ROOT, from anywhere in the directory — so
+        // `scripts/run_loop.py` means the same thing whether SKILL.md or a references/ file
+        // wrote it. Only these three prefixes exist, so the allowance cannot widen; a fourth
+        // directory means adding it here deliberately. (Resolving these against the citing
+        // file's own directory instead was rejected: `rules/<name>.md` would then resolve to
+        // an imaginary skills/creating-tools/rules/ and pass as "inside", turning a genuine
+        // outside-path escape into a silent allow — the exact failure this gate exists to stop.)
+        if (!p.includes('/')
+          || p.startsWith('references/')
+          || p.startsWith('scripts/')
+          || p.startsWith('assets/')) continue
+        // A self-reference written from the REPO ROOT is the trap this gate used to whitelist:
+        // `skills/creating-tools/SKILL.md` resolves only while the directory keeps that exact
+        // path, so it breaks the moment the directory is copied or zipped on its own — the one
+        // thing this gate exists to guarantee. Prefix-matching SKILL_DIR made it structurally
+        // invisible: the span looked "inside" because its text started with the directory name.
+        // The relative form (`../SKILL.md`) survives the copy, so absolute self-reference is a
+        // violation with a fix, not an exemption.
+        if (p.startsWith(SKILL_DIR)) {
+          violations.push(`${file}:${i + 1}  \`${p}\` — repo-root path to its own directory; use a path relative to this file instead`)
+          continue
+        }
         const exempt = Object.keys(OUTSIDE_PATH_EXEMPTIONS).some(k => p.startsWith(k))
         if (exempt) continue
         violations.push(`${file}:${i + 1}  \`${p}\``)

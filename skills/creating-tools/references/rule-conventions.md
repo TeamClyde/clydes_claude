@@ -7,7 +7,7 @@ whenever its `paths:` pattern matches — and that always-on nature is what its 
 account for.
 
 Deciding whether the constraint you're documenting should be a rule at all — versus a skill, an
-agent, or a hook — happens before this file is relevant. See `skills/creating-tools/SKILL.md`'s
+agent, or a hook — happens before this file is relevant. See `../SKILL.md`'s
 artifact-selection guidance first; everything below assumes that call has already been made.
 
 ## Contents

@@ -276,7 +276,7 @@
     {
       "type": "skill",
       "name": "creating-tools",
-      "description": "Use when creating or editing any workflow component — a skill, agent, rule, hook, or command. Covers artifact selection, the evaluation-first authoring cycle, type-specific conventions, and the registration gates a new component must satisfy.",
+      "description": "Use when creating, editing, or debugging anything that steers Claude itself — a skill, subagent, rule, hook, or /command. Also fires on indirect asks: making an instruction stick that Claude keeps ignoring, running a check automatically before every commit, a hook or SessionStart script that will not fire, deciding whether something belongs in CLAUDE.md or its own file, moving work into an isolated context, or a new component failing the orphan or description-budget gates.",
       "file": "skills/creating-tools/SKILL.md"
     },
     {

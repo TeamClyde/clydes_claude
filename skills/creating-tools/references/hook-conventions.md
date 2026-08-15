@@ -21,7 +21,7 @@ the user's work until someone notices. Both failures are quiet, which is why tes
 the most space below.
 
 Deciding whether the behavior you want is a hook at all — versus a skill, an agent, or a rule —
-happens upstream, in `skills/creating-tools/SKILL.md`'s artifact-selection guidance. This file
+happens upstream, in `../SKILL.md`'s artifact-selection guidance. This file
 assumes the spine has already routed you here; the checklist that opens the next section is a
 confirmation check against that routing, not a fresh decision, and everything after it covers only
 the hook-specific half.
@@ -359,7 +359,7 @@ generated gate map under `docs/reference/`. It just never arrives by citation. I
 genuinely referenced by a gate or another structured map, declare nothing — the edge already
 exists.
 
-The spine's authoring checklist in `skills/creating-tools/SKILL.md` mirrors this step. It is the
+The spine's authoring checklist in `../SKILL.md` mirrors this step. It is the
 last thing to do, after the hook is tested and wired, and it is the step most often forgotten
 because the gate that catches it runs somewhere else.
 

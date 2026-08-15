@@ -121,9 +121,22 @@
       "fewer skills: 42 -> 39. Lowering is the same deliberate act as raising and belongs in the same",
       "commit as the deletion -- a ceiling left at 13442 would have silently granted 653 chars of",
       "unearned slack, which is exactly the drift this number exists to catch. Headroom stays 4 on",
-      "purpose, so the next unplanned growth still fails at once."
+      "purpose, so the next unplanned growth still fails at once.",
+      "",
+      "RAISED 2026-08-14: ceiling 12793 -> 13028, measured baseline 12789 -> 13024 (+235).",
+      "creating-tools' description went 242 -> 477 chars. This is the first raise on this repo made",
+      "against a MEASUREMENT rather than a judgement call. The 242-char version was measured at",
+      "1/10 on should-trigger queries and 10/10 on should-not-trigger: perfect precision, ~10%",
+      "recall. It matched the artifact NOUNS ('a skill, agent, rule, hook') and missed every",
+      "oblique phrasing -- an instruction Claude keeps ignoring, a check that should run before",
+      "every commit, a SessionStart script that will not fire, a gate failure. Those are the modal",
+      "way the skill is actually reached, and it is the failure mode with no error and no red suite.",
+      "The extra 235 chars are trigger surface bought deliberately: one skill now has to fire for",
+      "skill, agent, rule AND hook intent, where four descriptions used to share that load, and the",
+      "collapse added no trigger surface to compensate. Method and re-measurement in",
+      "skills/creating-tools/references/evaluating.md. Headroom stays 4."
     ],
-    "totalDescriptionChars": 12793,
+    "totalDescriptionChars": 13028,
     "perSkillMaxChars": 1536
   },
 
