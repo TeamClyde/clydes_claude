@@ -124,3 +124,15 @@ test('dimensionalReview: flags verifyDegraded and keeps unverified findings when
   assert.equal(r.verifyDegraded, true);
   assert.deepEqual([...r.findings].sort(), ['a', 'b']); // unfiltered pre-verify findings retained
 });
+
+test('parallelFanout returns the modelTier it was given, so a consumer can assert the pin', async () => {
+  const units = [{ work: async () => 'ok' }];
+  const r = await parallelFanout(units, { perUnitTimeoutMs: 1000, modelTier: 'haiku' });
+  assert.equal(r.modelTier, 'haiku');
+});
+
+test('parallelFanout returns a null modelTier when no pin was passed', async () => {
+  const units = [{ work: async () => 'ok' }];
+  const r = await parallelFanout(units, { perUnitTimeoutMs: 1000 });
+  assert.equal(r.modelTier, null);
+});

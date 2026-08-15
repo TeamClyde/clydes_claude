@@ -203,7 +203,10 @@ async function parallelFanout(units, policy = {}) {
     launched += batch.length;
   }
   // degraded: below quorum, OR quorum=0 and something abandoned (ceil(0/2)=0 would never flag degraded without the extra check)
-  return { confirmed, abandoned, degraded: confirmed.length < quorum || (quorum === 0 && abandoned > 0), counts, stoppedReason };
+  // `modelTier` is echoed back so a consumer can ASSERT the pin. Producing it without returning it
+  // is what made the safeguard a name only (#158): the field that would have caught leaf agents
+  // inheriting Opus was written into the policy and never read by anything.
+  return { confirmed, abandoned, degraded: confirmed.length < quorum || (quorum === 0 && abandoned > 0), counts, stoppedReason, modelTier: p.modelTier };
 }
 
 /**
@@ -812,6 +815,12 @@ if (!Number.isInteger(edgeCount) || edgeCount <= 0) {
 
 // --- tunables (regulation dossier §10.1 — conservative defaults; revisit at run) ---
 const FINDER_TIMEOUT_MS = 240_000;   // per finder agent
+// Finder agents were dispatched with NO `model:` key, so every one inherited the caller's model.
+// That is the unpinned-leaf shape behind the 290-agent / 6.4M-token incident, and the safeguard
+// #158 describes (DispatchPolicy.modelTier) never reached here because this workflow calls
+// quorumBarrier directly and never constructs a DispatchPolicy at all.
+const FINDER_MODEL = 'claude-sonnet-4-6';
+const FINDER_MODEL_TIER = 'sonnet';
 // 900s per verify agent. Verify is no longer a single batched call — Tier 2 dispatches one agent per
 // cluster and each RE-READS the repo files its cluster cites, so cost tracks source-reading, not row
 // count. This budget has never been measured on this consumer; it is set to the librarian's measured
@@ -935,7 +944,7 @@ for (let i = 0; i < jobs.length; i += MAX_CONCURRENT) {
         `(skills/*/SKILL.md|skill.md, agents/*.md, rules/**/*.md, .claude/hooks/**) for file:line citations.\n` +
         (repair ? `\nPREVIOUS ATTEMPT REJECTED: ${repair}. Fix and resubmit.` : '') +
         `\nReturn the schema.`,
-        { label: job.label, phase: 'Find', schema: FINDINGS_SCHEMA },
+        { label: job.label, phase: 'Find', schema: FINDINGS_SCHEMA, model: FINDER_MODEL },
       ),
     })),
     Math.ceil(wave.length / 2), // health threshold; degraded is logged, never fatal

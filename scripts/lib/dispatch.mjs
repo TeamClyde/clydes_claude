@@ -59,7 +59,10 @@ export async function parallelFanout(units, policy = {}) {
     launched += batch.length;
   }
   // degraded: below quorum, OR quorum=0 and something abandoned (ceil(0/2)=0 would never flag degraded without the extra check)
-  return { confirmed, abandoned, degraded: confirmed.length < quorum || (quorum === 0 && abandoned > 0), counts, stoppedReason };
+  // `modelTier` is echoed back so a consumer can ASSERT the pin. Producing it without returning it
+  // is what made the safeguard a name only (#158): the field that would have caught leaf agents
+  // inheriting Opus was written into the policy and never read by anything.
+  return { confirmed, abandoned, degraded: confirmed.length < quorum || (quorum === 0 && abandoned > 0), counts, stoppedReason, modelTier: p.modelTier };
 }
 
 /**
