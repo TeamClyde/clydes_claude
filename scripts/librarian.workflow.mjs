@@ -1029,6 +1029,36 @@ function unknownUrls(markdown, findings) {
   return urlsInProse(markdown).filter((u) => !known.has(u));
 }
 
+/**
+ * Deterministic guards on an excise agent's output. The excise agent is asked to delete or soften
+ * ONLY the flagged claims and change nothing else; these two checks are what make that instruction
+ * verifiable rather than trusted.
+ *
+ * Reuses `unknownUrls` — the same set-membership check L1 already applies to the writer's prose, so
+ * an excise cannot smuggle in provenance the section's findings do not support.
+ *
+ * Check order is length-then-URL and is pinned by a test: when an output violates both, the reason
+ * must not drift, or the diagnostic lies about which rule was broken.
+ *
+ * @param {string} before   - the prose handed to the excise agent
+ * @param {string} after    - what it returned
+ * @param {Array}  findings - this section's findings, for URL membership
+ * @returns {{ok: true} | {ok: false, reason: string}}
+ */
+function exciseGuard(before, after, findings) {
+  if (typeof after !== 'string' || after.length === 0) {
+    return { ok: false, reason: 'excise returned no prose' };
+  }
+  if (after.length > before.length) {
+    return { ok: false, reason: 'excise output is longer than its input — an excise that grows is not an excise' };
+  }
+  const unknown = unknownUrls(after, findings);
+  if (unknown.length) {
+    return { ok: false, reason: `excise introduced URL(s) absent from this section's findings: ${unknown.slice(0, 3).join(', ')}` };
+  }
+  return { ok: true };
+}
+
 // ── Rendering ───────────────────────────────────────────────────────────────
 // Every table below is a PROJECTION of the findings. An agent never types a URL, a support label,
 // or a flag — which is what makes dossier.md and findings.json structurally unable to disagree.

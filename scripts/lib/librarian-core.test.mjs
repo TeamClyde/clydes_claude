@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  assessCoverage, deriveEvidenceState, hasAnySource, urlsInProse, unknownUrls,
+  assessCoverage, deriveEvidenceState, hasAnySource, urlsInProse, unknownUrls, exciseGuard,
   COVERAGE_MIN_RATIO, COVERAGE_MIN_ANSWERED,
   renderTable, renderDossierEntry, renderDossierHeader, mergeFindingsDoc,
 } from './librarian-core.mjs';
@@ -505,4 +505,61 @@ test('merge: `shift` is stamped from the closed move-key set, never from what th
   assert.equal(bogus[0].reframe.shift, 'unrecognized');
   const valid = mergeReframed(thin, [], { ...ctx, shift: 'entity-anchored' });
   assert.equal(valid[0].reframe.shift, 'entity-anchored', 'a real move key passes through unchanged');
+});
+
+// ── exciseGuard ─────────────────────────────────────────────────────────────
+
+const findings = [{ source: 'https://a.example/doc', claim: 'x' }];
+
+test('excised prose that is shorter and adds no URL passes', () => {
+  const r = exciseGuard('one two three', 'one two', findings);
+  assert.equal(r.ok, true);
+});
+
+test('excised prose that grew is rejected — an excise that grows is not an excise', () => {
+  const r = exciseGuard('one two', 'one two three four', findings);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /longer/i);
+});
+
+test('excised prose that introduces an unknown URL is rejected', () => {
+  // PRE-FLIGHTED. The plan's fixture was `before: 'one two three'` (13 chars) against
+  // `after: 'one two https://evil.example/x'` (30) — which trips the LENGTH guard first and returns
+  // the "longer" reason, so the /URL/i assertion could never pass. The fixture, not the guard, was
+  // wrong: a test for the URL check must not also violate the length check, or it tests whichever
+  // check happens to run first. `before` is padded so `after` is genuinely shorter.
+  const before = 'one two three four five six seven eight nine ten eleven twelve thirteen';
+  const r = exciseGuard(before, 'one two https://evil.example/x', findings);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /URL/i);
+});
+
+test('when an excise both grows AND adds a URL, length is reported first', () => {
+  // Pins the precedence the test above deliberately avoids depending on. Both guards reject, so
+  // only the REASON differs — but a reason that silently changes is a diagnostic that lies about
+  // which rule was broken.
+  const r = exciseGuard('one two', 'one two three https://evil.example/x', findings);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /longer/i);
+});
+
+test('a URL already in the findings is not "unknown" — excising must not require dropping citations', () => {
+  const before = 'one two three four five six seven eight nine ten eleven twelve thirteen';
+  const r = exciseGuard(before, 'one two https://a.example/doc', findings);
+  assert.equal(r.ok, true);
+});
+
+test('equal length is allowed — softening a claim need not shorten it', () => {
+  const r = exciseGuard('aaaa bbbb', 'aaaa cccc', findings);
+  assert.equal(r.ok, true);
+});
+
+test('empty output is rejected — excision must not delete the section', () => {
+  const r = exciseGuard('one two three', '', findings);
+  assert.equal(r.ok, false);
+});
+
+test('a non-string output is rejected rather than crashing', () => {
+  const r = exciseGuard('one two three', null, findings);
+  assert.equal(r.ok, false);
 });
