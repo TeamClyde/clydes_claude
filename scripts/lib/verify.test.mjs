@@ -598,3 +598,38 @@ test('#119: a non-array input degrades instead of rejecting — nothing escapes 
   assert.ok(Array.isArray(out.findings), 'must resolve with a usable shape, never reject');
   assert.equal(out.findings.length, 0);
 });
+
+test('a Tier-1 collapse still reports triageCoverage', async () => {
+  // REACHING degradedResult IS THE HARD PART — read this before changing the mock.
+  //
+  // A throwing agent does NOT work. Tier 1 dispatches through `Promise.allSettled`, which never
+  // rejects: a thrown error is captured as {status:'rejected'} and the try block completes
+  // normally. Control then falls to the `anyJudged` check and takes the `verifyEmptied`
+  // early-return — which ALREADY sets triageCoverage: 0, so the assertion below would pass
+  // before the fix and the test would be a false green.
+  //
+  // The Tier-1 try also spans the SYNCHRONOUS work after the allSettled, including
+  // `for (const v of r.value?.verdicts ?? [])`. Fulfilling with a non-iterable `verdicts` makes
+  // that a genuine TypeError inside the try, which is the only way to reach the catch-all.
+  const agent = async () => ({ verdicts: 5 });   // 5 is not iterable → synchronous throw in Tier 1
+  const r = await tieredVerify([{ claim: 'a', source: 'u' }], {
+    profile: 'web-research', agent, perTierTimeoutMs: 5000,
+  });
+  assert.equal(r.degraded, true);
+  assert.equal(r.degradedAtTier, 'triage');
+  assert.equal(typeof r.counts.triageCoverage, 'number',
+    'triageCoverage must be present on the catch-all degraded path');
+  assert.equal(typeof r.counts.recheckCoverage, 'number');
+  assert.equal(typeof r.counts.consensusCoverage, 'number');
+});
+
+test('the verifyEmptied path is a DIFFERENT path and already reported coverage', async () => {
+  // Pins the distinction the test above depends on. If this ever starts routing through
+  // degradedResult, the test above has stopped testing what it claims to.
+  const agent = async () => { throw new Error('boom'); };
+  const r = await tieredVerify([{ claim: 'a', source: 'u' }], {
+    profile: 'web-research', agent, perTierTimeoutMs: 5000,
+  });
+  assert.equal(r.verifyEmptied, true, 'a rejecting agent empties verify; it does not collapse Tier 1');
+  assert.equal(r.counts.triageCoverage, 0);
+});

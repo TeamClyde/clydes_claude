@@ -450,10 +450,20 @@ async function tieredVerify(findings, { profile, agent, perTierTimeoutMs = 120_0
   // Fallback rule: on tier failure, fall back to THAT TIER'S INPUT SET — never to an empty set,
   // and never to the whole run's input. A whole-tier collapse is reserved for a whole-tier failure;
   // per-unit losses inside a tier are contained by the allSettled handling within each tier.
+  // Every degraded return carries the coverage fractions. A degradation flag that can itself be
+  // lost during degradation is a defect (#153): the consumer reads
+  // `counts?.triageCoverage ?? null`, so an omitted field reports `null` on exactly the failure
+  // the field exists to describe. `triageCoverage` is read from the outer binding at CALL time,
+  // so a Tier-1 collapse after triage partially completed still reports what it achieved.
   const degradedResult = (tier, set) => ({
     findings: stripIdx(set),
     contested: [],
-    counts: { degraded: true },
+    counts: {
+      degraded: true,
+      triageCoverage,
+      recheckCoverage: 0,
+      consensusCoverage: 0,
+    },
     degraded: true,
     degradedAtTier: tier,
   });
