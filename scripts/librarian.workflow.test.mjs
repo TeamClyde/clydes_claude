@@ -45,7 +45,16 @@ test('the coverage gate runs BEFORE tieredVerify, so a failed brief costs no ver
 });
 
 test('the coverage gate early-returns rather than falling through', () => {
-  assert.match(BODY, /if \(!coverage\.ok\) \{[\s\S]{0,600}?stoppedAt: 'coverage-gate'/);
+  // Containment, not proximity. This was a `[\s\S]{0,600}?` window, which measures DISTANCE between
+  // two strings and so fails on any edit that adds prose or a statement between them — a layout
+  // change, not a behaviour change. It broke when Task 5 inserted the health computation inside the
+  // block. Bounded marker-slicing per rules/source-text-assertions.md tests the actual property:
+  // the gate body reaches a `return {` before it reaches its own stoppedAt tag.
+  const start = BODY.indexOf('if (!coverage.ok) {');
+  const end   = BODY.indexOf("stoppedAt: 'coverage-gate'", start);
+  assert.ok(start !== -1 && end > start, 'the coverage-gate block markers must resolve');
+  assert.match(BODY.slice(start, end), /\breturn \{/,
+    'the gate must RETURN, not fall through to verify and synthesis spend');
 });
 
 test('the evidence floor runs after verify and before the synthesis phase', () => {
@@ -593,4 +602,47 @@ test('every source-text region in this file is guarded before slicing', () => {
   const inlineSliceIndexOf = SELF.match(/\.slice\(\s*\w+\.indexOf\(/g) ?? [];
   assert.deepEqual(inlineSliceIndexOf, [],
     'slice(x.indexOf(...)) is unguarded — hoist the index, assert it resolves, then slice');
+});
+
+// Anchored per-site, NOT counted. A count-equality assertion over `return {` is wrong twice over:
+// BODY contains 7 own-line `return {` sites, of which only 3 are workflow-level returns — the rest
+// are `{ok, reason}` returns inside the `validate` closure, which must NOT carry `health`. And if
+// the regex ever matched nothing it would assert 0 === 0 and pass while testing nothing, which is
+// exactly the vacuous-assertion class rules/source-text-assertions.md exists to ban.
+const WORKFLOW_RETURN_ANCHORS = [
+  ["stoppedAt: 'coverage-gate'", 'coverage-gate return'],
+  ["stoppedAt: 'evidence-floor'", 'evidence-floor return'],
+  ['findingsDoc,', 'final return'],
+];
+
+for (const [anchor, name] of WORKFLOW_RETURN_ANCHORS) {
+  test(`the ${name} carries a health key`, () => {
+    const at = BODY.indexOf(anchor);
+    assert.ok(at !== -1, `${name} anchor must resolve`);
+    // Bound the region at BOTH ends: from the `return {` that opens this object to its anchor.
+    const open = BODY.lastIndexOf('return {', at);
+    assert.ok(open !== -1 && open < at, `${name} opening brace must resolve`);
+    const block = BODY.slice(open, at);
+    assert.match(block, /\bhealth,/, `${name} must report health — an early exit still has a verdict`);
+  });
+}
+
+test('checkRunHealth is called at BOTH sites, not just before the first return', () => {
+  // Task 5 adds two call sites: one before the coverage-gate return (verify: null), one before the
+  // final return. A single `call < firstReturn` assertion cannot detect a missing second site.
+  const calls = BODY.match(/checkRunHealth\(/g) ?? [];
+  assert.ok(calls.length >= 2, `expected >= 2 checkRunHealth call sites, found ${calls.length}`);
+
+  const firstCall = BODY.indexOf('checkRunHealth(');
+  const gate = BODY.indexOf("stoppedAt: 'coverage-gate'");
+  assert.ok(firstCall !== -1 && gate !== -1, 'both anchors must resolve');
+  assert.ok(firstCall < gate, 'health must be computed before the coverage gate returns it');
+});
+
+test('the validate closure returns do NOT carry health', () => {
+  const start = BODY.indexOf('validate: async (v) => {');
+  const end   = BODY.indexOf('work: async (repair)', start);
+  assert.ok(start !== -1 && end > start, 'validate block markers must resolve');
+  assert.doesNotMatch(BODY.slice(start, end), /\bhealth,/,
+    'validate returns {ok, reason} to runUnit — health belongs only on workflow-level returns');
 });
