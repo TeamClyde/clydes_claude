@@ -229,8 +229,11 @@ test('repair exhaustion KEEPS the section and records integrity — never drops 
   const validateEnd = BODY.indexOf('work: async (repair)', validateStart);
   assert.ok(validateStart !== -1 && validateEnd > validateStart, 'the validate block markers must resolve');
   const validateBlock = BODY.slice(validateStart, validateEnd);
-  // BOTH validation layers preserve on exhaustion — L1 (stray URL) and L2 (untraceable claim).
-  assert.equal((validateBlock.match(/if \(lastAttempt\) \{/g) ?? []).length, 2);
+  // ONE `lastAttempt` branch, not two. L1 (stray URL) still preserves on exhaustion. L2 no longer
+  // has an exhaustion path at all: since Task 11 an untraceable claim is excised in place and
+  // validation never fails, so there is no attempt budget for it to run out of. L2's preservation
+  // now lives on the failed-excise branch below, which is asserted separately.
+  assert.equal((validateBlock.match(/if \(lastAttempt\) \{/g) ?? []).length, 1);
 });
 
 test('validate takes ONE argument and counts attempts in a closure, never via ctx', () => {
@@ -264,6 +267,40 @@ test('the auditor judges traceability only — never truth, never new research',
   // contiguous regex cannot match it. Where the prompt happens to wrap is layout, not intent — the
   // bounded gap keeps the assertion about the instruction rather than about the line width.
   assert.match(BODY, /do NOT judge whether[\s\S]{0,40}a claim is TRUE in the world/);
+});
+
+// ── Task 11 — excise instead of regenerate ──────────────────────────────────
+
+test('the L2 audit no longer fails validation — it excises', () => {
+  const start = BODY.indexOf('const audit = await withWatchdog(');
+  const end   = BODY.indexOf('work: async (repair)', start);
+  assert.ok(start !== -1 && end > start, 'audit block markers must resolve');
+  const block = BODY.slice(start, end);
+  // `exciseGuard(` is safe to match against BODY: BODY is sliced FROM the LIBRARIAN-CORE end
+  // marker, so the inlined definition sits before it and only this call site is searched.
+  assert.match(block, /exciseGuard\(/, 'the excise output must pass the deterministic guards');
+  assert.doesNotMatch(block, /return \{\s*ok: false,\s*reason: `these claims are not traceable/,
+    'a flagged claim must no longer trigger a full-section regeneration');
+});
+
+test('an excise that fails its guards falls back to publish-and-flag', () => {
+  const start = BODY.indexOf('const audit = await withWatchdog(');
+  const end   = BODY.indexOf('work: async (repair)', start);
+  assert.ok(start !== -1 && end > start, 'audit block markers must resolve');
+  const block = BODY.slice(start, end);
+  // Anchored to the failed-excise reason, NOT to a bare `integrity.push(` — the audit-did-not-run
+  // branch already pushes integrity, so a bare match would have passed before this task existed.
+  assert.match(block, /surgical repair not applied/,
+    'preservation: a failed excise still publishes the original prose and records why');
+});
+
+test('the excise repairs the object the caller already holds', () => {
+  const start = BODY.indexOf('const audit = await withWatchdog(');
+  const end   = BODY.indexOf('work: async (repair)', start);
+  assert.ok(start !== -1 && end > start, 'audit block markers must resolve');
+  // runUnit returns res.value — the SAME object validate was handed. Assigning the repaired prose
+  // to a local instead would publish the unrepaired section while every check reported green.
+  assert.match(BODY.slice(start, end), /v\.markdown = excised\.value\.markdown;/);
 });
 
 // ── Task 9 — supersession pass ──────────────────────────────────────────────

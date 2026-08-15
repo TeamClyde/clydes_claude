@@ -1790,6 +1790,23 @@ const integrity = [];
 // in hand and does no research.
 const AUDIT_TIMEOUT_MS = 180_000;
 
+// The excise agent repairs prose SURGICALLY. The audit found ≤5 untraceable claims; regenerating
+// the whole section to remove them is O(section) work for O(1) defects, and measurably does not
+// converge — 16 of 16 rejected retries on run wf_cd105af0-fab came from this loop, and 31 claims
+// were still published flagged. Cheap model: this is constrained editing, not judgment.
+const EXCISE_SCHEMA = {
+  type: 'object', required: ['markdown'],
+  properties: { markdown: { type: 'string' } },
+};
+
+const excisePrompt = (markdown, bad) =>
+  `Remove or soften ONLY the listed claims from this section. Change NOTHING else — do not rewrite, ` +
+  `do not re-order, do not add transitions, do not add facts, do not add URLs. Where deleting a ` +
+  `sentence would break the paragraph, soften it to what the findings actually support instead of ` +
+  `deleting it. Return the FULL section markdown with those edits applied.\n\n` +
+  `CLAIMS TO REMOVE OR SOFTEN:\n${bad.map((b) => `- "${b.claim}" (${b.reason})`).join('\n')}\n\n` +
+  `SECTION:\n${markdown}`;
+
 const sectionUnits = sections.map((section) => {
   // Attempt counting lives in a CLOSURE, not in a `ctx` argument.
   //
@@ -1881,20 +1898,37 @@ const sectionUnits = sections.map((section) => {
 
       const bad = audit.value?.untraceable ?? [];
       if (bad.length) {
-        // On the LAST attempt, stop failing and record instead. Repair exhaustion must not drop
-        // the section: dropping violates preservation and re-creates #96's discarded-work
-        // complaint. A flagged section is more useful than a missing one.
-        if (lastAttempt) {
-          for (const b of bad) {
-            integrity.push({ subQuestion: section.subQuestion, claim: b.claim, reason: b.reason });
-          }
+        // Surgical repair, not regeneration. One cheap agent edits the flagged claims out of prose
+        // already in hand; the free L1 URL check then re-runs via exciseGuard. Validation is NOT
+        // failed, so the section never re-enters work() and never pays for a rewrite. That also
+        // means L2 has no exhaustion path — `lastAttempt` is now L1's alone.
+        const excised = await withWatchdog(
+          () => agent(excisePrompt(v.markdown, bad.slice(0, 5)),
+            { label: `excise:${section.subQuestion.slice(0, 40)}`, phase: 'Synthesize', schema: EXCISE_SCHEMA, model: 'claude-haiku-4-5-20251001' }),
+          AUDIT_TIMEOUT_MS);
+
+        const guard = excised.outcome === 'done'
+          ? exciseGuard(v.markdown, excised.value?.markdown, section.findings)
+          : { ok: false, reason: `excise did not complete (${excised.outcome})` };
+
+        if (guard.ok) {
+          // Mutate in place: runUnit returns res.value, so the repaired prose must land on the
+          // object the caller already holds. Reassigning a local would discard the repair.
+          v.markdown = excised.value.markdown;
           return { ok: true };
         }
-        return {
-          ok: false,
-          reason: `these claims are not traceable to this section's findings — remove or rewrite them: `
-            + bad.slice(0, 3).map((b) => `"${b.claim}" (${b.reason})`).join('; '),
-        };
+
+        // Preservation (#96). A failed excise publishes the ORIGINAL prose and records every flagged
+        // claim — strictly better than dropping the section, and honest about what was not repaired.
+        for (const b of bad) {
+          integrity.push({ subQuestion: section.subQuestion, claim: b.claim, reason: b.reason });
+        }
+        integrity.push({
+          subQuestion: section.subQuestion,
+          claim: '(excise)',
+          reason: `surgical repair not applied: ${guard.reason}`,
+        });
+        return { ok: true };
       }
       return { ok: true };
     },
