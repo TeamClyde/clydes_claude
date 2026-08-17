@@ -319,6 +319,16 @@ test('mergeFindingsDoc: first run seeds topic, runs[], findings[]', () => {
   assert.equal(doc.findings[0].runDate, '2026-08-05', 'runDate is stamped on every finding');
 });
 
+test('mergeFindingsDoc: excerpt survives the merge projection — a fixed field list must not replace the spread', () => {
+  const doc = mergeFindingsDoc(null, {
+    topic: 't', runDate: '2026-08-05', brief: 'b', coverage: { answered: 1, total: 1, missing: [] },
+    evidenceState: 'verified',
+    findings: [{ subQuestion: 'q', claim: 'c', source: 'https://x/1', excerpt: 'the exact quoted span' }],
+    supersedes: [], integrity: [],
+  });
+  assert.equal(doc.findings[0].excerpt, 'the exact quoted span');
+});
+
 test('mergeFindingsDoc: newest run first; NO prior finding is ever deleted', () => {
   const prior = {
     topic: 't',

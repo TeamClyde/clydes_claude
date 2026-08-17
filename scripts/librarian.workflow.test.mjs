@@ -809,7 +809,10 @@ test('FINDINGS carries excerpt as an optional property', () => {
   assert.ok(close > open, 'the Research phase must follow the FINDINGS declaration');
   const schema = BODY.slice(open, close);
   assert.match(schema, /excerpt: \{ type: 'string' \}/);
-  // Optional until the parent plan's Task 17 makes it contractual — see Open Question 1.
+  // Stays OPTIONAL in the schema by design (2026-08-17): a required field would reject the reframe
+  // path, which still runs the single-agent shape and produces no excerpt. This pin exists so a
+  // future refactor cannot silently drop `excerpt` from the FINDINGS contract — it is load-bearing
+  // for excerptGuard and Tier 2 verify even though the schema does not force it.
   assert.match(schema, /required: \['subQuestion', 'claim', 'source'\]/);
 });
 

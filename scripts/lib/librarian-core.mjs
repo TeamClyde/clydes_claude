@@ -539,10 +539,14 @@ export function selectHarvestTargets(results, cap, alreadyHarvested = []) {
 // 80 chars: short enough for one pointed sentence, long enough that a bare noun phrase ("the
 // transition rate") cannot pass as evidence.
 //
-// KNOWN LIMIT, accepted and recorded (design §4.2). A synthesizer that quotes a span exactly but
-// attaches it to the WRONG CLAIM still passes. Closing that needs deterministic quoting — the
-// synthesizer returns a span INDEX and code substitutes the text — which changes the FINDINGS
-// contract that the parent plan's Task 17 owns. Revisit there.
+// KNOWN LIMIT, accepted and recorded (design §4.2). Two things remain open: the model AUTHORS the
+// excerpt text, so fabrication and boundary drift are possible; and separately, a synthesizer that
+// quotes a span exactly but attaches it to the WRONG CLAIM still passes this guard. Deterministic
+// quoting — the synthesizer returns a span INDEX and code substitutes the text — would close the
+// FIRST of those (fidelity), not the second: whether a correctly-quoted span actually supports its
+// claim is a semantic judgment already owned by the verify tiers (Tier 2 re-check, Tier 3
+// consensus), not by this guard. Deterministic quoting was deferred by user decision (2026-08-17)
+// to be reconsidered after the Task 19 acceptance run.
 //
 // Second consumer: needsLiveRecheck (below) reuses this same value for a different job — deciding
 // whether Tier 2's verify-time excerpt is usable rather than gating research-time admission. The two
