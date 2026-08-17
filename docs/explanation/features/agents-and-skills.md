@@ -233,6 +233,18 @@ Re-running the skill reads `progress.json` and resumes from the first incomplete
 
 **Shared tiered-adversarial verify protocol:** All six regulated fan-out consumers — the architect panel, `adherence-audit`, `requesting-code-review`, `subagent-driven-development`'s two-lens review, the `librarian` workflow, and the `orchestration-audit` workflow — route their post-fan-out finding verification through one shared protocol (`skills/dispatching-parallel-agents/references/verify-protocol.md`) instead of per-skill ad-hoc verify. The protocol has three tiers: (1) a cheap batched triage that labels findings `supported`/`uncertain`/`unsupported`; (2) a clustered adversarial re-check on the escalation set, one re-check per cluster; (3) a minority-veto 3-voter consensus on the contested tail only. A finding survives Tier 3 iff ≥2 of 3 structurally-diverse voters fail to refute it. This is codified in ADR-0006.
 
+### Tool Restriction as a Structural Guardrail (Librarian Research Phase)
+
+The librarian's research phase runs three **tool-restricted agent types** per sub-question rather than one long-context research agent: `web-search` (WebSearch only — ranks candidate URLs and structurally cannot fetch a page), `page-harvest` (WebFetch only — fetches exactly one page and returns verbatim spans, and cannot search), and `synthesize` (no web tool at all — reads only the quote bundles the harvest stage produced, so it cannot reach a source it was not given).
+
+The point is that **the toolset is the guardrail, not the prompt**. A single research agent is *told* "do not answer from memory" and "search at most N times"; an agent with no fetch tool has no such option to ignore. This is the same principle the regulation layer applies to concurrency — make the unwanted behavior structurally unavailable rather than discouraged.
+
+Two measured properties shape the design. A subagent carries a **fixed per-agent floor** — a prompt-write cost paid on spawn regardless of how much work it does — and restricting its toolset cuts that floor to roughly a third, because the floor is dominated by the system prompt and tool schemas rather than by the model tier or the job. Pinning an agent to a cheaper model therefore does *not* lower its floor; removing tools does. Consequently the harvest fan-out is **hard-capped** rather than demand-driven: the cap is a budget control, expressed as a pure function (`selectHarvestTargets`) so it is unit-testable rather than an emergent property of a prompt.
+
+Because the two fan-out layers (one unit per sub-question, one harvest agent per page) **multiply**, the outer in-flight limit is divided by the harvest width. The runtime does not reject excess agents — it queues them while their watchdogs already tick, which is the "fan-out steps fail first" cascade this layer exists to prevent.
+
+`synthesize` is declared with `tools: Read` rather than an empty tool list. An empty list does not produce a no-tools agent — Claude Code refuses to spawn an agent whose tools resolve to zero, so the stage would never launch. `Read` is the narrowest spawnable toolset that still withholds the capability being guarded: it touches the local filesystem, not the network.
+
 ### The Librarian's Durable Artifact Contract
 
 The `librarian` workflow no longer returns a report string. It returns a **dossier entry** (assembled in code) and a **findings document** (the complete `findings.json` payload), and the skill writes both to `research/<slug>/`. The Workflow sandbox has no filesystem, so the split is not incidental: the workflow computes and the skill persists.

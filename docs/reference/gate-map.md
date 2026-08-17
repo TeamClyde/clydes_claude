@@ -88,6 +88,9 @@ flowchart LR
   integration_test_constraints --> systematic_debugging
   jira_workflow_manager --> researcher
   librarian --> dispatching_parallel_agents
+  librarian --> page_harvest
+  librarian --> synthesize
+  librarian --> web_search
   mcp_governance --> git_manager
   mcp_governance --> jira_workflow_manager
   new_repo_setup --> architect
@@ -310,6 +313,9 @@ flowchart LR
 | integration-test-constraints | systematic-debugging |
 | jira-workflow-manager | researcher |
 | librarian | dispatching-parallel-agents |
+| librarian | page-harvest |
+| librarian | synthesize |
+| librarian | web-search |
 | mcp-governance | git-manager |
 | mcp-governance | jira-workflow-manager |
 | new-repo-setup | architect |
