@@ -4,7 +4,7 @@ import {
   assessCoverage, deriveEvidenceState, hasAnySource, urlsInProse, unknownUrls, exciseGuard,
   COVERAGE_MIN_RATIO, COVERAGE_MIN_ANSWERED,
   renderTable, renderDossierEntry, renderDossierHeader, mergeFindingsDoc,
-  selectHarvestTargets, excerptGuard, MIN_EXCERPT_CHARS,
+  selectHarvestTargets, excerptGuard, MIN_EXCERPT_CHARS, roundsConverged,
 } from './librarian-core.mjs';
 
 const Q = ['q1', 'q2', 'q3', 'q4'];
@@ -678,4 +678,38 @@ test('excerptGuard: the source check runs before the excerpt check', () => {
 
 test('excerptGuard: MIN_EXCERPT_CHARS is 80', () => {
   assert.equal(MIN_EXCERPT_CHARS, 80);
+});
+
+// ── roundsConverged ──────────────────────────────────────────────────────────
+
+const u = (n) => `https://s${n}.example/p`;
+
+test('roundsConverged: identical url sets converge', () => {
+  const a = [u(1), u(2), u(3), u(4), u(5)];
+  assert.equal(roundsConverged(a, a), true);
+});
+
+test('roundsConverged: 4 of 5 repeated is 80% and does NOT converge (strictly greater than)', () => {
+  assert.equal(roundsConverged([u(1), u(2), u(3), u(4), u(5)], [u(1), u(2), u(3), u(4), u(9)]), false);
+});
+
+test('roundsConverged: 5 of 6 repeated is 83% and converges', () => {
+  assert.equal(roundsConverged([u(1), u(2), u(3), u(4), u(5), u(6)],
+    [u(1), u(2), u(3), u(4), u(5), u(9)]), true);
+});
+
+test('roundsConverged: a disjoint round 2 does not converge', () => {
+  assert.equal(roundsConverged([u(1), u(2)], [u(3), u(4)]), false);
+});
+
+test('roundsConverged: overlap is measured on host+path, so tracking params do not hide a repeat', () => {
+  assert.equal(roundsConverged(['https://a.example/x'], ['https://a.example/x?utm_source=q']), true);
+});
+
+test('roundsConverged: an empty round 2 converges — there is nothing new to harvest', () => {
+  assert.equal(roundsConverged([u(1)], []), true);
+});
+
+test('roundsConverged: an empty round 1 does not converge', () => {
+  assert.equal(roundsConverged([], [u(1)]), false);
 });

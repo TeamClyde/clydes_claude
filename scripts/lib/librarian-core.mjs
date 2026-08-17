@@ -572,3 +572,22 @@ export function excerptGuard(finding, spansBySource, searchedUrls) {
   }
   return { ok: true };
 }
+
+// ── Round-2 convergence ─────────────────────────────────────────────────────
+// A hard 2-round cap alone would keep adaptive search bounded but blind: it would spend a second
+// full round on a topic whose sources are exhausted. Overlap is the cheap exhaustion signal.
+// Reuses harvestKey so "the same page under a tracking param" is one page here too.
+
+/**
+ * @param {string[]} urlsRound1
+ * @param {string[]} urlsRound2
+ * @returns {boolean} true when round 2 is >80% repeats of round 1 (or found nothing) — stop.
+ */
+export function roundsConverged(urlsRound1, urlsRound2) {
+  const seen = new Set((urlsRound1 ?? []).map(harvestKey).filter(Boolean));
+  if (seen.size === 0) return false;
+  const second = (urlsRound2 ?? []).map(harvestKey).filter(Boolean);
+  if (second.length === 0) return true;
+  const repeats = second.filter((k) => seen.has(k)).length;
+  return repeats / second.length > 0.8;
+}
