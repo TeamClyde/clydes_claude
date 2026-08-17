@@ -748,8 +748,15 @@ test('needsLiveRecheck measures length the same way excerptGuard does — via no
 });
 
 test('a non-string excerpt escalates rather than being coerced and measured', () => {
-  const longNumber = Number('9'.repeat(MIN_EXCERPT_CHARS + 10));
-  assert.equal(needsLiveRecheck({ excerpt: longNumber }, { needsSource: false }), true);
+  // A plain array's default String() coercion is a comma-join with no whitespace, so it survives
+  // normalizeSpan unchanged. Sized so the coerced-and-normalized string alone clears the bar — this
+  // is what makes the fixture actually exercise the typeof guard: without the guard, this value
+  // would wrongly read as a usable excerpt and needsLiveRecheck would return false.
+  const nonString = Array(MIN_EXCERPT_CHARS).fill('x');
+  const coerced = String(nonString);
+  const normalized = coerced.replace(/\s+/g, ' ').trim();
+  assert.ok(normalized.length >= MIN_EXCERPT_CHARS);
+  assert.equal(needsLiveRecheck({ excerpt: nonString }, { needsSource: false }), true);
 });
 
 test('the recheck agent raising needsSource escalates', () => {
