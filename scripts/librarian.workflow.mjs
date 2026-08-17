@@ -1470,6 +1470,33 @@ function roundsConverged(urlsRound1, urlsRound2) {
   return repeats / second.length > 0.8;
 }
 
+// ── Tier-2 escape lane ───────────────────────────────────────────────────────
+
+/**
+ * The Tier-2 escape lane. Excerpt-first re-check is the cheap default; this predicate decides when
+ * the cheap path is not good enough and the live source must be fetched.
+ *
+ * Escalates when the excerpt cannot settle the question — not merely when the agent is unsure. A
+ * missing verdict escalates, because silence is not evidence that the excerpt sufficed.
+ *
+ * Reuses MIN_EXCERPT_CHARS (the excerptGuard bar) rather than a separate threshold: excerptGuard
+ * already rejects anything under 80 chars at research time, so a looser bar here would wave through
+ * fragments the evidence contract has already thrown out. One bar, one meaning. The length check in
+ * this predicate is therefore defensive redundancy whose real job is catching the reframe path,
+ * which produces NO excerpt at all.
+ *
+ * @param {object} finding - the finding, carrying `excerpt` and possibly `contested`
+ * @param {object|undefined} verdict - the recheck agent's entry for this finding
+ * @returns {boolean} true when Tier 2 must re-fetch the live source for this finding
+ */
+function needsLiveRecheck(finding, verdict) {
+  if (finding?.contested === true) return true;
+  const ex = typeof finding?.excerpt === 'string' ? finding.excerpt.trim() : '';
+  if (ex.length < MIN_EXCERPT_CHARS) return true;
+  if (!verdict) return true;
+  return verdict.needsSource === true;
+}
+
 // <LIBRARIAN-CORE:end>
 
 if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing timer — cannot guarantee liveness');

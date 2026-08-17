@@ -5,6 +5,7 @@ import {
   COVERAGE_MIN_RATIO, COVERAGE_MIN_ANSWERED,
   renderTable, renderDossierEntry, renderDossierHeader, mergeFindingsDoc,
   selectHarvestTargets, excerptGuard, MIN_EXCERPT_CHARS, roundsConverged,
+  needsLiveRecheck,
 } from './librarian-core.mjs';
 
 const Q = ['q1', 'q2', 'q3', 'q4'];
@@ -712,4 +713,36 @@ test('roundsConverged: an empty round 2 converges — there is nothing new to ha
 
 test('roundsConverged: an empty round 1 does not converge', () => {
   assert.equal(roundsConverged([], [u(1)]), false);
+});
+
+// ── needsLiveRecheck ─────────────────────────────────────────────────────────
+
+const USABLE_EXCERPT = 'a verbatim span of real length that comfortably clears the eighty character minimum excerpt threshold for reuse';
+
+test('a finding with a usable excerpt and no objection does not need the live source', () => {
+  assert.equal(needsLiveRecheck({ excerpt: USABLE_EXCERPT }, { needsSource: false }), false);
+});
+
+test('a finding with no excerpt always escalates', () => {
+  assert.equal(needsLiveRecheck({ }, { needsSource: false }), true);
+});
+
+test('an empty or whitespace excerpt escalates', () => {
+  assert.equal(needsLiveRecheck({ excerpt: '   ' }, { needsSource: false }), true);
+});
+
+test('an excerpt shorter than MIN_EXCERPT_CHARS but non-empty escalates', () => {
+  assert.equal(needsLiveRecheck({ excerpt: 'too short' }, { needsSource: false }), true);
+});
+
+test('the recheck agent raising needsSource escalates', () => {
+  assert.equal(needsLiveRecheck({ excerpt: USABLE_EXCERPT }, { needsSource: true }), true);
+});
+
+test('a missing verdict escalates — silence is not evidence the excerpt sufficed', () => {
+  assert.equal(needsLiveRecheck({ excerpt: USABLE_EXCERPT }, undefined), true);
+});
+
+test('a contested finding escalates regardless of excerpt quality', () => {
+  assert.equal(needsLiveRecheck({ excerpt: USABLE_EXCERPT, contested: true }, { needsSource: false }), true);
 });
