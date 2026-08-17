@@ -1521,6 +1521,13 @@ const HARVEST_PER_LEAF = (harvestPerLeaf && harvestPerLeaf > 0) ? Math.floor(har
 // Haiku for harvest ONLY. It is mechanical single-page extraction — copy spans out of one page —
 // which is the one job in this pipeline that is not judgment. Synthesis stays Sonnet.
 const HARVEST_MODEL = 'claude-haiku-4-5-20251001';
+// roundsBudget: how many sub-questions across the WHOLE run may have a second research round.
+// Per-unit capping alone is not enough — round 2 on all nine units would add ~540 K and erase the
+// slice's ~160 K win. Spent neediest-first; a unit denied a round publishes on round-1 evidence
+// with its gaps recorded, never silently.
+const ROUNDS_BUDGET = (roundsBudget != null && roundsBudget >= 0) ? Math.floor(roundsBudget) : 3;
+// Round 2 is gap-filling, not a re-run: half the width of round 1.
+const ROUND2_HARVEST = 2;
 // The two fan-out layers MULTIPLY. MAX_CONCURRENT was the whole in-flight budget when a unit was
 // one agent; a unit is now one agent plus up to HARVEST_PER_LEAF concurrent harvests, so running
 // MAX_CONCURRENT units would put MAX_CONCURRENT x HARVEST_PER_LEAF agents against a runtime ceiling
@@ -1653,6 +1660,44 @@ const units = subQuestions.map((q) => ({
 // two layers multiply. See the OUTER_IN_FLIGHT comment above for why the excess is a cascade rather
 // than a queue you can ignore.
 const review = await parallelFanout(units, { perUnitTimeoutMs: 1_200_000, maxInFlight: Math.min(subQuestions.length, OUTER_IN_FLIGHT), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet' });
+
+// ── Round 2 — bounded adaptive search ───────────────────────────────────────
+// Sequential by design. The budget is a shared counter, so deciding all nine units concurrently
+// would let them all read `roundsRemaining > 0` before any decrements it and overspend by 3x. The
+// cost is latency on at most ROUNDS_BUDGET units, which is the cheaper of the two failures.
+let roundsRemaining = ROUNDS_BUDGET;
+const round2Candidates = review.confirmed
+  .filter((r) => Array.isArray(r?.gaps) && r.gaps.length > 0)
+  .sort((a, b) => b.gaps.length - a.gaps.length);
+for (const r1 of round2Candidates) {
+  // subQuestion is read off r1.findings[0] because parallelFanout's `confirmed` is a COMPACT
+  // array — abandoned units are absent, so the index does not line up with subQuestions. This
+  // mirrors the same guard already applied at the section-writer fan-out.
+  const q = r1.findings[0]?.subQuestion;
+  const needsRound2 = roundsRemaining > 0 && r1.gaps.length > 0 && typeof q === 'string';
+  if (!needsRound2) {
+    // Budget exhausted: gaps recorded in the integrity channel so the dossier reports what was
+    // known-missing rather than presenting round-1 evidence as complete.
+    researchIntegrity.push({ subQuestion: q ?? '(unknown)', claim: r1.gaps.join('; '),
+      reason: 'gap not researched — run-wide round-2 budget exhausted' });
+    continue;
+  }
+  roundsRemaining -= 1;
+  const gapQ = `${q}\nFOCUS ON THESE GAPS: ${r1.gaps.join('; ')}`;
+  // Search FIRST, on its own. One agent buys the information needed to decide whether the
+  // remaining three are worth spawning.
+  const s2 = await searchAndSelect(gapQ, r1.harvested, ROUND2_HARVEST);
+  if (roundsConverged(r1.searched, s2.searched)) {
+    // >80% repeats means the topic's reachable sources are exhausted. Stopping HERE — before the
+    // harvest fan-out and the synthesizer — is the whole value of the check: it saves ~3 agents.
+    // Run after the round instead, it could only pick which string to log.
+    researchIntegrity.push({ subQuestion: q, claim: r1.gaps.join('; '),
+      reason: 'gap not closed — round 2 search returned the same sources (converged)' });
+    continue;
+  }
+  const h2 = await harvestAndSynthesize(gapQ, s2.targets, s2.searched);
+  r1.findings.push(...h2.findings);
+}
 const allFindings = review.confirmed.flatMap((r) => r.findings ?? []);
 // Captured here because `review` is shadowed by no later binding but the health calls below read
 // only the tier — keeping the read at the source makes the pin's provenance obvious.

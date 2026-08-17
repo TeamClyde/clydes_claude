@@ -812,3 +812,75 @@ test('FINDINGS carries excerpt as an optional property', () => {
   // Optional until the parent plan's Task 17 makes it contractual — see Open Question 1.
   assert.match(schema, /required: \['subQuestion', 'claim', 'source'\]/);
 });
+
+// ── Slice 4 Task 7: bounded round-2 adaptive search ──────────────────────────
+
+test('round 2 is spent from a run-wide budget, not per unit', () => {
+  assert.match(BODY, /let roundsRemaining = ROUNDS_BUDGET/);
+  assert.match(BODY, /roundsRemaining -= 1/);
+});
+
+test('round 2 is gated on the run-wide budget AND on non-empty gaps', () => {
+  const at = BODY.indexOf('const needsRound2');
+  assert.ok(at !== -1, 'needsRound2 must resolve');
+  const cond = BODY.slice(at, at + 400);
+  assert.match(cond, /roundsRemaining > 0/);
+  assert.match(cond, /r1\.gaps\.length > 0/);
+});
+
+test('convergence is checked AFTER round 2 search but BEFORE the harvest fan-out', () => {
+  // The whole point of the check: it must be able to skip the expensive half. A convergence test
+  // that runs after harvestAndSynthesize saves nothing and only picks a log string.
+  const start = BODY.indexOf('const s2 = await searchAndSelect(');
+  assert.ok(start > 0, 'round-2 search call not found');
+  const conv = BODY.indexOf('roundsConverged(r1.searched, s2.searched)', start);
+  const spend = BODY.indexOf('harvestAndSynthesize(gapQ', start);
+  assert.ok(conv > start && spend > conv, 'convergence check must sit between search and harvest');
+});
+
+test('a converged round 2 skips the harvest fan-out via continue', () => {
+  // Bounded by the two MARKERS, not by a character distance. A fixed window here would measure
+  // distance rather than containment and would break when a comment is added between them —
+  // the failure mode a proximity regex already caused once on this branch.
+  const conv = BODY.indexOf('roundsConverged(r1.searched, s2.searched)');
+  const spend = BODY.indexOf('harvestAndSynthesize(gapQ', conv);
+  assert.ok(conv > 0 && spend > conv, 'round-2 markers not found in order');
+  assert.match(BODY.slice(conv, spend), /continue;/);
+});
+
+test('round-2 integrity drops survive into the run-level integrity array', () => {
+  // `const integrity = [...researchIntegrity]` is a COPY, not a live view. If it were captured
+  // before the round-2 loop runs, every round-2 drop would be silently lost — the #96
+  // "recoverable work thrown away" failure in a new place. Pin the order.
+  const budget = BODY.indexOf('let roundsRemaining = ROUNDS_BUDGET');
+  const copy = BODY.indexOf('const integrity = [...researchIntegrity]');
+  assert.ok(budget !== -1 && copy !== -1, 'both markers must resolve');
+  assert.ok(budget < copy, 'the round-2 loop must run before integrity is copied');
+});
+
+test('round 2 harvests at most 2 pages, not HARVEST_PER_LEAF', () => {
+  assert.match(BODY, /ROUND2_HARVEST = 2/);
+});
+
+test('round 2 excludes the urls round 1 already harvested', () => {
+  const at = BODY.indexOf('const s2 = await searchAndSelect(');
+  assert.ok(at !== -1, 'round-2 search call must resolve');
+  assert.match(BODY.slice(at, at + 200), /r1\.harvested, ROUND2_HARVEST\)/);
+});
+
+test('a unit denied round 2 by the budget records its gaps rather than dropping them', () => {
+  // Anchored on the BRANCH, not on prose. The phrase "gaps recorded" also appears in the
+  // ROUNDS_BUDGET comment further up, so a prose anchor resolves to the constant declaration and
+  // measures nothing. Bound at both ends — the branch opens at `if (!needsRound2) {` and closes at
+  // its `continue;` — so this asserts containment rather than distance.
+  const open = BODY.indexOf('if (!needsRound2) {');
+  assert.ok(open !== -1, 'the budget-exhausted branch must resolve');
+  const close = BODY.indexOf('continue;', open);
+  assert.ok(close > open, 'the branch must reach its continue');
+  assert.match(BODY.slice(open, close), /researchIntegrity\.push/,
+    'a unit denied round 2 must record its gaps before continuing');
+});
+
+test('neediest-first: units are ordered by gap count before the budget is spent', () => {
+  assert.match(BODY, /sort\(\(a, b\) => b\.gaps\.length - a\.gaps\.length\)/);
+});
