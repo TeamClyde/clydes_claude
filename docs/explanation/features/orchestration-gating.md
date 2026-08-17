@@ -179,6 +179,35 @@ flowchart TB
 
 The skill file (`/deep-research`) is a markdown pointer — its trigger description fires the Skill tool, which invokes a JavaScript workflow. The workflow provides guaranteed phase order (Scope → Search → Fetch → Verify → Synthesize) and fan-out mechanics; the individual phases delegate back to the LLM via `agent()` calls. This is the "put cognition in markdown, put control flow in code" principle made concrete. The Verify phase in the diagram was a cautionary case: a verification barrier that over-fanned its votes and deadlocked. This is the canonical example of the engineering risk introduced when edges are hardened — not a compliance failure, but a structural bug in the deterministic layer.
 
+### Nested fan-out, and the toolset as the gate (librarian research phase)
+
+The librarian's research phase is a **nested** fan-out. Each sub-question is still one unit in `parallelFanout` — so the engine's watchdog, quorum and validate contract apply at the level they were designed for — but the unit's `work` now runs three sequential agent stages internally: a `web-search` agent ranks URLs, up to `harvestPerLeaf` (default 4) `page-harvest` agents each fetch exactly one page and return verbatim spans, and a `synthesize` agent turns those quote bundles into cited findings.
+
+```mermaid
+flowchart LR
+  S["web-search · Sonnet<br/>tools: WebSearch"] --> P{"selectHarvestTargets<br/>PURE · cap 4"}
+  P --> H1["page-harvest · Haiku<br/>tools: WebFetch<br/>ONE page"]
+  P --> H2["page-harvest · Haiku"]
+  P --> Hn["page-harvest · Haiku"]
+  H1 --> Y["synthesize · Sonnet<br/>tools: Read — no web reach"]
+  H2 --> Y
+  Hn --> Y
+  Y --> G{"excerptGuard<br/>PURE"}
+  G -->|pass| OK["findings"]
+  G -->|fail| DR["dropped → integrity[]"]
+  Y -.->|"gaps · round 2 only, budgeted"| S
+```
+
+**The toolset is the gate.** This replaces three prompt instructions that were measurably ignored — the previous single research agent was told not to answer from memory and to bound its searches, and did neither. An agent with no fetch tool cannot fetch; an agent with no network tool cannot introduce a source nobody retrieved. This is the same move the hard-gate hooks make against prompt-level guidance elsewhere in this document: prefer the constraint that cannot be reasoned around.
+
+It is also a cost control. A subagent carries a fixed per-agent floor paid at spawn, and restricting its toolset cuts that floor to roughly a third — measured on these three types, not extrapolated. Notably the floor tracks the system prompt and tool schemas rather than the model tier, so pinning to a cheaper model does not reduce it.
+
+**Two fan-out layers multiply.** `maxInFlight` for the outer fan-out is divided by the harvest width, because the runtime does not reject excess agents — it queues them while each queued agent's watchdog is already running. That is the "fan-out steps fail first" cascade this layer exists to prevent. The cost is more batch barriers and a longer wall clock, which is the cheaper failure: a barrier costs time, a saturated pool costs the run.
+
+**`excerptGuard` is a gate over evidence, not over control flow.** Every finding must carry an `excerpt` that is a verbatim substring of a harvested span *for its own source*, and a source the search stage actually returned. Findings that fail are dropped — but recorded in the run's `integrity` channel, never silently, so the dossier reports degraded evidence rather than presenting a thinner set as complete. Its limit is documented and accepted: a real quote attached to the **wrong claim** still passes. Closing that requires deterministic quoting, where the synthesizer returns a span index and code substitutes the text, which changes the findings contract and is deferred.
+
+**Round 2 is budgeted run-wide, not per unit.** A second research round fires only on reported gaps, is spent neediest-first, and is capped across the whole run rather than per sub-question — a per-unit cap would still permit a second round everywhere. It also stops early: if the round-2 search returns more than 80% of round 1's sources, the topic is exhausted and the harvest fan-out is skipped. That check sits deliberately *between* the search and the harvest, which is the only position where it can prevent spend rather than merely describe it.
+
 ### Key files
 
 | Path | Role |

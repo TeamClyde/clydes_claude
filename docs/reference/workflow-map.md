@@ -89,6 +89,9 @@ All agents invoked via: `Agent { subagent_type: "<name>", prompt: "..." }`
 | `test-strategy` | `plan-gate` (after architect APPROVED) | Derives per-plan validation criteria. Appends `## Testing` section to plan doc. |
 | `test-builder` | `plan-gate` (after test-strategy, in parallel with implementation) | Writes failing tests to disk from the Testing section. Never reads implementation source. |
 | `test-runner` | `executing-plans` (main context), `subagent-driven-development` (orchestrator) | Post-implementation test executor. Runs the test suite, classifies failures (BUILD / TEST / ENVIRONMENT), writes results to `.claude/test-results.md`, and mandates `systematic-debugging` via REQUIRED NEXT STEP block on any failure. Caller must have Skill tool access — never dispatch as a leaf implementer subagent. |
+| `web-search` | `librarian` workflow, research phase | Ranks candidate URLs for one sub-question. `tools: WebSearch` only — structurally cannot fetch a page. Never invoked directly by a user. |
+| `page-harvest` | `librarian` workflow, research phase (up to `harvestPerLeaf` per sub-question) | Fetches exactly ONE page and returns verbatim spans plus the publication date. `tools: WebFetch` only — cannot search, cannot follow links. Pinned to Haiku: mechanical extraction, not judgment. |
+| `synthesize` | `librarian` workflow, research phase | Turns quote bundles into cited findings. `tools: Read` only, so it has no network reach and cannot add an unsourced claim. `Read` rather than an empty list because an agent whose tools resolve to zero is refused at spawn; the body instructs it not to use `Read` at all. |
 | `todo-manager` | — | **Removed.** Superseded by `plan-management` skill. |
 
 ---

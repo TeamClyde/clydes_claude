@@ -72,6 +72,15 @@ Use when the user asks for:
    > `maxSearchesPerLeaf` defaults to `6` in the script. Raise it only for an unusually broad topic.
    > Unbounded searching is the run's single largest cost — measured at ~116 tokens of re-read
    > context per token of output, and 73% of a whole run's cache reads from 16% of its agents.
+   >
+   > `harvestPerLeaf` defaults to `4` — the hard cap on pages read per sub-question, and the control
+   > that keeps the research phase inside its token budget. Raising it is a budget decision, not a
+   > tuning knob: each extra harvest agent costs a fixed ~8 K floor regardless of how little it finds.
+   >
+   > `roundsBudget` defaults to `3` — how many sub-questions across the WHOLE run may get a second
+   > research round. Round 2 fires only on reported gaps, is spent neediest-first, harvests 2 pages
+   > rather than 4, and stops early if its search returns >80% of round 1's sources. The budget is
+   > run-wide because per-unit capping alone would let a second round fire on every sub-question.
 
    The research phase runs three tool-restricted agent types per sub-question — `web-search`
    (WebSearch only, ranks URLs and cannot fetch), `page-harvest` (WebFetch only, one page each,
