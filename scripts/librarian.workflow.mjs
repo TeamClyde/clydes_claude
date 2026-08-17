@@ -1478,7 +1478,7 @@ if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing
 // robust to both object and stringified delivery — the front-door exemplar must not
 // assume the happy path.
 const input = typeof args === 'string' ? JSON.parse(args) : args;
-const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf = 6, now, cap } = input;
+const { brief, subQuestions, seedText, leafModel, maxSearchesPerLeaf = 6, harvestPerLeaf = 4, roundsBudget = 3, now, cap } = input;
 // `now` (ISO string) is the ONLY time source: Date.now(), Math.random(), and an argless `new Date()`
 // all THROW in the Workflow sandbox — they would break run resumption, so the sandbox forbids them.
 // Main context computes the timestamp and passes it in.
@@ -1512,40 +1512,147 @@ if (!Array.isArray(subQuestions) || subQuestions.length === 0) {
 }
 // Research leaves are configurable (default Sonnet); the judgment steps (verify + synth) stay Sonnet.
 const LEAF_MODEL = leafModel || 'claude-sonnet-4-6';
+// harvestPerLeaf: the hard cap on harvest agents per sub-question, and the control that keeps this
+// phase inside its budget. Measured 2026-08-15: an agent costs a ~23 K fixed floor regardless of
+// prompt size, cut to ~34% of that by restricting its toolset (measured on these three types at
+// Task 1). At 4 harvests a sub-question costs ~80 K against ~98 K today; at 6 it is ~100 K and the
+// slice stops paying for itself. Raising this is a deliberate budget decision, not a tuning knob.
+const HARVEST_PER_LEAF = (harvestPerLeaf && harvestPerLeaf > 0) ? Math.floor(harvestPerLeaf) : 4;
+// Haiku for harvest ONLY. It is mechanical single-page extraction — copy spans out of one page —
+// which is the one job in this pipeline that is not judgment. Synthesis stays Sonnet.
+const HARVEST_MODEL = 'claude-haiku-4-5-20251001';
+// The two fan-out layers MULTIPLY. MAX_CONCURRENT was the whole in-flight budget when a unit was
+// one agent; a unit is now one agent plus up to HARVEST_PER_LEAF concurrent harvests, so running
+// MAX_CONCURRENT units would put MAX_CONCURRENT x HARVEST_PER_LEAF agents against a runtime ceiling
+// of min(16, cores - 2). The runtime does not reject the excess — it QUEUES it, while each queued
+// agent's watchdog already ticks. That is the "fan-out steps fail first" cascade the regulation
+// layer exists to prevent (see docs/explanation/orchestration-regulation-layer.md).
+//
+// The cost of this division is more batch barriers and a longer wall clock. That is the cheaper of
+// the two failures: a barrier costs time, a saturated pool costs the run.
+const OUTER_IN_FLIGHT = Math.max(1, Math.floor(MAX_CONCURRENT / HARVEST_PER_LEAF));
+const researchIntegrity = [];
 
 // Research findings are CITED: every claim carries the source URL it came from + the sub-question it answers.
+// Research findings are CITED: every claim carries the source URL it came from + the sub-question it answers.
+// `excerpt` is the verbatim span excerptGuard checks against the harvested text. It is OPTIONAL in the
+// schema and enforced by the guard, not by validation — the parent plan's Task 17 owns promoting it to
+// a contractual required field, and a required field here would reject the reframe path, which still
+// runs the single-agent shape and produces no excerpt.
 const FINDINGS = { type: 'object', required: ['findings'], properties: { findings: { type: 'array',
   items: { type: 'object', required: ['subQuestion', 'claim', 'source'], properties: {
-    subQuestion: { type: 'string' }, claim: { type: 'string' }, source: { type: 'string' }, detail: { type: 'string' } } } } } };
+    subQuestion: { type: 'string' }, claim: { type: 'string' }, source: { type: 'string' },
+    excerpt: { type: 'string' }, detail: { type: 'string' } } } },
+  gaps: { type: 'array', items: { type: 'string' } } } };
+
+const SEARCH_RESULTS = { type: 'object', required: ['results'], properties: { results: { type: 'array',
+  items: { type: 'object', required: ['url'], properties: {
+    url: { type: 'string' }, title: { type: 'string' }, why: { type: 'string' } } } } } };
+
+const QUOTE_BUNDLE = { type: 'object', required: ['url', 'spans'], properties: {
+  url: { type: 'string' }, publishedDate: { type: 'string' },
+  spans: { type: 'array', items: { type: 'string' } } } };
 
 phase('Research');
-// One regulated unit per sub-question: each agent SEARCHES THE WEB, reads sources, returns cited findings.
-// Sonnet — web research + source reading is judgment-heavy (never Opus). Watchdog + quorum via the engine.
+// One regulated unit per sub-question — unchanged, deliberately. The fan-out is now NESTED (each
+// unit runs 6 agents), and parallelFanout BATCHES at maxInFlight with a BARRIER between batches, so
+// flattening 9x6 into one fan-out would serialise badly. Keeping the sub-question as the unit
+// preserves the engine's watchdog, quorum and validate contract at the level they were designed for.
+//
+// The three stages are tool-restricted agent types, not prompt instructions. Today's single research
+// agent is TOLD "do not answer from memory" and "search at most N times"; the parent plan's Task 12
+// exists because that was ignored 16 times out of 16. Removing the tool removes the option.
+
+/** Stage 1 — rank URLs. WebSearch only: structurally cannot fetch. */
+const searchStage = (q, exclude) => agent(
+  `Rank the most promising web sources for this sub-question. Do NOT answer it.\n` +
+  `SUB-QUESTION: ${q}\n` +
+  (brief ? `OVERALL RESEARCH GOAL (context only): ${brief}\n` : '') +
+  `Search budget: perform at most ${maxSearchesPerLeaf} WebSearch calls.\n` +
+  `Return at most ${HARVEST_PER_LEAF * 2} results, best first — a later stage caps how many are read, so rank matters more than volume.\n` +
+  (exclude.length ? `ALREADY READ — do not return these: ${exclude.join(', ')}\n` : '') +
+  (seedText ? `\n--- SEED CONTEXT (the user's draft; a topic map only — do NOT treat it as a source) ---\n${seedText}` : ''),
+  { label: `search:${q.slice(0, 40)}`, phase: 'Research', schema: SEARCH_RESULTS,
+    model: LEAF_MODEL, agentType: 'web-search' });
+
+/** Stage 2 — one page, one agent, verbatim spans out. WebFetch only. */
+const harvestStage = (q, url) => agent(
+  `Fetch this ONE page and copy out the passages that bear on the sub-question.\n` +
+  `URL: ${url}\n` +
+  `SUB-QUESTION: ${q}\n` +
+  `Copy each passage character-for-character from the page — a rewritten span invalidates every finding built on it. Return the page's publication date if it states one.\n` +
+  `If the page is dead, paywalled, or off-topic, return an empty spans array. Do NOT substitute another source and do NOT answer from your own knowledge.\n`,
+  { label: `harvest:${url.slice(0, 48)}`, phase: 'Research', schema: QUOTE_BUNDLE,
+    model: HARVEST_MODEL, agentType: 'page-harvest' });
+
+/** Stage 3 — quotes in, cited findings out. No web tool: cannot add an unsourced claim. */
+const synthesizeStage = (q, bundles) => agent(
+  `Turn these verbatim quote bundles into findings for ONE sub-question. You have no web tool — everything you may assert is below.\n` +
+  `SUB-QUESTION: ${q}\n` +
+  (brief ? `OVERALL RESEARCH GOAL (context only): ${brief}\n` : '') +
+  `Set "subQuestion" on EVERY finding to exactly: ${q}\n` +
+  `Set "source" to the bundle URL the claim came from, and "excerpt" to one of that bundle's spans (or a contiguous substring of one), copied exactly. An excerpt that is not a real substring of its source's spans is DROPPED, and one under 80 characters is dropped as unusable.\n` +
+  `Name any genuinely missing facts in "gaps" — concrete gaps, not a restatement of the topic.\n` +
+  `\nQUOTE BUNDLES:\n${JSON.stringify(bundles)}`,
+  { label: `synth:${q.slice(0, 44)}`, phase: 'Research', schema: FINDINGS,
+    model: LEAF_MODEL, agentType: 'synthesize' });
+
+// The round is split into a cheap half and an expensive half so a caller can decide BETWEEN them.
+// Round 2 uses that seam to check convergence after paying for one search but before paying for a
+// harvest fan-out and a synthesis. Fused into one function, a convergence check could only ever run
+// after the whole round's spend, which would make it a log-message chooser rather than a control.
+
+/** Cheap half: one search, then the pure cap/dedupe. */
+async function searchAndSelect(q, exclude, cap) {
+  const search = await searchStage(q, exclude);
+  const searched = (search?.results ?? []).map((r) => r?.url).filter((u) => typeof u === 'string');
+  return { searched, targets: selectHarvestTargets(search?.results ?? [], cap, exclude) };
+}
+
+/**
+ * Expensive half: harvest fan-out -> synthesize -> guard.
+ * Promise.all for the harvests: they share nothing, the unit's watchdog bounds them, and
+ * OUTER_IN_FLIGHT keeps the total across all in-flight units under the runtime ceiling.
+ */
+async function harvestAndSynthesize(q, targets, searched) {
+  const bundles = (await Promise.all(targets.map((t) => harvestStage(q, t.url)))).filter(Boolean);
+  const spansBySource = {};
+  for (const b of bundles) {
+    if (typeof b?.url === 'string') spansBySource[b.url] = Array.isArray(b.spans) ? b.spans : [];
+  }
+  const synth = await synthesizeStage(q, bundles);
+  const kept = [];
+  for (const f of (synth?.findings ?? [])) {
+    const g = excerptGuard(f, spansBySource, searched);
+    if (g.ok) { kept.push(f); continue; }
+    // Recorded, never silently dropped: a claim that failed the verbatim check is a signal about
+    // the run's evidence quality, and #96's lesson is that discarded work must still be handed over.
+    researchIntegrity.push({ subQuestion: q, claim: f?.claim ?? '(no claim)', reason: g.reason });
+  }
+  return { findings: kept, gaps: synth?.gaps ?? [], harvested: Object.keys(spansBySource) };
+}
+
+/** One sub-question, one full round. */
+async function researchRound(q, exclude, cap) {
+  const s = await searchAndSelect(q, exclude, cap);
+  const h = await harvestAndSynthesize(q, s.targets, s.searched);
+  return { ...h, searched: s.searched };
+}
+
 const units = subQuestions.map((q) => ({
   validate: (v) => (v && Array.isArray(v.findings) && v.findings.length > 0)
-    ? { ok: true } : { ok: false, reason: 'need a non-empty { findings: [{subQuestion, claim, source}] }' },
-  work: (repair) => agent(
-    `You are a research analyst. Investigate this sub-question by SEARCHING THE WEB — do NOT answer from memory.\n` +
-    `SUB-QUESTION: ${q}\n` +
-    (brief ? `OVERALL RESEARCH GOAL (context only): ${brief}\n` : '') +
-    `Method: run several WebSearch queries; for the most relevant hits, fetch the page with WebFetch (if WebFetch is unavailable, rely on search-result content). Prefer recent, primary, authoritative sources; note dates on time-sensitive facts; if sources disagree, report both.\n` +
-    (maxSearchesPerLeaf != null ? `Search budget: perform at most ${maxSearchesPerLeaf} WebSearch calls, then synthesize from what you have found.\n` : '') +
-    `Return concrete findings. Set "subQuestion" on EVERY finding to exactly: ${q}. Set "source" to the URL the claim came from.\n` +
-    (repair ? `PREVIOUS ATTEMPT REJECTED: ${repair}. Fix it.\n` : '') +
-    (seedText ? `\n--- SEED CONTEXT (the user's draft; use only as a topic map — VERIFY its claims against live sources, do not treat it as ground truth) ---\n${seedText}` : ''),
-    { label: `research:${q.slice(0, 48)}`, phase: 'Research', schema: FINDINGS, model: LEAF_MODEL }),
+    ? { ok: true } : { ok: false, reason: 'need a non-empty { findings: [{subQuestion, claim, source, excerpt}] } — every excerpt must be a verbatim span of its source' },
+  work: () => researchRound(q, [], HARVEST_PER_LEAF),
 }));
-// maxInFlight = min(units, MAX_CONCURRENT): keeps all units in ONE batch whenever the caller's cap
-// allows, so the runtime's rolling concurrency fills slots instead of parallelFanout imposing a
-// batch barrier. The cap comes from args.cap = min(16, cores − 2), computed in main context.
-// A hardcoded value here cannot be right: it is either below the machine's real ceiling (a wasted
-// barrier) or above it (agents queue while their watchdogs already tick).
-// 900s watchdog: measured research units run 293-562s (WebSearch + several WebFetch reads per unit).
-// A budget below that floor is not a saving — the watchdog is NON-PREEMPTIVE, so a timed-out agent
-// still runs to completion and is still paid for; only its result is discarded. Worse, with
-// maxRetries:1 each timeout spawns a retry ALONGSIDE the still-running original, so a too-tight
-// budget doubles the in-flight agent count and then throws away most of what it bought.
-const review = await parallelFanout(units, { perUnitTimeoutMs: 900_000, maxInFlight: Math.min(subQuestions.length, MAX_CONCURRENT), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet' });
+// 1200s: a unit now holds THREE sequential agent stages (search -> harvest fan-out -> synthesize),
+// where it previously held one. The watchdog is NON-PREEMPTIVE — a timed-out unit still runs to
+// completion and is still paid for; only its result is discarded — so a budget below the real floor
+// buys nothing and, with maxRetries:1, spawns a retry alongside the still-running original.
+//
+// maxInFlight now uses OUTER_IN_FLIGHT, not MAX_CONCURRENT: each unit is itself a fan-out, so the
+// two layers multiply. See the OUTER_IN_FLIGHT comment above for why the excess is a cascade rather
+// than a queue you can ignore.
+const review = await parallelFanout(units, { perUnitTimeoutMs: 1_200_000, maxInFlight: Math.min(subQuestions.length, OUTER_IN_FLIGHT), modelTier: LEAF_MODEL.includes('haiku') ? 'haiku' : 'sonnet' });
 const allFindings = review.confirmed.flatMap((r) => r.findings ?? []);
 // Captured here because `review` is shadowed by no later binding but the health calls below read
 // only the tier — keeping the read at the source makes the pin's provenance obvious.
@@ -1585,7 +1692,7 @@ if (!coverage.ok) {
     runDate: now ?? null,
     stoppedAt: 'coverage-gate',
     verify: null,
-    integrity: [],
+    integrity: researchIntegrity,
   };
 }
 
@@ -1801,7 +1908,7 @@ if (vetted.length === 0) {
     runDate: now ?? null,
     stoppedAt: 'evidence-floor',
     verify: { degraded: verifyDegraded, partial: verified.partial === true, degradedAtTier: verified.degradedAtTier ?? null, triageCoverage: verified.counts?.triageCoverage ?? null, recheckCoverage: null, consensusCoverage: null },
-    integrity: [],
+    integrity: researchIntegrity,
   };
 }
 // < 1 means triage passed over some findings without judging them. Surfaced, never swallowed.
@@ -1897,7 +2004,9 @@ const AUDIT_SCHEMA = {
 // Populated by the section audit. Kept OUTSIDE the unit closures because a section that exhausts
 // its repair budget is still published — its flagged claims must survive into the dossier's
 // `### Integrity` block rather than vanishing with the failed validation attempt.
-const integrity = [];
+// Seeded with the research phase's guard drops: `integrity` is declared after the research phase,
+// so a bare [] here would discard every excerpt-guard record before anything could report it.
+const integrity = [...researchIntegrity];
 
 // The audit runs INSIDE `validate`, which runUnit does not watchdog — so this deadline is the only
 // thing bounding it. Well under the 600s section budget: the auditor reads prose that is already

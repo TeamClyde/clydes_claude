@@ -31,9 +31,14 @@ test('input is destructured before its first use (TDZ guard)', () => {
 
 test('args.cap feeds maxInFlight — the >8 batching cliff is caller-controlled', () => {
   assert.match(BODY, /const MAX_CONCURRENT = \(cap && cap > 0\) \? Math\.min\(Math\.floor\(cap\), 16\) : 8;/);
-  assert.match(BODY, /maxInFlight: Math\.min\(subQuestions\.length, MAX_CONCURRENT\)/);
-  assert.doesNotMatch(BODY, /maxInFlight: Math\.min\(subQuestions\.length, 8\)/,
-    'the hardcoded 8 must be gone — it is a moved cliff, not a removed one');
+  // Slice 4 lengthened the chain rather than breaking it: the research fan-out is now NESTED, so
+  // its maxInFlight reads OUTER_IN_FLIGHT, which is itself derived from MAX_CONCURRENT. The
+  // property this test guards — that args.cap, not a literal, controls the batching cliff — is
+  // unchanged; only the number of hops grew. Both hops are asserted so neither can be cut.
+  assert.match(BODY, /const OUTER_IN_FLIGHT = Math\.max\(1, Math\.floor\(MAX_CONCURRENT \/ HARVEST_PER_LEAF\)\)/);
+  assert.match(BODY, /maxInFlight: Math\.min\(subQuestions\.length, (MAX_CONCURRENT|OUTER_IN_FLIGHT)\)/);
+  assert.doesNotMatch(BODY, /maxInFlight: Math\.min\(subQuestions\.length, \d+\)/,
+    'a hardcoded literal must be gone — it is a moved cliff, not a removed one');
 });
 
 test('the coverage gate runs BEFORE tieredVerify, so a failed brief costs no verify spend', () => {
@@ -73,13 +78,22 @@ test('all three exits share ONE contract — a caller never branches on which ga
   // Task 18 added a SECOND unit-construction block (reframeUnits), whose `return {` is the same
   // validation control flow, not an exit path. Excised on the same grounds and by the same
   // technique — any future unit block must be added here too, or it inflates the count.
+  // Slice 4 added a THIRD such block: the research phase's search/harvest/synthesize helpers.
+  // Their three `return {` sites are internal plumbing between pipeline stages, not run exits —
+  // counting them compares unrelated things exactly as the reframe and section blocks would.
+  // Excised on the same grounds and by the same technique.
+  const researchStart = BODY.indexOf('const searchStage = (q, exclude) => agent(');
+  const researchEnd = BODY.indexOf('const units = subQuestions.map((q) => ({');
   const reframeStart = BODY.indexOf('const reframeUnits = thinQs.map(');
   const reframeEnd = BODY.indexOf('const reframePlans =');
   const unitsStart = BODY.indexOf('const sectionUnits = sections.map(');
   const unitsEnd = BODY.indexOf('const sectionReview =');
-  assert.ok(reframeStart !== -1 && reframeEnd > reframeStart, 'reframeUnits block markers must resolve');
+  assert.ok(researchStart !== -1 && researchEnd > researchStart, 'research pipeline block markers must resolve');
+  assert.ok(reframeStart > researchEnd, 'reframeUnits block markers must resolve, after the research block');
+  assert.ok(reframeEnd > reframeStart, 'reframeUnits block must be bounded');
   assert.ok(unitsStart !== -1 && unitsEnd > unitsStart, 'sectionUnits block markers must resolve');
-  const EXIT_SCOPE = BODY.slice(0, reframeStart) + BODY.slice(reframeEnd, unitsStart) + BODY.slice(unitsEnd);
+  const EXIT_SCOPE = BODY.slice(0, researchStart) + BODY.slice(researchEnd, reframeStart)
+    + BODY.slice(reframeEnd, unitsStart) + BODY.slice(unitsEnd);
 
   // The count is asserted so the loop below can never pass vacuously: if the split stopped matching,
   // an empty `exits` would satisfy every per-item check without testing anything.
@@ -717,4 +731,84 @@ test('the validate closure returns do NOT carry health', () => {
   assert.ok(start !== -1 && end > start, 'validate block markers must resolve');
   assert.doesNotMatch(BODY.slice(start, end), /\bhealth,/,
     'validate returns {ok, reason} to runUnit — health belongs only on workflow-level returns');
+});
+
+// ── Slice 4: the search → harvest → synthesize research pipeline ─────────────
+
+test('research: the search stage is pinned to the WebSearch-only agent type', () => {
+  assert.match(BODY, /agentType: 'web-search'/);
+});
+
+test('research: harvest agents are pinned to the WebFetch-only agent type AND to Haiku', () => {
+  // Bounded marker-slicing, NOT a distance window and NOT indexOf('}'): the first `}` after the
+  // label marker closes the `${url.slice(0, 48)}` template interpolation, not the options object,
+  // so slicing on it would truncate before agentType and could never match. `});` closes the call.
+  const i = BODY.indexOf('label: `harvest:');
+  assert.ok(i > 0, 'harvest agent call not found');
+  const opts = BODY.slice(i, BODY.indexOf('});', i));
+  assert.match(opts, /agentType: 'page-harvest'/);
+  assert.match(opts, /model: HARVEST_MODEL/);
+});
+
+test('research: the synthesizer cannot reach the web and never receives a page', () => {
+  assert.match(BODY, /agentType: 'synthesize'/);
+});
+
+test('research: harvest fan-out is capped by an explicit cap argument, and round 1 passes HARVEST_PER_LEAF', () => {
+  // Asserted in two parts so Task 7 (which makes the cap a parameter for round 2) cannot silently
+  // break it: the selection call must take a cap, and the round-1 caller must supply the budgeted one.
+  assert.match(BODY, /selectHarvestTargets\(search\?\.results \?\? \[\], cap, exclude\)/);
+  assert.match(BODY, /researchRound\(q, \[\], HARVEST_PER_LEAF\)/);
+});
+
+test('nested fan-out is capped multiplicatively — outer in-flight is divided by the harvest width', () => {
+  // The unit fan-out and the harvest fan-out MULTIPLY. Without this division, 8 units x 4 harvests
+  // puts 32 agents against a min(16, cores-2) runtime ceiling; the excess queues while its
+  // watchdog already ticks, which is the documented "fan-out steps fail first" cascade.
+  assert.match(BODY, /const OUTER_IN_FLIGHT = Math\.max\(1, Math\.floor\(MAX_CONCURRENT \/ HARVEST_PER_LEAF\)\)/);
+  assert.match(BODY, /maxInFlight: Math\.min\(subQuestions\.length, OUTER_IN_FLIGHT\)/);
+});
+
+test('research: every finding passes excerptGuard before it is kept', () => {
+  assert.match(BODY, /excerptGuard\(f, spansBySource, searched\)/);
+});
+
+test('research: a guard-failed finding is recorded, never silently dropped', () => {
+  // Index hoisted and guarded before slicing, per rules/source-text-assertions.md: an unresolved
+  // marker would slice from 0 and match somewhere unrelated, reporting a false PASS.
+  const at = BODY.indexOf('excerptGuard(f, spansBySource, searched)');
+  assert.ok(at !== -1, 'excerptGuard call site must resolve');
+  const guard = BODY.slice(at);
+  assert.match(guard.slice(0, 600), /researchIntegrity\.push\(\{[\s\S]{0,200}reason: g\.reason/);
+});
+
+test('research: the per-unit watchdog covers three sequential agent stages', () => {
+  const at = BODY.indexOf('const review = await parallelFanout(units,');
+  assert.ok(at !== -1, 'parallelFanout call must resolve');
+  const call = BODY.slice(at);
+  assert.match(call.slice(0, 300), /perUnitTimeoutMs: 1_200_000/);
+});
+
+test('research integrity is carried into the run-level integrity channel', () => {
+  assert.match(BODY, /const integrity = \[\.\.\.researchIntegrity\]/);
+});
+
+test('the early-return paths hand over research integrity rather than an empty array', () => {
+  // Two returns fire BEFORE `integrity` is declared. Handing over [] there would discard every
+  // dropped-finding record the research phase produced — the #96 "recoverable work thrown away"
+  // failure in a new place.
+  assert.equal(BODY.split('integrity: researchIntegrity,').length - 1, 2);
+  assert.ok(!/integrity: \[\],/.test(BODY));
+});
+
+test('FINDINGS carries excerpt as an optional property', () => {
+  // Bounded at BOTH ends, both indices guarded — the region must be contained, not merely near.
+  const open = BODY.indexOf('const FINDINGS = ');
+  const close = BODY.indexOf('phase(\'Research\')');
+  assert.ok(open !== -1, 'FINDINGS declaration must resolve');
+  assert.ok(close > open, 'the Research phase must follow the FINDINGS declaration');
+  const schema = BODY.slice(open, close);
+  assert.match(schema, /excerpt: \{ type: 'string' \}/);
+  // Optional until the parent plan's Task 17 makes it contractual — see Open Question 1.
+  assert.match(schema, /required: \['subQuestion', 'claim', 'source'\]/);
 });
