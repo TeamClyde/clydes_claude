@@ -3,7 +3,7 @@
 Canonical reference for how skills, agents, rules, hooks, and plugins connect in the
 Claude workflow. Update this file whenever a component is added, removed, or rewired.
 
-Last updated: 2026-07-08
+Last updated: 2026-08-17
 
 ---
 
@@ -237,6 +237,18 @@ Hooks live in `hooks/` and are symlinked to `~/.claude/hooks/` by setup.sh.
 | `PostToolUse` (on commit) | Subagent commits bypass PostToolUse in the orchestrator context — hook would fire inconsistently or not at all. |
 | `SessionEnd` | Mixed human/agent context makes SessionEnd timing ambiguous; cleanup logic would be unreliable. |
 | `PreCompact` | Poor failure semantics — a PreCompact hook that errors can abort compaction mid-stream with no recovery path. |
+
+---
+
+## Engine Scripts
+
+Support scripts consumed by the `librarian` and `orchestration-audit` workflow engines. Not skills or
+hooks — plain Node.js modules invoked directly by `.workflow.mjs` scripts or by hand.
+
+| Script | Consumed by | What it does |
+|--------|-------------|--------------|
+| `scripts/lib/run-health.mjs` (`checkRunHealth`) | End of `scripts/librarian.workflow.mjs` and `scripts/orchestration-audit.workflow.mjs` | PURE — no I/O, no timers (inlined into the Workflow sandbox, where `Date.now()`/timers throw). Turns engine signals `parallelFanout`/verify already compute but previously discarded into hard failures: model-pin assertion above an N>10 fan-out, hard-fail on `triageCoverage < 1` or `verifyEmptied` (and the per-tier coverage fractions when not degraded), and stitch-completeness (every `orderedSections[i].subQuestion` present in the returned report). Duration-based checks are NOT here — see `watchdogMargin` below. |
+| `scripts/measure-workflow-run.mjs` | Manual, run by hand against a completed run's transcript directory | Offline forensics over a workflow run's `journal.jsonl` and `agent-*.jsonl` transcripts. Classifies agents by exact prompt prefix (`classifyAgent`), sums `usage` once per unique `message.id` with last-wins `output_tokens` (not once per content-block line — see `docs/explanation/librarian-token-efficiency-retrospective-2026-08-14.md` §6), reports per-phase token totals, identifies orphaned agents (started with no `result` line — paid for and discarded), and exposes `watchdogMargin` — flagging units whose span landed at ≥70% of their configured `timeoutMs`. Duration-based checks live here rather than in `run-health.mjs` because the Workflow sandbox bans `Date.now()`/timers; this script reads transcripts offline instead. Pinned by unit tests in `scripts/measure-workflow-run.test.mjs`. |
 
 ---
 
