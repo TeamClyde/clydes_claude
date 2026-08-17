@@ -732,7 +732,24 @@ test('an empty or whitespace excerpt escalates', () => {
 });
 
 test('an excerpt shorter than MIN_EXCERPT_CHARS but non-empty escalates', () => {
+  assert.ok('too short'.length < MIN_EXCERPT_CHARS);
   assert.equal(needsLiveRecheck({ excerpt: 'too short' }, { needsSource: false }), true);
+});
+
+test('needsLiveRecheck measures length the same way excerptGuard does — via normalizeSpan, not a bare trim', () => {
+  // Two short words separated by a wall of internal whitespace: RAW length clears the bar, but the
+  // NORMALIZED length (whitespace collapsed to single spaces, per normalizeSpan) does not. excerptGuard
+  // would reject this excerpt as too short; needsLiveRecheck must agree and escalate.
+  const rawExcerpt = `ab${' '.repeat(MIN_EXCERPT_CHARS)}cd`;
+  const normalized = rawExcerpt.replace(/\s+/g, ' ').trim();
+  assert.ok(rawExcerpt.length >= MIN_EXCERPT_CHARS);
+  assert.ok(normalized.length < MIN_EXCERPT_CHARS);
+  assert.equal(needsLiveRecheck({ excerpt: rawExcerpt }, { needsSource: false }), true);
+});
+
+test('a non-string excerpt escalates rather than being coerced and measured', () => {
+  const longNumber = Number('9'.repeat(MIN_EXCERPT_CHARS + 10));
+  assert.equal(needsLiveRecheck({ excerpt: longNumber }, { needsSource: false }), true);
 });
 
 test('the recheck agent raising needsSource escalates', () => {
