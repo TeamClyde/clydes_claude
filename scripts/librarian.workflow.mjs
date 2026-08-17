@@ -1551,6 +1551,15 @@ function roundsConverged(urlsRound1, urlsRound2) {
 // this predicate must measure length the same way excerptGuard does: via normalizeSpan, not a bare
 // .trim(). The length check in this predicate is therefore defensive redundancy whose real job is
 // catching the reframe path, which produces NO excerpt at all.
+//
+// Hand-copied mirror: `scripts/lib/verify.mjs` inlines this predicate as `needsLive` inside Tier 2.
+// verify.mjs is dependency-free by design and cannot import it, so the duplication is deliberate.
+// Any behavioural change here — a branch, its order, the threshold, or the measurement — must be
+// mirrored there and followed by `npm run build:engine`, since the mirror is inlined into both
+// workflow bundles. The mirror is behaviourally test-guarded, not merely documented: the
+// `(inline predicate)` tests in verify.test.mjs drive these edge cases through `tieredVerify`, the
+// only execution path that reaches it, so a real divergence goes red. This note closes the
+// discoverability gap, not a correctness one — no second guard is needed.
 
 /**
  * @param {object} finding - the finding, carrying `excerpt` and possibly `contested`
