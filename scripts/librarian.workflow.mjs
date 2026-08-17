@@ -1409,6 +1409,48 @@ function selectHarvestTargets(results, cap, alreadyHarvested = []) {
   return out;
 }
 
+// ── Excerpt integrity ───────────────────────────────────────────────────────
+// The synthesizer never sees a page — only spans a harvest agent copied out of one. This guard is
+// what makes that a CHECK rather than a hope: it re-derives, from data the workflow already holds,
+// whether the excerpt it emitted is genuinely one of those spans.
+//
+// 80 chars: short enough for one pointed sentence, long enough that a bare noun phrase ("the
+// transition rate") cannot pass as evidence.
+//
+// KNOWN LIMIT, accepted and recorded (design §4.2). A synthesizer that quotes a span exactly but
+// attaches it to the WRONG CLAIM still passes. Closing that needs deterministic quoting — the
+// synthesizer returns a span INDEX and code substitutes the text — which changes the FINDINGS
+// contract that the parent plan's Task 17 owns. Revisit there.
+const MIN_EXCERPT_CHARS = 80;
+
+/** Collapse every run of whitespace to one space and trim. The ONLY normalisation applied. */
+function normalizeSpan(s) {
+  return String(s).replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * @param {{source:string, excerpt:string}} finding
+ * @param {Record<string, string[]>} spansBySource - verbatim spans keyed by the URL they came from
+ * @param {string[]} searchedUrls - every URL the search stage returned this round
+ * @returns {{ok:true}|{ok:false, reason:string}}
+ */
+function excerptGuard(finding, spansBySource, searchedUrls) {
+  const source = finding?.source;
+  // Source first: an unsourced finding's excerpt problem is not the one worth reporting.
+  if (!source || !searchedUrls.includes(source)) {
+    return { ok: false, reason: 'source is not among the searched URLs' };
+  }
+  const excerpt = normalizeSpan(finding?.excerpt ?? '');
+  if (excerpt.length < MIN_EXCERPT_CHARS) {
+    return { ok: false, reason: `excerpt is missing or too short (< ${MIN_EXCERPT_CHARS} chars)` };
+  }
+  const spans = (spansBySource?.[source] ?? []).map(normalizeSpan);
+  if (!spans.some((s) => s.includes(excerpt))) {
+    return { ok: false, reason: 'excerpt is not a verbatim span of its source' };
+  }
+  return { ok: true };
+}
+
 // <LIBRARIAN-CORE:end>
 
 if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing timer — cannot guarantee liveness');

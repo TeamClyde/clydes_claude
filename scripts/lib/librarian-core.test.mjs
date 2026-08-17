@@ -4,7 +4,7 @@ import {
   assessCoverage, deriveEvidenceState, hasAnySource, urlsInProse, unknownUrls, exciseGuard,
   COVERAGE_MIN_RATIO, COVERAGE_MIN_ANSWERED,
   renderTable, renderDossierEntry, renderDossierHeader, mergeFindingsDoc,
-  selectHarvestTargets,
+  selectHarvestTargets, excerptGuard, MIN_EXCERPT_CHARS,
 } from './librarian-core.mjs';
 
 const Q = ['q1', 'q2', 'q3', 'q4'];
@@ -608,4 +608,74 @@ test('selectHarvestTargets: tolerates a null/empty result list', () => {
   assert.deepEqual(selectHarvestTargets(null, 4, []), []);
   assert.deepEqual(selectHarvestTargets([], 4, []), []);
   assert.deepEqual(selectHarvestTargets([{ }, { url: '' }], 4, []), []);
+});
+
+// ── excerptGuard ─────────────────────────────────────────────────────────────
+
+const SPANS = {
+  'https://a.example/x': [
+    'The transition rate rose from 4.2 percent in 2023 to 7.8 percent in 2024, the largest single-year move on record.',
+  ],
+};
+const URLS = ['https://a.example/x', 'https://b.example/y'];
+const fnd = (over = {}) => ({
+  subQuestion: 'q1', claim: 'c', source: 'https://a.example/x',
+  excerpt: 'The transition rate rose from 4.2 percent in 2023 to 7.8 percent in 2024, the largest single-year move on record.',
+  ...over,
+});
+
+test('excerptGuard: a verbatim span passes', () => {
+  assert.deepEqual(excerptGuard(fnd(), SPANS, URLS), { ok: true });
+});
+
+test('excerptGuard: a verbatim SUBSTRING of a span passes', () => {
+  const r = excerptGuard(fnd({ excerpt: 'rose from 4.2 percent in 2023 to 7.8 percent in 2024, the largest single-year move' }), SPANS, URLS);
+  assert.equal(r.ok, true);
+});
+
+test('excerptGuard: whitespace differences are normalised away', () => {
+  const r = excerptGuard(fnd({ excerpt: 'The transition rate rose from 4.2 percent\n  in 2023 to 7.8 percent in 2024, the largest single-year move on record.' }), SPANS, URLS);
+  assert.equal(r.ok, true);
+});
+
+test('excerptGuard: a paraphrase fails with the paraphrase reason', () => {
+  const r = excerptGuard(fnd({ excerpt: 'The transition rate nearly doubled between 2023 and 2024, which was a record annual increase.' }), SPANS, URLS);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /not a verbatim span/);
+});
+
+test('excerptGuard: an excerpt shorter than MIN_EXCERPT_CHARS fails even though it is verbatim', () => {
+  const r = excerptGuard(fnd({ excerpt: 'The transition rate rose' }), SPANS, URLS);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /too short/);
+  assert.ok('The transition rate rose'.length < MIN_EXCERPT_CHARS);
+});
+
+test('excerptGuard: a missing or empty excerpt fails', () => {
+  assert.equal(excerptGuard(fnd({ excerpt: '' }), SPANS, URLS).ok, false);
+  assert.equal(excerptGuard(fnd({ excerpt: undefined }), SPANS, URLS).ok, false);
+});
+
+test('excerptGuard: a span belonging to a DIFFERENT source does not satisfy this finding', () => {
+  const spans = { 'https://b.example/y': SPANS['https://a.example/x'] };
+  const r = excerptGuard(fnd(), spans, URLS);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /not a verbatim span/);
+});
+
+test('excerptGuard: a source the search stage never returned fails with the source reason', () => {
+  const r = excerptGuard(fnd({ source: 'https://evil.example/z' }), SPANS, URLS);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /not among the searched URLs/);
+});
+
+test('excerptGuard: the source check runs before the excerpt check', () => {
+  // An unsourced finding with a good-looking excerpt must report the SOURCE failure — reporting
+  // "too short" would send a reader looking at the wrong defect.
+  const r = excerptGuard(fnd({ source: 'https://evil.example/z', excerpt: 'x' }), SPANS, URLS);
+  assert.match(r.reason, /not among the searched URLs/);
+});
+
+test('excerptGuard: MIN_EXCERPT_CHARS is 80', () => {
+  assert.equal(MIN_EXCERPT_CHARS, 80);
 });
