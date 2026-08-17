@@ -2,6 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tieredVerify, VERIFY_PROTOCOL, TRIAGE_SCHEMA } from './verify.mjs';
 
+// >80 chars — clears MIN_EXCERPT_CHARS, the bar the Tier-2 escape-lane predicate uses (and the
+// canonical needsLiveRecheck in librarian-core.mjs). Declared here because web-research fixtures
+// defined ABOVE the excerpt-first test block still need it: without a usable excerpt every one of
+// them escalates to the live lane, and a test that means to exercise the cheap path stops doing so.
+const GOOD_EXCERPT =
+  'Retrieval latency at the 99th percentile stayed under twelve milliseconds across all ten trial runs.';
+
 const F = [
   { id: 'a', where: 'x.mjs:1', summary: 'real',   _seed: 'supported' },
   { id: 'b', where: 'x.mjs:2', summary: 'false',   _seed: 'unsupported' },
@@ -92,7 +99,9 @@ test('degrades gracefully when a tier throws', async () => {
 // instead of dropping it (escalateOn includes 'unsupported'). The other tests use
 // the `audit` profile, which drops unsupported — this guards the override branch.
 test('web-research profile: unsupported finding escalates to Tier 2 (not dropped)', async () => {
-  const W = [{ id: 'u', where: 'src.mjs:1', summary: 'weak', _seed: 'unsupported' }];
+  // Carries an excerpt so Tier 2 takes the cheap lane — this test is about the profile's
+  // escalateOn override, not about the excerpt-first escape lane.
+  const W = [{ id: 'u', where: 'src.mjs:1', summary: 'weak', _seed: 'unsupported', excerpt: GOOD_EXCERPT }];
   const agent = async (prompt, opts) => {
     if (opts.label === 'verify:triage') return { verdicts: [{ index: 0, support: 'unsupported' }] };
     if (opts.label?.startsWith('verify:recheck')) return { keep: [{ index: 0, keep: true }] };
@@ -373,9 +382,12 @@ test('a fully healthy verify reports full coverage and is not partial', async ()
 // ── Regression: #118 thin-source escalation ─────────────────────────────────────
 // Fixtures for thin-source: one authoritative, one thin, both triaged `supported` so that ONLY the
 // thinSource flag can be responsible for escalation.
+// Both carry a usable excerpt: these tests are about thin-SOURCE escalation, so they must take
+// Tier 2's cheap excerpt lane. Without one they would also escalate to the live lane, and the
+// `recheckSaw` assertion below would end up describing the live prompt instead of the recheck one.
 const T = [
-  { id: 'auth', source: 'https://arxiv.org/abs/1', claim: 'well-sourced' },
-  { id: 'thin', source: 'https://vendor.example/blog', claim: 'single low-authority source' },
+  { id: 'auth', source: 'https://arxiv.org/abs/1', claim: 'well-sourced', excerpt: GOOD_EXCERPT },
+  { id: 'thin', source: 'https://vendor.example/blog', claim: 'single low-authority source', excerpt: GOOD_EXCERPT },
 ];
 
 function mkThinAgent({ recheckKeeps = true, refute = () => false } = {}) {
@@ -621,6 +633,188 @@ test('a Tier-1 collapse still reports triageCoverage', async () => {
     'triageCoverage must be present on the catch-all degraded path');
   assert.equal(typeof r.counts.recheckCoverage, 'number');
   assert.equal(typeof r.counts.consensusCoverage, 'number');
+});
+
+// ── Excerpt-first Tier 2 with a live escape lane ───────────────────────────────
+// Tier 2 used to re-fetch every source the research agent had already read and discarded. It now
+// judges against the VERBATIM excerpt the finding carries, and escalates to ONE live-source pass
+// only where the excerpt cannot settle the claim. Gated on the web-research profile — every other
+// profile keeps the original single-pass live-source lane.
+//
+// The escalation predicate is an INLINE MIRROR of needsLiveRecheck() in librarian-core.mjs.
+// librarian-core's own unit tests import the canonical function directly and never execute this
+// copy, so the four `(inline predicate)` tests below are the ONLY thing that reaches the mirror.
+
+// GOOD_EXCERPT (top of file) is >80 chars on purpose — a shorter string would escalate on LENGTH
+// and make every needsSource/contested assertion below vacuous.
+const mkEx = (over = {}) => ({ id: 'e1', source: 'https://ex.com/a', claim: 'a claim', excerpt: GOOD_EXCERPT, ...over });
+
+// All fixtures triage `uncertain` so they escalate to Tier 2 under any profile; Tier 3 keeps
+// everything (empty votes → keeper) so the only thing that can drop a finding is Tier 2.
+function mkExAgent(findings, { excerptKeep = [], liveKeep = [], liveThrows = false, log } = {}) {
+  return async (prompt, opts) => {
+    log?.push({ label: opts.label, prompt, schema: opts.schema });
+    if (opts.label === 'verify:triage') {
+      return { verdicts: findings.map((_, i) => ({ index: i, support: 'uncertain' })) };
+    }
+    if (opts.label?.startsWith('verify:recheck:live')) {
+      if (liveThrows) throw new Error('live source down');
+      return { keep: liveKeep };
+    }
+    if (opts.label?.startsWith('verify:recheck')) return { keep: excerptKeep };
+    if (opts.label?.startsWith('verify:consensus')) return { votes: [] };
+  };
+}
+
+const liveLabels = (log) => log.filter((c) => c.label?.startsWith('verify:recheck:live')).map((c) => c.label);
+const excerptCall = (log) => log.find((c) => c.label?.startsWith('verify:recheck') && !c.label.startsWith('verify:recheck:live'));
+
+test('web-research Tier 2 judges against the carried excerpt and is told not to fetch', async () => {
+  const f = [mkEx()];
+  const log = [];
+  await tieredVerify(f, {
+    profile: 'web-research',
+    agent: mkExAgent(f, { excerptKeep: [{ index: 0, keep: true }], log }),
+    perTierTimeoutMs: 1000,
+  });
+  const p = excerptCall(log).prompt;
+  assert.match(p, /VERBATIM EXCERPT/, 'the cheap lane must name the excerpt as the thing being judged');
+  assert.match(p, /Do NOT fetch anything/, 'the whole saving is that this pass does not re-fetch');
+  assert.ok(p.includes(GOOD_EXCERPT), 'the excerpt text itself must be in the prompt — a prompt that omits it judges nothing');
+});
+
+// THE load-bearing negative. Without it a `needsLive` that returned `true` unconditionally would
+// pass every other test in this block while destroying the entire saving.
+test('a good excerpt with no objection does NOT reach the live lane (inline predicate)', async () => {
+  const f = [mkEx()];
+  const log = [];
+  const out = await tieredVerify(f, {
+    profile: 'web-research',
+    agent: mkExAgent(f, { excerptKeep: [{ index: 0, keep: true }], log }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.deepEqual(liveLabels(log), [], 'a settled excerpt must not trigger a live fetch');
+  assert.equal(out.findings.length, 1);
+});
+
+test('a needsSource verdict triggers a live re-fetch pass (inline predicate)', async () => {
+  const f = [mkEx()];
+  const log = [];
+  await tieredVerify(f, {
+    profile: 'web-research',
+    agent: mkExAgent(f, { excerptKeep: [{ index: 0, keep: true, needsSource: true }], log }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.equal(liveLabels(log).length, 1, 'an explicit "I need the source" must reach the live lane');
+  const live = log.find((c) => c.label?.startsWith('verify:recheck:live'));
+  assert.match(live.prompt, /against their shared source/, 'the live lane uses the original live-source prompt');
+  assert.ok(!live.prompt.includes('Do NOT fetch'), 'the live lane must not carry the no-fetch instruction');
+});
+
+// Escalate on SILENCE. Everywhere else in this engine an omitted index means "keep" — but that rule
+// is about evidence AGAINST a finding, and this predicate asks a different question: did the excerpt
+// settle the claim? A verdict that never arrived is not an answer of "yes".
+test('a finding the excerpt pass never returned a verdict for escalates (inline predicate)', async () => {
+  const f = [mkEx()];
+  const log = [];
+  await tieredVerify(f, {
+    profile: 'web-research',
+    agent: mkExAgent(f, { excerptKeep: [], log }),   // the recheck agent omits the index entirely
+    perTierTimeoutMs: 1000,
+  });
+  assert.equal(liveLabels(log).length, 1, 'silence is not evidence that the excerpt sufficed');
+});
+
+test('a contested finding escalates to the live lane (inline predicate)', async () => {
+  const f = [mkEx({ contested: true })];
+  const log = [];
+  await tieredVerify(f, {
+    profile: 'web-research',
+    agent: mkExAgent(f, { excerptKeep: [{ index: 0, keep: true }], log }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.equal(liveLabels(log).length, 1, 'a contested finding must touch the source even with a usable excerpt');
+});
+
+test('a too-short or missing excerpt escalates to the live lane (inline predicate)', async () => {
+  for (const bad of [{ excerpt: 'tiny' }, { excerpt: undefined }]) {
+    const f = [mkEx(bad)];
+    const log = [];
+    await tieredVerify(f, {
+      profile: 'web-research',
+      agent: mkExAgent(f, { excerptKeep: [{ index: 0, keep: true }], log }),
+      perTierTimeoutMs: 1000,
+    });
+    assert.equal(liveLabels(log).length, 1, `excerpt ${JSON.stringify(bad.excerpt)} cannot settle a claim`);
+  }
+});
+
+// The mirror must measure length the way excerptGuard does — whitespace-collapsed, not bare-trimmed.
+// A `.trim()`-only ruler fails OPEN: this excerpt is >80 raw and <80 normalized, so it would skip
+// the live lane exactly when the source is most needed.
+test('excerpt length is measured whitespace-collapsed, not bare-trimmed (inline predicate)', async () => {
+  const padded = 'short claim text here'.split('').join('   ');   // >80 raw, <80 once collapsed
+  assert.ok(padded.trim().length >= 80 && padded.replace(/\s+/g, ' ').trim().length < 80, 'fixture must straddle the bar');
+  const f = [mkEx({ excerpt: padded })];
+  const log = [];
+  await tieredVerify(f, {
+    profile: 'web-research',
+    agent: mkExAgent(f, { excerptKeep: [{ index: 0, keep: true }], log }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.equal(liveLabels(log).length, 1, 'a bare .trim() ruler would wave this through');
+});
+
+test('the live pass OVERRIDES the excerpt verdict for the same index', async () => {
+  const f = [mkEx()];
+  const out = await tieredVerify(f, {
+    profile: 'web-research',
+    agent: mkExAgent(f, {
+      excerptKeep: [{ index: 0, keep: true, needsSource: true }],
+      liveKeep: [{ index: 0, keep: false }],
+    }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.equal(out.findings.length, 0, 'the live source wins over the excerpt pass');
+});
+
+test('a failed live pass leaves the excerpt verdict standing rather than dropping the finding', async () => {
+  const f = [mkEx()];
+  const out = await tieredVerify(f, {
+    profile: 'web-research',
+    agent: mkExAgent(f, { excerptKeep: [{ index: 0, keep: true, needsSource: true }], liveThrows: true }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.equal(out.findings.length, 1, 'a lost live pass is not evidence against a finding');
+  assert.equal(out.degraded, false);
+});
+
+test('the re-check schema declares needsSource — a lane whose trigger the schema forbids can never fire', async () => {
+  const f = [mkEx()];
+  const log = [];
+  await tieredVerify(f, {
+    profile: 'web-research',
+    agent: mkExAgent(f, { excerptKeep: [{ index: 0, keep: true }], log }),
+    perTierTimeoutMs: 1000,
+  });
+  assert.equal(excerptCall(log).schema.properties.keep.items.properties.needsSource.type, 'boolean');
+});
+
+// Profile gate. `orchestration-audit.workflow.mjs` shares this module; its behaviour must not move.
+test('non-web-research profiles keep the original live-source prompt and never dispatch a live lane', async () => {
+  for (const profile of ['audit', 'code-review', 'plan-review']) {
+    const f = [{ id: 'n1', where: 'x.mjs:1', summary: 'no excerpt anywhere' }];
+    const log = [];
+    await tieredVerify(f, {
+      profile,
+      agent: mkExAgent(f, { excerptKeep: [{ index: 0, keep: true }], log }),
+      perTierTimeoutMs: 1000,
+    });
+    assert.deepEqual(liveLabels(log), [], `${profile} must not gain a second Tier-2 pass`);
+    const p = excerptCall(log).prompt;
+    assert.match(p, /Re-check this cluster of related findings against their shared source/, `${profile} keeps the original prompt`);
+    assert.ok(!p.includes('EXCERPT'), `${profile} must not be handed the excerpt-first prompt`);
+  }
 });
 
 test('the verifyEmptied path is a DIFFERENT path and already reported coverage', async () => {

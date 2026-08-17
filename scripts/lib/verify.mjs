@@ -52,6 +52,9 @@ const RECHECK_SCHEMA = {
         properties: {
           index: { type: 'integer' },
           keep:  { type: 'boolean' },
+          // The escape lane's trigger. The re-check agent raises this when the carried excerpt is
+          // not enough to judge the claim — it is an explicit "I need the source", not a guess.
+          needsSource: { type: 'boolean' },
         },
       },
     },
@@ -139,7 +142,24 @@ function triagePrompt(findings) {
   );
 }
 
-function recheckPrompt(members) {
+// Two prompts, one per lane. `excerptFirst` is the cheap default for web research: the research
+// agent already fetched and read this page, and re-fetching it is what made Tier 2 the dominant
+// cache-read cost of a librarian run. The excerpt is a VERBATIM span, not a summary — judging
+// against a restatement would be circular, judging against a quote is not. The live lane is the
+// escape hatch and is unchanged from the original prompt.
+function recheckPrompt(members, { excerptFirst = false } = {}) {
+  if (excerptFirst) {
+    const list = members
+      .map((f) => `<${f._idx}>: ${renderFinding(f)}\n  EXCERPT: ${(f.excerpt ?? '').trim()}`)
+      .join('\n');
+    return (
+      'Re-check these findings against the VERBATIM EXCERPT carried with each one. For EACH `index`, ' +
+      '`keep:true` only if the excerpt supports the claim. Do NOT fetch anything. ' +
+      'If the excerpt is insufficient to decide — truncated, off-topic, or not addressing the claim — ' +
+      'set `needsSource:true` instead of guessing. Terse.\n\n' +
+      list
+    );
+  }
   const list = members
     .map((f) => `<${f._idx}>: ${renderFinding(f)}`)
     .join('\n');
@@ -334,6 +354,25 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
     // ── Tier 2: Clustered Adversarial Re-Check ───────────────────────────────
     const keyFn = clusterBy ?? defaultClusterKey;
 
+    // Excerpt-first is librarian-only. `orchestration-audit.workflow.mjs` shares this module and
+    // must keep byte-identical behaviour, so the optimisation is gated on the PROFILE, not applied
+    // globally. Every other profile takes the original single-pass live-source lane below.
+    const excerptFirst = profile === 'web-research';
+
+    // Mirrors needsLiveRecheck() in librarian-core.mjs — kept inline because verify.mjs imports
+    // nothing. MUST stay behaviourally identical to the canonical copy, including the 80-char bar
+    // and the whitespace-collapsing measurement: `.trim()` alone would use a different ruler for
+    // the same threshold and fail OPEN (an excerpt >=80 raw but <80 normalized would skip the live
+    // lane). Escalate on silence: a missing verdict is not evidence the excerpt sufficed.
+    const MIN_EXCERPT_CHARS = 80;
+    const needsLive = (f, verdict) => {
+      if (f?.contested === true) return true;
+      const ex = typeof f?.excerpt === 'string' ? f.excerpt.replace(/\s+/g, ' ').trim() : '';
+      if (ex.length < MIN_EXCERPT_CHARS) return true;
+      if (!verdict) return true;
+      return verdict.needsSource === true;
+    };
+
     // Group escalation set by cluster key.
     const clusters = new Map();
     for (const f of escalation) {
@@ -355,7 +394,7 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
     const clusterResults = await Promise.allSettled(
       clusterEntries.map(async ([key, members]) => {
         const r = await withDeadline(
-          agent(recheckPrompt(members), { label: `verify:recheck:${key}`, schema: RECHECK_SCHEMA, model: 'claude-sonnet-4-6' }),
+          agent(recheckPrompt(members, { excerptFirst }), { label: `verify:recheck:${key}`, schema: RECHECK_SCHEMA, model: 'claude-sonnet-4-6' }),
           perTierTimeoutMs,
         );
         return [members, r];
@@ -363,7 +402,7 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
     );
 
     for (const [i, settled] of clusterResults.entries()) {
-      const members = clusterEntries[i][1];
+      const [key, members] = clusterEntries[i];
 
       if (settled.status !== 'fulfilled') {
         contestedTail.push(...members);   // fall back to this cluster's own input set
@@ -375,11 +414,36 @@ export async function tieredVerify(findings, { profile, agent, perTierTimeoutMs 
       const [, r] = settled.value;
       const keepSet = new Map();
       for (const entry of r?.keep ?? []) {
-        keepSet.set(entry.index, entry.keep); // entry.index is the global _idx
+        keepSet.set(entry.index, entry); // entry.index is the global _idx; `needsSource` rides along
+      }
+
+      // ── Escape lane ────────────────────────────────────────────────────────
+      // The excerpt pass is the cheap default. Anything it could not settle — the agent said so,
+      // or the excerpt is absent/too short to be a quotable span, or the finding is contested —
+      // gets ONE live-source pass. This is what keeps ground truth exactly one hop away: Tier 2 is
+      // no longer fully independent of the research agent, so the claims it cannot settle from a
+      // quote must still touch the source.
+      if (excerptFirst) {
+        const needy = members.filter((f) => needsLive(f, keepSet.get(f._idx)));
+        if (needy.length) {
+          const live = await Promise.allSettled([
+            withDeadline(
+              agent(recheckPrompt(needy, { excerptFirst: false }),
+                { label: `verify:recheck:live:${key}`, schema: RECHECK_SCHEMA, model: 'claude-sonnet-4-6' }),
+              perTierTimeoutMs,
+            ),
+          ]);
+          // The live source WINS: it overwrites the excerpt pass's entry for the same index. A
+          // failed live pass leaves the excerpt verdict standing, and every needy finding still
+          // reaches Tier 3, which always reads the live source anyway.
+          if (live[0].status === 'fulfilled') {
+            for (const entry of live[0].value?.keep ?? []) keepSet.set(entry.index, entry);
+          }
+        }
       }
 
       for (const f of members) {
-        const shouldKeep = keepSet.get(f._idx);
+        const shouldKeep = keepSet.get(f._idx)?.keep;
         if (shouldKeep !== false) {
           // Kept (true or absent → keep by default)
           contestedTail.push(f);
