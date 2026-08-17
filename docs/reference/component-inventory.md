@@ -11,7 +11,7 @@
 | agent | integration-engineer | claude-sonnet-4-6 | Cross-repo contract analyst. Invoked during planning when a proposed change has cross-repo impact, w |
 | agent | jira-workflow-manager | claude-sonnet-4-6 | Handles all Jira operations for the Claude-assisted development workflow: creating Epic, Task, and B |
 | agent | mermaid-expert | haiku | Create Mermaid diagrams for flowcharts, sequences, ERDs, and architectures. Masters syntax for all d |
-| agent | page-harvest | claude-haiku-4-5-20251001 | Fetches exactly ONE web page and returns verbatim spans from it. Dispatched by the librarian workflo |
+| agent | page-harvest | claude-haiku-4-5-20251001 | Fetches exactly ONE web page with WebFetch and returns verbatim spans copied from it, plus the publi |
 | agent | reference-builder | haiku | Creates exhaustive technical references and API documentation. Generates comprehensive parameter lis |
 | agent | researcher | claude-haiku-4-5-20251001 | Lookup agent that answers a single specific question by querying the appropriate MCP — local codebas |
 | agent | synthesize | claude-sonnet-4-6 | Turns verbatim quote bundles into cited findings for one research sub-question. Has no network tool, |

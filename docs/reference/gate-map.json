@@ -52,7 +52,7 @@
     {
       "type": "agent",
       "name": "page-harvest",
-      "description": "Fetches exactly ONE web page and returns verbatim spans from it. Dispatched by the librarian workflow's research phase.",
+      "description": "Fetches exactly ONE web page with WebFetch and returns verbatim spans copied from it, plus the publication date. Cannot search and cannot follow links — the toolset enforces both. Dispatched by the librarian workflow's research phase; never invoked directly by a user.",
       "model": "claude-haiku-4-5-20251001",
       "file": "agents/page-harvest.md"
     },
