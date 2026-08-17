@@ -4,6 +4,7 @@ import {
   assessCoverage, deriveEvidenceState, hasAnySource, urlsInProse, unknownUrls, exciseGuard,
   COVERAGE_MIN_RATIO, COVERAGE_MIN_ANSWERED,
   renderTable, renderDossierEntry, renderDossierHeader, mergeFindingsDoc,
+  selectHarvestTargets,
 } from './librarian-core.mjs';
 
 const Q = ['q1', 'q2', 'q3', 'q4'];
@@ -562,4 +563,49 @@ test('empty output is rejected — excision must not delete the section', () => 
 test('a non-string output is rejected rather than crashing', () => {
   const r = exciseGuard('one two three', null, findings);
   assert.equal(r.ok, false);
+});
+
+// ── selectHarvestTargets ─────────────────────────────────────────────────────
+
+test('selectHarvestTargets: caps at the requested count', () => {
+  const r = [1, 2, 3, 4, 5, 6].map((n) => ({ url: `https://a.example/${n}` }));
+  assert.equal(selectHarvestTargets(r, 4, []).length, 4);
+});
+
+test('selectHarvestTargets: dedupes on host+path, ignoring query and fragment', () => {
+  const r = [
+    { url: 'https://a.example/x?utm=1' },
+    { url: 'https://a.example/x#frag' },
+    { url: 'https://b.example/x' },
+  ];
+  assert.deepEqual(selectHarvestTargets(r, 4, []).map((t) => t.url),
+    ['https://a.example/x?utm=1', 'https://b.example/x']);
+});
+
+test('selectHarvestTargets: drops non-http schemes and unparseable urls', () => {
+  const r = [
+    { url: 'ftp://a.example/x' },
+    { url: 'not a url' },
+    { url: 'javascript:alert(1)' },
+    { url: 'https://ok.example/y' },
+  ];
+  assert.deepEqual(selectHarvestTargets(r, 4, []).map((t) => t.url), ['https://ok.example/y']);
+});
+
+test('selectHarvestTargets: excludes already-harvested urls by host+path', () => {
+  const r = [{ url: 'https://a.example/x?a=1' }, { url: 'https://b.example/y' }];
+  assert.deepEqual(selectHarvestTargets(r, 4, ['https://a.example/x']).map((t) => t.url),
+    ['https://b.example/y']);
+});
+
+test('selectHarvestTargets: preserves search rank order', () => {
+  const r = [{ url: 'https://c.example/3' }, { url: 'https://a.example/1' }];
+  assert.deepEqual(selectHarvestTargets(r, 4, []).map((t) => t.url),
+    ['https://c.example/3', 'https://a.example/1']);
+});
+
+test('selectHarvestTargets: tolerates a null/empty result list', () => {
+  assert.deepEqual(selectHarvestTargets(null, 4, []), []);
+  assert.deepEqual(selectHarvestTargets([], 4, []), []);
+  assert.deepEqual(selectHarvestTargets([{ }, { url: '' }], 4, []), []);
 });

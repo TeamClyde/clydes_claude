@@ -1367,6 +1367,48 @@ function mergeReframed(thin, candidates, ctx) {
   ];
 }
 
+// ── Harvest target selection ────────────────────────────────────────────────
+// Chooses which of a search stage's URLs get a harvest agent. Pure so the cap — the control that
+// keeps this slice inside its token budget (design §2.3) — is unit-testable rather than an
+// emergent property of a prompt.
+//
+// Dedupe is on host+path, NOT on the raw URL: search engines return the same document under
+// tracking query strings and fragments, and paying a whole agent floor to fetch the same page
+// twice is the exact waste this slice exists to remove.
+
+/** @returns {string|null} `host/path` for http(s) URLs, else null (unparseable or wrong scheme). */
+function harvestKey(url) {
+  if (typeof url !== 'string' || url === '') return null;
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  return `${u.host}${u.pathname.replace(/\/$/, '')}`;
+}
+
+/**
+ * @param {Array<{url:string}>|null} results - search stage output, in rank order
+ * @param {number} cap - hard maximum number of harvest agents to spawn
+ * @param {string[]} alreadyHarvested - URLs harvested in a previous round
+ * @returns {Array<{url:string}>} the surviving results, rank order preserved
+ */
+function selectHarvestTargets(results, cap, alreadyHarvested = []) {
+  if (!Array.isArray(results)) return [];
+  const seen = new Set();
+  for (const u of alreadyHarvested) {
+    const k = harvestKey(u);
+    if (k) seen.add(k);
+  }
+  const out = [];
+  for (const r of results) {
+    if (out.length >= cap) break;
+    const k = harvestKey(r?.url);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(r);
+  }
+  return out;
+}
+
 // <LIBRARIAN-CORE:end>
 
 if (typeof setTimeout === 'undefined') throw new Error('Workflow sandbox missing timer — cannot guarantee liveness');
